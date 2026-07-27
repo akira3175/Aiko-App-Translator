@@ -2,6 +2,11 @@
 
 Ứng dụng hỗ trợ dịch, biên tập, review và xuất bản tiểu thuyết trong một workspace chạy cục bộ.
 
+> **Tác giả:** Akira Satoh ([@akira3175](https://github.com/akira3175))
+> **Aiko App Translator được phát hành chính thức hoàn toàn miễn phí. Không trả tiền cho bên thứ ba để tải bản chính thức.**
+
+Nguồn phát hành chính thức duy nhất: [akira3175/Aiko-App-Translator](https://github.com/akira3175/Aiko-App-Translator).
+
 ## Chạy từ mã nguồn
 
 Yêu cầu Python 3.10:
@@ -18,3 +23,7 @@ Sau đó mở `http://127.0.0.1:8765`.
 Chạy `build_release.ps1` để tạo gói Windows x64 trong thư mục `release`.
 
 Dữ liệu truyện, cài đặt cục bộ và API key không được đưa vào repository hoặc gói phát hành.
+
+## Giấy phép
+
+Copyright © 2026 Akira Satoh. Phần mã nguồn do dự án sở hữu được cấp phép theo [PolyForm Noncommercial 1.0.0](LICENSE): cho phép sử dụng, chỉnh sửa và phân phối vì mục đích phi thương mại; không cho phép khai thác thương mại khi chưa có sự đồng ý bằng văn bản. Thành phần bên thứ ba tiếp tục tuân theo giấy phép riêng của chúng.

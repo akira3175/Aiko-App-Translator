@@ -1,5 +1,10 @@
 # Novel Translator Studio - bản portable Windows
 
+**Aiko App Translator · Tác giả: Akira Satoh (@akira3175) · Copyright © 2026**
+
+Ứng dụng chính thức luôn miễn phí và chỉ được phát hành tại
+https://github.com/akira3175/Aiko-App-Translator. Không trả tiền cho bên thứ ba để tải bản chính thức. Việc sử dụng và phân phối thương mại cần có sự cho phép bằng văn bản của tác giả. Xem `LICENSE`.
+
 ## Khởi động
 
 1. Giải nén toàn bộ file ZIP vào một thư mục có quyền ghi.

@@ -58,6 +58,7 @@ Copy-Item -LiteralPath (Join-Path $projectRoot "start_app.bat") -Destination $st
 Copy-Item -LiteralPath (Join-Path $projectRoot "restart_app.ps1") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "apply_update.ps1") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "README_USER.md") -Destination $stageRoot
+Copy-Item -LiteralPath (Join-Path $projectRoot "LICENSE") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "requirements-portable.txt") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "VERSION") -Destination $stageRoot
 foreach ($folder in @("cores", "split", "web", "up")) {

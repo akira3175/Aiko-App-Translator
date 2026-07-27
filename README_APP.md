@@ -1,5 +1,9 @@
 # Novel Translator Studio
 
+**Aiko App Translator · Tác giả Akira Satoh (@akira3175) · Copyright © 2026**
+
+Bản chính thức được phát hành miễn phí tại https://github.com/akira3175/Aiko-App-Translator. Dự án sử dụng PolyForm Noncommercial License 1.0.0; xem `LICENSE`.
+
 Web app cục bộ bọc quanh bộ script dịch hiện có.
 
 Mỗi truyện nằm trong thư mục riêng: `truyen/<ten-truyen>/raw` và `truyen/<ten-truyen>/translated`. App tự nhận diện và cho phép đổi truyện từ thanh bên.
