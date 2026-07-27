@@ -18,6 +18,7 @@ let activeSettingsGroup='gemini-api';
 let geminiApiKeys=[];
 let publishingBooks=[];
 let manualPromptRequest=0;
+let availableUpdate=null;
 const settingsGroups={
   'gemini-api':['Gemini API','Model và thông số sinh nội dung khi dịch, hậu dịch và review qua API.'],
   'gemini-web':['Gemini Web','Gem, model và mức suy nghĩ khi tự động hóa trình duyệt Gemini.'],
@@ -196,6 +197,7 @@ async function loadPythonSettings() {
 }
 
 function renderUpdateStatus(data) {
+  availableUpdate=data.update_available&&data.download_ready?data:null;
   $('#updateVersion').textContent=`Phiên bản hiện tại ${data.current_version}`;
   const messages={
     ready:`Nguồn cập nhật: GitHub · ${data.repository}.`,
@@ -204,6 +206,9 @@ function renderUpdateStatus(data) {
     update_available:`Có phiên bản ${data.latest_version}. ${data.download_ready?'Gói ZIP đã có checksum và sẵn sàng tải.':'Release còn thiếu ZIP Windows hoặc checksum.'}`,
   };
   $('#updateStatus').textContent=messages[data.status]||'Chưa kiểm tra bản mới.';
+  $('#checkUpdate').textContent=availableUpdate?'Tải và cập nhật':'Kiểm tra cập nhật';
+  $('#checkUpdate').classList.toggle('primary',Boolean(availableUpdate));
+  $('#checkUpdate').classList.toggle('secondary',!availableUpdate);
 }
 
 async function loadUpdateStatus(check=false) {
@@ -218,6 +223,23 @@ async function loadUpdateStatus(check=false) {
     if(check)toast(error.message);
   } finally {
     if(check){button.disabled=false;button.textContent='Kiểm tra cập nhật';}
+  }
+}
+
+async function installUpdate() {
+  if(state.dirty||state.characterDirty)return toast('Hãy lưu thay đổi đang soạn trước khi cập nhật');
+  if(!confirm(`Tải và cập nhật lên phiên bản ${availableUpdate.latest_version}? App sẽ tự khởi động lại.`))return;
+  const button=$('#checkUpdate');
+  button.disabled=true;button.textContent='Đang tải bản cập nhật…';
+  try {
+    const result=await api('/api/update',{method:'POST',body:'{}'});
+    $('#updateStatus').textContent=result.message;
+    button.textContent='Đang khởi động lại…';
+    toast(result.message);
+  } catch(error) {
+    button.disabled=false;button.textContent='Tải và cập nhật';
+    $('#updateStatus').textContent=error.message;
+    toast(error.message);
   }
 }
 
@@ -1107,7 +1129,7 @@ $('#emptyRunCharacterAnalysis').onclick=()=>configureTask('characters');
 $('#characterEmpty').onclick=event=>{if(event.target.closest('button'))return;state.characterDirty=true;renderCharacters();$('#characterEditor').focus();};
 $('#savePythonSettings').onclick=savePythonSettings;
 $('#resetPythonSettings').onclick=resetPythonSettings;
-$('#checkUpdate').onclick=()=>loadUpdateStatus(true);
+$('#checkUpdate').onclick=()=>availableUpdate?installUpdate():loadUpdateStatus(true);
 $('#addGeminiApiKey').onclick=()=>{ syncGeminiApiKeyDraft(); geminiApiKeys.push(''); renderGeminiApiKeys(); const inputs=$$('[data-gemini-api-key]'); inputs[inputs.length-1]?.focus(); };
 $('#saveGeminiApiKeys').onclick=saveGeminiApiKeys;
 $('#addPublishingBook').onclick=()=>{syncPublishingBookDraft();const used=publishingBooks.map(book=>Number(book.volume)).filter(Number.isFinite);publishingBooks.push({book_id:'',volume:used.length?Math.max(...used)+1:1});renderPublishingBooks();};

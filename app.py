@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import mimetypes
 import os
 import re
@@ -11,9 +12,11 @@ import threading
 import time
 import traceback
 import webbrowser
+import zipfile
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from pathlib import PurePosixPath
 from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
@@ -29,6 +32,8 @@ APP_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip() if VERSION_FILE.e
 GITHUB_REPOSITORY = "akira3175/Aiko-App-Translator"
 GITHUB_LATEST_RELEASE_API = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
 UPDATE_ASSET_NAME = "NovelTranslatorStudio-Windows-x64.zip"
+UPDATE_DIR = ROOT / ".runtime" / "updates"
+UPDATER_SOURCE = ROOT / "apply_update.ps1"
 
 PIPELINES = {
     "v1": ROOT / "cores" / "dich_v1.py",
@@ -327,8 +332,85 @@ def update_payload(check_remote=False):
         "release_url": str(release.get("html_url", "")).strip(),
         "asset_found": bool(asset),
         "download_ready": bool(download_url and checksum),
+        "download_url": download_url,
+        "sha256": checksum,
     })
     return result
+
+
+def validate_update_archive(path: Path, expected_version: str):
+    required = {
+        "NovelTranslatorStudio/app.py",
+        "NovelTranslatorStudio/VERSION",
+        "NovelTranslatorStudio/runtime/python.exe",
+        "NovelTranslatorStudio/apply_update.ps1",
+    }
+    with zipfile.ZipFile(path) as archive:
+        names = set()
+        for info in archive.infolist():
+            normalized = info.filename.replace("\\", "/")
+            item = PurePosixPath(normalized)
+            if item.is_absolute() or ".." in item.parts or not item.parts or item.parts[0] != "NovelTranslatorStudio":
+                raise ValueError("Gói cập nhật chứa đường dẫn không an toàn")
+            names.add(normalized.rstrip("/"))
+        missing = required - names
+        if missing:
+            raise ValueError(f"Gói cập nhật thiếu file: {', '.join(sorted(missing))}")
+        version = archive.read("NovelTranslatorStudio/VERSION").decode("utf-8-sig").strip()
+    if version != expected_version:
+        raise ValueError(f"Phiên bản trong ZIP là {version}, không phải {expected_version}")
+
+
+def prepare_update():
+    if not (ROOT / "runtime" / "python.exe").is_file():
+        raise ValueError("Tự động cập nhật chỉ dùng được trên bản portable")
+    if not UPDATER_SOURCE.is_file():
+        raise ValueError("Thiếu apply_update.ps1 trong thư mục ứng dụng")
+    if any(job.get("status") == "running" for job in jobs.values()):
+        raise ValueError("Hãy chờ hoặc dừng mọi tác vụ trước khi cập nhật")
+    release = update_payload(True)
+    if not release.get("update_available"):
+        raise ValueError("Không có phiên bản mới để cập nhật")
+    if not release.get("download_ready"):
+        raise ValueError("Release GitHub thiếu ZIP Windows hoặc SHA-256")
+    UPDATE_DIR.mkdir(parents=True, exist_ok=True)
+    destination = UPDATE_DIR / UPDATE_ASSET_NAME
+    partial = destination.with_suffix(".zip.part")
+    partial.unlink(missing_ok=True)
+    request = Request(
+        release["download_url"],
+        headers={"Accept": "application/octet-stream", "User-Agent": f"NovelTranslatorStudio/{APP_VERSION}"},
+    )
+    digest = hashlib.sha256()
+    try:
+        with urlopen(request, timeout=60) as response, partial.open("wb") as output:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                digest.update(chunk)
+                output.write(chunk)
+    except Exception:
+        partial.unlink(missing_ok=True)
+        raise
+    if digest.hexdigest() != release["sha256"]:
+        partial.unlink(missing_ok=True)
+        raise ValueError("Checksum SHA-256 của bản cập nhật không khớp")
+    os.replace(partial, destination)
+    validate_update_archive(destination, release["latest_version"])
+    updater = UPDATE_DIR / "apply_update.ps1"
+    shutil.copy2(UPDATER_SOURCE, updater)
+    command = [
+        "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", str(updater),
+        "-ZipPath", str(destination),
+        "-AppRoot", str(ROOT),
+        "-ExpectedVersion", release["latest_version"],
+        "-ServerPid", str(os.getpid()),
+    ]
+    creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+    subprocess.Popen(command, cwd=str(ROOT), creationflags=creation_flags)
+    return {"ok": True, "version": release["latest_version"], "message": "Đã tải và xác minh. App sẽ khởi động lại để cập nhật."}
 
 
 def gemini_api_keys_payload():
@@ -1135,6 +1217,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json_response(update_payload(query.get("check", ["0"])[0] == "1"))
             except (ValueError, OSError) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/health":
+            return self.json_response({"ok": True, "version": APP_VERSION})
         if path == "/api/publishing":
             try:
                 return self.json_response(publishing_data(project))
@@ -1307,6 +1391,13 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self.json_response(write_settings(self.body()))
             except (ValueError, OSError, json.JSONDecodeError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/update":
+            try:
+                result = prepare_update()
+                threading.Timer(0.8, self.server.shutdown).start()
+                return self.json_response(result)
+            except (ValueError, OSError, zipfile.BadZipFile) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/publishing":
             try:
