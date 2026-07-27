@@ -1,0 +1,112 @@
+.help-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 1160px;
+  margin-bottom: 24px;
+}
+.help-head h2 { margin: 6px 0 8px; font-size: 30px; }
+.help-head p { margin: 0; color: var(--muted); }
+.help-search { display: grid; width: min(360px,100%); gap: 6px; }
+.help-search span { color: var(--muted); font-size: 11px; font-weight: 650; }
+.help-search input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 11px 13px;
+  outline: 0;
+}
+.help-search input:focus { border-color: var(--accent); }
+.help-layout {
+  display: grid;
+  grid-template-columns: 190px minmax(0,760px);
+  align-items: start;
+  gap: 34px;
+  max-width: 1040px;
+}
+.help-topics {
+  position: sticky;
+  top: 92px;
+  display: grid;
+  gap: 3px;
+}
+.help-topics button {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  padding: 9px 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.help-topics button:hover { background: var(--surface); color: var(--ink); }
+.help-topics button.active { background: var(--soft); color: var(--accent); font-weight: 700; }
+.help-content { min-width: 0; }
+.help-section { padding: 4px 0 36px; border-bottom: 1px solid var(--line); scroll-margin-top: 92px; }
+.help-section + .help-section { padding-top: 34px; }
+.help-section[hidden] { display: none; }
+.help-kicker { color: var(--accent); font-size: 10px; font-weight: 750; letter-spacing: .08em; }
+.help-section h3 { margin: 7px 0 15px; font-size: 23px; line-height: 1.25; }
+.help-section > p { color: var(--muted); line-height: 1.65; }
+.quick-steps {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.quick-steps li {
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+}
+.quick-steps b {
+  display: grid;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--accent);
+}
+.quick-steps span,.quick-steps strong,.quick-steps small { display: block; }
+.quick-steps small { margin-top: 4px; color: var(--muted); line-height: 1.45; }
+.help-procedure { display: grid; gap: 10px; margin: 0; padding-left: 22px; }
+.help-procedure li { padding-left: 5px; color: var(--muted); line-height: 1.6; }
+.help-procedure li::marker { color: var(--accent); font-weight: 700; }
+.help-procedure strong { color: var(--ink); }
+.help-choices { margin: 0; padding: 0; list-style: none; }
+.help-choices li { display: grid; grid-template-columns: minmax(150px,.75fr) 1.25fr; gap: 18px; padding: 11px 0; }
+.help-choices li + li { border-top: 1px solid var(--line); }
+.help-choices span { color: var(--muted); line-height: 1.5; }
+.help-note { padding: 11px 13px; border-left: 3px solid var(--accent); background: var(--soft); color: var(--ink)!important; }
+.help-section code { color: #b9d9cf; font: 12px/1.5 Consolas,"Courier New",monospace; }
+.help-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.help-actions button { white-space: nowrap; }
+.help-faq { margin: 0; }
+.help-faq > div { display: grid; grid-template-columns: minmax(170px,.7fr) 1.3fr; gap: 18px; padding: 12px 0; }
+.help-faq > div + div { border-top: 1px solid var(--line); }
+.help-faq dt { font-weight: 700; }
+.help-faq dd { margin: 0; color: var(--muted); line-height: 1.55; }
+.help-empty { display: none; padding: 40px 20px; text-align: center; }
+.help-empty.open { display: grid; gap: 6px; }
+.help-empty span { color: var(--muted); }
+@media(max-width:850px){
+  .help-head { align-items: stretch; flex-direction: column; }
+  .help-layout { grid-template-columns: 1fr; gap: 22px; }
+  .help-topics { position: static; display: flex; overflow-x: auto; padding-bottom: 4px; }
+  .help-topics button { flex: 0 0 auto; white-space: nowrap; }
+}
+@media(max-width:600px){
+  .quick-steps { grid-template-columns: 1fr; }
+  .help-choices li,.help-faq > div { grid-template-columns: 1fr; gap: 5px; }
+}

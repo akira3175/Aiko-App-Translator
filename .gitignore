@@ -1,0 +1,30 @@
+# User data and credentials
+.runtime/
+truyen/
+apikeys.txt
+.env
+.env.*
+up/config_md.json
+up/image_cache.json
+
+# Portable runtime and generated releases
+runtime/
+release/
+
+# Python and test caches
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Editor and OS files
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Temporary and backup files
+*.tmp
+*.part
+*.bak
+*.log

@@ -1,0 +1,8 @@
+PyYAML==6.0.2
+google-genai==1.73.1
+selenium==4.39.0
+webdriver-manager==4.0.2
+pyperclip==1.11.0
+playwright==1.44.0
+boto3==1.43.29
+playwright-stealth==2.0.2
