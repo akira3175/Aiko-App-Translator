@@ -408,7 +408,7 @@ def prepare_update():
         "-ExpectedVersion", release["latest_version"],
         "-ServerPid", str(os.getpid()),
     ]
-    creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+    creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
     subprocess.Popen(command, cwd=str(ROOT), creationflags=creation_flags)
     return {"ok": True, "version": release["latest_version"], "message": "Đã tải và xác minh. App sẽ khởi động lại để cập nhật."}
 

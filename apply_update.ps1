@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$Host.UI.RawUI.WindowTitle = "Aiko App Translator - Cập nhật"
 $root = [IO.Path]::GetFullPath($AppRoot).TrimEnd('\')
 $runtimeRoot = Join-Path $root ".runtime"
 $updatesRoot = Join-Path $runtimeRoot "updates"
@@ -47,6 +48,7 @@ $zip = Assert-ChildPath $ZipPath $updatesRoot
 "[$(Get-Date -Format s)] Bắt đầu cập nhật lên $ExpectedVersion" | Set-Content -LiteralPath $logPath -Encoding UTF8
 
 try {
+    Write-Host "Đang chờ Aiko App Translator đóng..." -ForegroundColor Cyan
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
         if (-not (Get-Process -Id $ServerPid -ErrorAction SilentlyContinue)) { break }
         Start-Sleep -Milliseconds 500
@@ -57,6 +59,7 @@ try {
     Remove-SafeTree $stagingRoot $runtimeRoot
     Remove-SafeTree $backupRoot $runtimeRoot
     New-Item -ItemType Directory -Force -Path $stagingRoot, $backupRoot | Out-Null
+    Write-Host "Đang giải nén và kiểm tra bản $ExpectedVersion..." -ForegroundColor Cyan
     Expand-Archive -LiteralPath $zip -DestinationPath $stagingRoot -Force
     $payload = Join-Path $stagingRoot "NovelTranslatorStudio"
     $payloadVersion = (Get-Content -LiteralPath (Join-Path $payload "VERSION") -Raw).Trim()
@@ -65,6 +68,7 @@ try {
     }
 
     $items = @(Get-ChildItem -LiteralPath $payload -Force)
+    Write-Host "Đang thay thế file chương trình. Dữ liệu cá nhân được giữ nguyên..." -ForegroundColor Cyan
     foreach ($item in $items) {
         if ($protected -contains $item.Name) { continue }
         $installedNames += $item.Name
@@ -86,6 +90,7 @@ try {
     }
 
     $newProcess = Start-Aiko
+    Write-Host "Đang kiểm tra bản mới..." -ForegroundColor Cyan
     $healthy = $false
     for ($attempt = 0; $attempt -lt 40; $attempt++) {
         Start-Sleep -Milliseconds 500
@@ -104,10 +109,13 @@ try {
         throw "Bản mới không khởi động hoặc trả sai phiên bản"
     }
     "[$(Get-Date -Format s)] Cập nhật thành công lên $ExpectedVersion" | Add-Content -LiteralPath $logPath -Encoding UTF8
+    Write-Host "Cập nhật thành công lên $ExpectedVersion." -ForegroundColor Green
     Remove-SafeTree $stagingRoot $runtimeRoot
     Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
 } catch {
     "[$(Get-Date -Format s)] Cập nhật lỗi: $($_.Exception.Message)" | Add-Content -LiteralPath $logPath -Encoding UTF8
+    Write-Host "Cập nhật lỗi: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Đang khôi phục phiên bản cũ..." -ForegroundColor Yellow
     try {
         if (Test-Path -LiteralPath $backupRoot) {
             foreach ($name in $installedNames) {
@@ -128,6 +136,8 @@ try {
         }
     } catch {
         "[$(Get-Date -Format s)] Rollback lỗi: $($_.Exception.Message)" | Add-Content -LiteralPath $logPath -Encoding UTF8
+        Write-Host "Không thể tự khôi phục: $($_.Exception.Message)" -ForegroundColor Red
     }
+    Start-Sleep -Seconds 8
     exit 1
 }
