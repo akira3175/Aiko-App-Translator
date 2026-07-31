@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
-const state = { projects: [], project: null, projectRevision: 0, chapters: [], reviews: [], context: {index:0,glossary:[],style_notes:'',raw_yaml:''}, characters: {content:'',count:0,exists:false,backup:false}, characterDirty: false, reviewCurrent: null, currentImages: [], current: null, dirty: false, timer: null };
+const state = { projects: [], project: null, projectRevision: 0, chapters: [], reviews: [], context: {index:0,glossary:[],style_notes:'',raw_yaml:''}, characters: {content:'',count:0,exists:false,backup:false}, pronouns: {pairs:[],count:0,locked_count:0,raw_yaml:''}, pronounCurrent: null, characterDirty: false, reviewCurrent: null, currentImages: [], current: null, dirty: false, timer: null };
 const editorViews = {};
 let syncingEditors = false;
 const punctuationStyles = [
@@ -27,7 +27,7 @@ const settingsGroups={
   publishing:['Xuất bản','Tài khoản Hako và kho ảnh Cloudflare R2.'],
   general:['Chung','Hành vi chung của workspace và quy trình hậu xử lý.'],
 };
-const views = { workspace: ['BÀN DỊCH','Không gian dịch'], chapters: ['THƯ VIỆN','Kho chương'], pipeline: ['TỰ ĐỘNG HÓA','Quy trình AI'], terminology: ['BỘ NHỚ','Thuật ngữ'], characters: ['BỘ NHỚ','Hồ sơ nhân vật'], help: ['TRỢ GIÚP','Hướng dẫn sử dụng'], settings: ['HỆ THỐNG','Cài đặt'] };
+const views = { workspace: ['BÀN DỊCH','Không gian dịch'], chapters: ['THƯ VIỆN','Kho chương'], pipeline: ['TỰ ĐỘNG HÓA','Quy trình AI'], terminology: ['BỘ NHỚ','Thuật ngữ'], characters: ['BỘ NHỚ','Hồ sơ nhân vật'], pronouns: ['BỘ NHỚ','Xưng hô'], help: ['TRỢ GIÚP','Hướng dẫn sử dụng'], settings: ['HỆ THỐNG','Cài đặt'] };
 
 function initCodeEditors() {
   editorViews.source=CodeMirror.fromTextArea($('#sourceEditor'),{mode:'markdown',lineNumbers:true,lineWrapping:true,readOnly:true,viewportMargin:20});
@@ -196,6 +196,30 @@ async function loadPythonSettings() {
   catch(error) { toast(error.message); }
 }
 
+async function loadLanStatus() {
+  try {
+    const data=await api('/api/lan/status'), card=$('#lanAccessCard');
+    card.classList.toggle('active',Boolean(data.configured));
+    $('#lanAccessState').textContent=data.active?'Đang mở trong mạng LAN':data.configured?'Đã cấu hình · cần khởi động lại app':'Đang tắt';
+    $('#lanAccessHint').textContent=data.active?'Điện thoại cùng Wi-Fi mở địa chỉ dưới đây, nhập PIN và cho phép mạng Private nếu Windows hỏi.':data.configured?'Đóng cửa sổ app rồi chạy lại start_app.bat để áp dụng.':'Bật “Truy cập từ điện thoại” bên dưới rồi lưu cấu hình.';
+    $('#lanAccessUrl').textContent=data.url||'';
+    $('#lanAccessPin').textContent=data.pin?`PIN: ${data.pin}`:'';
+    $('#copyLanAccess').disabled=!data.url;
+  } catch(error) { $('#lanAccessState').textContent='Không đọc được trạng thái LAN'; }
+}
+
+async function copyLanAccess() {
+  const text=$('#lanAccessUrl').textContent;
+  if(!text)return;
+  try {
+    if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);
+    else {
+      const input=document.createElement('textarea');input.value=text;document.body.appendChild(input);input.select();document.execCommand('copy');input.remove();
+    }
+    toast('Đã sao chép địa chỉ mở trên điện thoại');
+  } catch(error) { toast('Không thể sao chép địa chỉ'); }
+}
+
 function renderUpdateStatus(data) {
   availableUpdate=data.update_available&&data.download_ready?data:null;
   $('#updateVersion').textContent=`Phiên bản hiện tại ${data.current_version}`;
@@ -247,14 +271,14 @@ async function savePythonSettings() {
   const button=$('#savePythonSettings'); button.disabled=true;
   const values=Object.fromEntries(settingsItems.map(item=>[item.key,item.value]));
   $$('[data-python-setting]').forEach(input=>values[input.dataset.pythonSetting]=input.value);
-  try { renderPythonSettings((await api('/api/settings',{method:'POST',body:JSON.stringify({values})})).items); await loadUpdateStatus(); toast('Đã lưu cấu hình Python'); }
+  try { renderPythonSettings((await api('/api/settings',{method:'POST',body:JSON.stringify({values})})).items); await Promise.all([loadUpdateStatus(),loadLanStatus()]); toast('Đã lưu cấu hình · thay đổi LAN cần khởi động lại app'); }
   catch(error) { toast(error.message); }
   finally { button.disabled=false; }
 }
 
 async function resetPythonSettings() {
   const button=$('#resetPythonSettings'); button.disabled=true;
-  try { renderPythonSettings((await api('/api/settings',{method:'POST',body:JSON.stringify({reset:true})})).items); toast('Đã khôi phục toàn bộ giá trị mặc định'); }
+  try { renderPythonSettings((await api('/api/settings',{method:'POST',body:JSON.stringify({reset:true})})).items); await loadLanStatus(); toast('Đã khôi phục toàn bộ giá trị mặc định'); }
   catch(error) { toast(error.message); }
   finally { button.disabled=false; }
 }
@@ -304,7 +328,7 @@ async function selectProject(name) {
   renderContext();
   state.currentImages=[]; renderMarkdownEditors();
   $('#projectPopover').classList.remove('open');
-  await Promise.all([loadChapters(), loadReviews(), loadContext(), loadCharacters(), loadPublishingBooks()]); toast('Đã mở ' + name);
+  await Promise.all([loadChapters(), loadReviews(), loadContext(), loadCharacters(), loadPronouns(), loadPublishingBooks()]); toast('Đã mở ' + name);
 }
 
 async function loadContext() {
@@ -340,6 +364,88 @@ function renderCharacters() {
   $('#characterSaveState').textContent=state.characterDirty?'Chưa lưu':(!state.characters.exists?'Chưa có dữ liệu':state.characters.backup?'Đã lưu · Có backup':'Đã lưu');
   $('#characterPreview').innerHTML=markdownToHtml(content,[]);
   $('#characterEmpty').classList.toggle('open',!content.trim()&&!state.characterDirty);
+}
+
+async function loadPronouns() {
+  if(!state.project)return;
+  const project=state.project, revision=state.projectRevision;
+  try {
+    const data=await api('/api/pronouns?project='+encodeURIComponent(project));
+    if(state.project!==project||state.projectRevision!==revision)return;
+    state.pronouns=data;
+    if(!data.pairs.some(pair=>pair.key===state.pronounCurrent))state.pronounCurrent=data.pairs[0]?.key||null;
+    renderPronouns();
+  } catch(error) {
+    if(state.project!==project||state.projectRevision!==revision)return;
+    state.pronouns={pairs:[],count:0,locked_count:0,raw_yaml:''};state.pronounCurrent=null;renderPronouns();toast(error.message);
+  }
+}
+
+function pronounPairLabel(pair) {
+  const latest=pair.latest||{};
+  return latest.speaker&&latest.listener?`${latest.speaker} → ${latest.listener}`:(pair.characters||[]).join(' ↔ ');
+}
+
+function renderPronouns() {
+  const data=state.pronouns||{pairs:[],count:0,locked_count:0,raw_yaml:''};
+  const query=($('#pronounSearch')?.value||'').trim().toLocaleLowerCase('vi');
+  const filter=$('#pronounFilter')?.value||'all';
+  const pairs=data.pairs.filter(pair=>{
+    const haystack=`${(pair.characters||[]).join(' ')} ${pronounPairLabel(pair)}`.toLocaleLowerCase('vi');
+    return (!query||haystack.includes(query))&&(filter==='all'||(filter==='locked'&&pair.locked)||(filter==='conflict'&&pair.changed));
+  });
+  $('#pronounBadge').textContent=data.count||0;
+  $('#pronounSummary').textContent=state.project?`${state.project} · ${data.count||0} cặp · ${data.locked_count||0} đã khóa`:'Chưa chọn truyện.';
+  $('#pronounCount').textContent=`${pairs.length}/${data.count||0} cặp`;
+  $('#pronounRawYaml').textContent=data.raw_yaml||'# Chưa có dữ liệu xưng hô.';
+  $('#pronounList').innerHTML=pairs.length?pairs.map((pair,index)=>{
+    const latest=pair.latest||{};
+    return `<button class="pronoun-row ${pair.key===state.pronounCurrent?'active':''}" data-pronoun-key="${escapeHtml(pair.key)}"><span><strong>${escapeHtml(pronounPairLabel(pair))}</strong><small>${escapeHtml(latest.speaker_self||'?')} / ${escapeHtml(latest.speaker_to_listener||'?')} · Chương ${escapeHtml(latest.chapter_number??'—')}</small></span><span class="pronoun-row-meta">${pair.changed?'<i class="pronoun-chip">Đã đổi</i>':''}${pair.locked?'<i class="pronoun-chip locked">Đã khóa</i>':''}</span></button>`;
+  }).join(''):'<div class="pronoun-list-empty">Không có cặp xưng hô phù hợp.</div>';
+  renderPronounDetail();
+}
+
+function renderPronounDetail() {
+  const pair=(state.pronouns.pairs||[]).find(item=>item.key===state.pronounCurrent);
+  if(!pair){$('#pronounDetail').innerHTML='<div class="pronoun-empty"><strong>Chưa có dữ liệu xưng hô</strong><span>Dữ liệu sẽ xuất hiện sau khi một chương chạy hậu xử lý.</span></div>';return;}
+  const latest=pair.latest||{}, history=[...(pair.timeline||[])].reverse();
+  $('#pronounDetail').innerHTML=`<div class="pronoun-detail-head"><div><span class="eyebrow">${pair.locked?'QUY TẮC ĐÃ KHÓA':'AI GHI NHẬN'}</span><h3>${escapeHtml(pronounPairLabel(pair))}</h3><p>Cập nhật gần nhất tại chương ${escapeHtml(latest.chapter_number??'—')}</p></div><div class="pronoun-detail-actions"><button class="secondary" id="editPronounPair">Chỉnh sửa</button><button class="secondary pronoun-delete" id="deletePronounPair">Xóa cặp</button></div></div><div class="pronoun-current"><div><span>Tự xưng</span><strong>${escapeHtml(latest.speaker_self||'Chưa rõ')}</strong></div><div><span>Gọi đối phương</span><strong>${escapeHtml(latest.speaker_to_listener||'Chưa rõ')}</strong></div></div><div class="pronoun-context-card"><span>NGỮ CẢNH QUAN HỆ</span><p>${escapeHtml(latest.relationship_status||'Chưa có mô tả quan hệ.')}</p><small>${escapeHtml(latest.emotional_tone||'Chưa ghi nhận giọng điệu.')}</small></div><h4 class="pronoun-history-title">Lịch sử theo chương</h4><div class="pronoun-history">${history.map(item=>`<div class="pronoun-history-item"><b>Chương ${escapeHtml(item.chapter_number??'—')}</b><div><p><strong>${escapeHtml(item.speaker||'?')}</strong> tự xưng “${escapeHtml(item.speaker_self||'?')}”, gọi <strong>${escapeHtml(item.listener||'?')}</strong> là “${escapeHtml(item.speaker_to_listener||'?')}”</p><small>${escapeHtml(item.relationship_status||item.emotional_tone||'Không có ghi chú')}</small></div></div>`).join('')}</div>`;
+  $('#editPronounPair').onclick=openPronounEditor;
+  $('#deletePronounPair').onclick=deletePronounPair;
+}
+
+function openPronounEditor() {
+  const pair=(state.pronouns.pairs||[]).find(item=>item.key===state.pronounCurrent);
+  if(!pair)return;
+  const latest=pair.latest||{};
+  $('#pronounModalTitle').textContent=pronounPairLabel(pair);
+  $('#pronounSpeaker').value=latest.speaker||'';
+  $('#pronounListener').value=latest.listener||'';
+  $('#pronounSelf').value=latest.speaker_self||'';
+  $('#pronounToListener').value=latest.speaker_to_listener||'';
+  $('#pronounRelationship').value=latest.relationship_status||'';
+  $('#pronounTone').value=latest.emotional_tone||'';
+  $('#pronounLocked').checked=Boolean(pair.locked);
+  $('#pronounModal').classList.add('open');
+}
+
+async function savePronounEdit() {
+  if(!state.pronounCurrent)return;
+  const button=$('#savePronounEdit');button.disabled=true;button.textContent='Đang lưu…';
+  try {
+    state.pronouns=await api('/api/pronouns?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({key:state.pronounCurrent,speaker_self:$('#pronounSelf').value,speaker_to_listener:$('#pronounToListener').value,relationship_status:$('#pronounRelationship').value,emotional_tone:$('#pronounTone').value,locked:$('#pronounLocked').checked})});
+    $('#pronounModal').classList.remove('open');renderPronouns();toast('Đã lưu quy tắc xưng hô · Có bản sao .bak');
+  } catch(error){toast(error.message);}
+  finally{button.disabled=false;button.textContent='Lưu quy tắc';}
+}
+
+async function deletePronounPair() {
+  const pair=(state.pronouns.pairs||[]).find(item=>item.key===state.pronounCurrent);
+  if(!pair||!confirm(`Xóa toàn bộ lịch sử “${pronounPairLabel(pair)}”?`))return;
+  try {
+    state.pronouns=await api('/api/pronouns?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({action:'delete',key:pair.key})});
+    state.pronounCurrent=state.pronouns.pairs[0]?.key||null;renderPronouns();toast('Đã xóa cặp xưng hô · Có thể khôi phục từ .bak');
+  } catch(error){toast(error.message);}
 }
 
 function setCharacterMode(mode) {
@@ -1004,7 +1110,7 @@ async function cancelTranslation(mode) {
   button.disabled=true;
   try {
     await api('/api/translation/cancel',{method:'POST',body:JSON.stringify({mode})});
-    updateConsoleOutput(after?'Đã yêu cầu dừng sau chương/batch hiện tại…':'Đang hủy dịch ngay lập tức…');
+    if(!after)updateConsoleOutput('Đang hủy dịch ngay lập tức…');
     toast(after?'Sẽ dừng sau chương/batch hiện tại':'Đã gửi lệnh dừng ngay');
   } catch(error) { button.disabled=false; toast(error.message); }
 }
@@ -1041,6 +1147,7 @@ document.addEventListener('click', (event) => {
   const chapter=event.target.closest('[data-chapter]'); if(chapter) openChapter(chapter.dataset.chapter);
   const project=event.target.closest('[data-project]'); if(project) selectProject(project.dataset.project);
   const run=event.target.closest('[data-run]'); if(run) configureTask(run.dataset.run);
+  const pronoun=event.target.closest('[data-pronoun-key]'); if(pronoun){state.pronounCurrent=pronoun.dataset.pronounKey;renderPronouns();}
   if(!event.target.closest('.popover,#chapterSelect,#projectSelect'))$$('.popover.open').forEach(item=>item.classList.remove('open'));
 });
 $('#chapterSelect').onclick = () => { togglePopover($('#chapterPopover'),$('#chapterSelect')); if($('#chapterPopover').classList.contains('open'))requestAnimationFrame(focusCurrentChapterInPopover); };
@@ -1062,6 +1169,10 @@ $('#cancelTask').onclick=()=>{manualPromptRequest++;$('#taskModal').classList.re
 $('#confirmTask').onclick=confirmTask;
 $('#popoverSearch').oninput = e => renderPopover(e.target.value);
 $('#glossarySearch').oninput = e => renderContext(e.target.value);
+$('#pronounSearch').oninput=renderPronouns;
+$('#pronounFilter').onchange=renderPronouns;
+$('#cancelPronounEdit').onclick=()=>$('#pronounModal').classList.remove('open');
+$('#savePronounEdit').onclick=savePronounEdit;
 $('#editContextButton').onclick=openContextEditor;
 $('#cancelContextEdit').onclick=()=>$('#contextModal').classList.remove('open');
 $('#saveContextEdit').onclick=saveContextYaml;
@@ -1114,7 +1225,14 @@ $('#cancelRetranslate').onclick=()=>$('#retranslateModal').classList.remove('ope
 $('#confirmRetranslate').onclick=startRetranslate;
 $('#menuButton').onclick=()=>$('#sidebar').classList.toggle('open');
 $('#focusButton').onclick=()=>{document.body.classList.toggle('focus'); $('#focusButton').textContent=document.body.classList.contains('focus')?'Thoát tập trung':'Chế độ tập trung';requestAnimationFrame(()=>{updateLineNumbers('source');updateLineNumbers('target');});};
-$$('[data-mode]').forEach(b=>b.onclick=()=>{$$('[data-mode]').forEach(x=>x.classList.remove('active'));b.classList.add('active');$('#editorGrid').className='editor-grid '+(b.dataset.mode==='split'?'':b.dataset.mode);requestAnimationFrame(()=>{updateLineNumbers('source');updateLineNumbers('target');});});
+function setWorkspaceMode(mode,remember=true){
+  if(!['split','source','target'].includes(mode))mode='split';
+  $$('[data-mode]').forEach(button=>button.classList.toggle('active',button.dataset.mode===mode));
+  $('#editorGrid').className='editor-grid '+(mode==='split'?'':mode);
+  if(remember&&window.matchMedia('(max-width:560px)').matches)localStorage.setItem('mobileWorkspaceMode',mode);
+  requestAnimationFrame(()=>{editorViews.source?.refresh();editorViews.target?.refresh();updateLineNumbers('source');updateLineNumbers('target');});
+}
+$$('[data-mode]').forEach(button=>button.onclick=()=>setWorkspaceMode(button.dataset.mode));
 $$('[data-editor-mode]').forEach(button=>button.onclick=()=>setEditorMode(button.dataset.editorMode));
 $$('[data-format]').forEach(button=>button.onclick=()=>applyFormat(button.dataset.format));
 $('#closeConsole').onclick=()=>$('#console').classList.remove('open');
@@ -1129,6 +1247,7 @@ $('#emptyRunCharacterAnalysis').onclick=()=>configureTask('characters');
 $('#characterEmpty').onclick=event=>{if(event.target.closest('button'))return;state.characterDirty=true;renderCharacters();$('#characterEditor').focus();};
 $('#savePythonSettings').onclick=savePythonSettings;
 $('#resetPythonSettings').onclick=resetPythonSettings;
+$('#copyLanAccess').onclick=copyLanAccess;
 $('#checkUpdate').onclick=()=>availableUpdate?installUpdate():loadUpdateStatus(true);
 $('#addGeminiApiKey').onclick=()=>{ syncGeminiApiKeyDraft(); geminiApiKeys.push(''); renderGeminiApiKeys(); const inputs=$$('[data-gemini-api-key]'); inputs[inputs.length-1]?.focus(); };
 $('#saveGeminiApiKeys').onclick=saveGeminiApiKeys;
@@ -1139,4 +1258,6 @@ window.addEventListener('resize',()=>{repositionPopovers();updateLineNumbers('so
 window.addEventListener('scroll',repositionPopovers,true);
 setEditorMode('source-text');
 updateLineNumbers('source'); updateLineNumbers('target');
-initCodeEditors(); initPunctuationOptions(); initPipeline(); loadProjects(); loadPythonSettings(); loadGeminiApiKeys(); loadUpdateStatus();
+initCodeEditors();
+setWorkspaceMode(window.matchMedia('(max-width:560px)').matches?(localStorage.getItem('mobileWorkspaceMode')||'target'):'split',false);
+initPunctuationOptions(); initPipeline(); loadProjects(); loadPythonSettings(); loadGeminiApiKeys(); loadUpdateStatus(); loadLanStatus();

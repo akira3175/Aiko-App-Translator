@@ -13,6 +13,7 @@ from cores.runtime_config import option
 
 from cores.dich_utils import (
     export_recent_translations_to_txt_md,
+    find_glossary_targets,
     format_pronoun_context,
     get_translated_title,
     is_translated,
@@ -29,6 +30,30 @@ TranslateBatch = Callable[[list[dict], int, str, str], list[tuple[str, str]]]
 
 def _chapter_id(path):
     return os.path.splitext(os.path.basename(path))[0]
+
+
+def _raw_text_for_glossary(paths):
+    chapters = [load_md_chapter(path) for path in paths]
+    return "\n".join(
+        f"{chapter.get('title', '')}\n{chapter.get('content', '')}"
+        for chapter in chapters
+    )
+
+
+def _filtered_context_and_names(
+    context_path, raw_files, start_index, chapter_count=1
+):
+    """Use glossary terms found in the target chapter(s) or the next chapter."""
+    stop_index = min(len(raw_files), start_index + chapter_count + 1)
+    raw_text = _raw_text_for_glossary(raw_files[start_index:stop_index])
+    pronouns_path = os.path.join(
+        os.path.dirname(os.path.abspath(context_path)), "pronouns.yaml"
+    )
+    return (
+        load_context(context_path, raw_text=raw_text),
+        find_glossary_targets(context_path, raw_text, pronouns_path),
+        pronouns_path,
+    )
 
 
 def translate_batch_with_web(
@@ -151,7 +176,6 @@ def run_single_translation(
     translate: TranslateOne, raw_dir, translated_dir, context_path, postprocess=None
 ):
     """Translate and persist the first untranslated chapter."""
-    context_text = load_context(context_path)
     raw_files = scan_md_dir(raw_dir)
     if not raw_files:
         print(f"[INFO] Không tìm thấy file .md nào trong {raw_dir}")
@@ -167,7 +191,14 @@ def run_single_translation(
 
         chapter_number = index + 1
         chapter = load_md_chapter(raw_path)
-        pronoun_context = format_pronoun_context(chapter_number)
+        context_text, glossary_names, pronouns_path = _filtered_context_and_names(
+            context_path, raw_files, index
+        )
+        pronoun_context = format_pronoun_context(
+            chapter_number,
+            pronouns_file=pronouns_path,
+            glossary_names=glossary_names,
+        )
         previous_count = int(option("previous_context_chapters", 3))
         export_recent_translations_to_txt_md(target_chapter_id=chapter_id, n=previous_count)
         print(f"📖 Đang dịch Chương {chapter_number}: {chapter['id']}...")
@@ -191,7 +222,11 @@ def run_single_translation(
 
         if postprocess is None:
             title, content = run_post_translation_pipeline(
-                chapter, chapter_number, context_text, pronoun_context
+                chapter,
+                chapter_number,
+                context_text,
+                pronoun_context,
+                pronouns_file=pronouns_path,
             )
         else:
             title, content = postprocess(
@@ -213,7 +248,6 @@ def run_batch_translation(
     context_path,
 ):
     """Translate and persist the first consecutive untranslated batch."""
-    context_text = load_context(context_path)
     raw_files = scan_md_dir(raw_dir)
     if not raw_files:
         print(f"[INFO] Không tìm thấy file .md nào trong {raw_dir}")
@@ -240,8 +274,15 @@ def run_batch_translation(
             continue
 
         batch = [load_md_chapter(path) for path in batch_paths]
+        context_text, glossary_names, pronouns_path = _filtered_context_and_names(
+            context_path, raw_files, index, chapter_count=len(batch_paths)
+        )
         start_chapter_number = index + 1
-        pronoun_context = format_pronoun_context(start_chapter_number)
+        pronoun_context = format_pronoun_context(
+            start_chapter_number,
+            pronouns_file=pronouns_path,
+            glossary_names=glossary_names,
+        )
         previous_count = int(option("previous_context_chapters", 3))
         export_recent_translations_to_txt_md(target_chapter_id=chapter_id, n=previous_count)
         print(f"📖 Chuẩn bị dịch Batch {len(batch)} chương (từ {chapter_id})...")
@@ -266,9 +307,24 @@ def run_batch_translation(
         print("\n🔧 Đang chạy pipeline hậu dịch cho từng chương trong batch...")
         for offset, (chapter, path) in enumerate(zip(batch, batch_paths)):
             chapter_number = start_chapter_number + offset
-            current_pronouns = format_pronoun_context(chapter_number)
+            (
+                chapter_context,
+                chapter_glossary_names,
+                chapter_pronouns_path,
+            ) = _filtered_context_and_names(
+                context_path, raw_files, index + offset
+            )
+            current_pronouns = format_pronoun_context(
+                chapter_number,
+                pronouns_file=chapter_pronouns_path,
+                glossary_names=chapter_glossary_names,
+            )
             title, content = run_post_translation_pipeline(
-                chapter, chapter_number, context_text, current_pronouns
+                chapter,
+                chapter_number,
+                chapter_context,
+                current_pronouns,
+                pronouns_file=chapter_pronouns_path,
             )
             chapter["title_translation"] = title
             chapter["translation"] = content

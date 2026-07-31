@@ -7,3 +7,5 @@
 @media(max-width:560px){.editor-shell{grid-template-columns:42px minmax(0,1fr)}.line-numbers{padding:20px 9px 20px 0;font-size:11px;line-height:29.6px}.find-bar,.replace-bar{grid-template-columns:minmax(90px,1fr) auto auto auto auto}.replace-bar #targetReplace{grid-column:1/3}.replace-bar [data-find-action="replace-all"]{grid-column:4/6}}
 .editor-shell textarea{white-space:pre}
 .chapter-row-copy{display:grid;min-width:0;gap:4px}.chapter-row-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chapter-row-copy small{overflow:hidden;color:var(--muted);font:10px/1.2 Consolas,"Courier New",monospace;text-overflow:ellipsis;white-space:nowrap}
+.sidebar{overflow:hidden}.sidebar nav{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}.sidebar-foot{flex:0 0 auto}.modal-backdrop{overflow-y:auto}.modal{margin:auto;max-height:calc(100dvh - 40px);overflow-y:auto}
+@media(max-height:760px){.sidebar{padding-top:16px;padding-bottom:16px}.brand{padding-bottom:16px}.add-project{margin-bottom:10px}.sidebar .nav-item{padding-top:9px;padding-bottom:9px}.health{padding-top:10px;padding-bottom:10px}}

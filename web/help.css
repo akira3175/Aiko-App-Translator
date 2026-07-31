@@ -103,6 +103,9 @@
 .official-notice { display:grid; gap:3px; margin:0 8px 7px; padding:10px 11px; border:1px solid #34423c; border-radius:9px; }
 .official-notice strong { color:#d6f064; font-size:9px; letter-spacing:.11em; }
 .official-notice span { color:#87948e; font-size:10px; line-height:1.4; }
+.official-notice a { color:#b9c8c1; text-decoration:none; }
+.official-notice a:hover { color:#d6f064; text-decoration:underline; }
+.official-notice i { margin:0 6px; color:#53615b; font-style:normal; }
 @media(max-width:850px){
   .help-head { align-items: stretch; flex-direction: column; }
   .help-layout { grid-template-columns: 1fr; gap: 22px; }

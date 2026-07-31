@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import unicodedata
 
 import yaml
 from google import genai
@@ -1442,14 +1443,82 @@ def save_yaml(data, file_path=NOVEL_YAML):
         yaml.dump(data, f, allow_unicode=True, sort_keys=False)
 
 
-def load_context(file_path=CONTEXT_YAML):
+def _glossary_source_is_relevant(source, raw_text):
+    searchable = (raw_text or "").casefold()
+    source_folded = source.casefold()
+    if source_folded in searchable:
+        return True
+
+    # Một tên ngắn trong raw vẫn kéo theo các mục tên mở rộng liên quan.
+    # Ví dụ raw có "김" thì dùng cả "김" và "김철수" trong glossary.
+    raw_cjk_terms = re.findall(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7a3]+", searchable)
+    if any(term in source_folded for term in raw_cjk_terms):
+        return True
+
+    # Với chữ Latin, so khớp theo cả từ để tránh một mẩu chữ ngắn khớp nhầm.
+    source_words = set(re.findall(r"[^\W_]+", source_folded, flags=re.UNICODE))
+    raw_words = set(re.findall(r"[^\W_]+", searchable, flags=re.UNICODE))
+    return bool(source_words & raw_words)
+
+
+def _filter_glossary(glossary_text, raw_text):
+    """Keep glossary entries related to words found in the given chapters."""
+    matched = []
+    for line in str(glossary_text or "").splitlines():
+        source, separator, _target = line.partition("=")
+        source = source.strip()
+        if not separator or not source:
+            continue
+        if _glossary_source_is_relevant(source, raw_text):
+            matched.append(line.strip())
+    return "\n".join(matched)
+
+
+def find_glossary_targets(file_path=CONTEXT_YAML, raw_text="", pronouns_file=None):
+    """Return translated glossary names related to the supplied raw chapters."""
+    if not os.path.exists(file_path):
+        return []
+    with open(file_path, "r", encoding="utf-8") as f:
+        ctx = yaml.safe_load(f) or {}
+
+    targets = []
+    for line in _filter_glossary(ctx.get("glossary", ""), raw_text).splitlines():
+        _source, separator, target = line.partition("=")
+        target = target.strip()
+        if separator and target and target not in targets:
+            targets.append(target)
+
+    if pronouns_file:
+        memory = load_pronouns(pronouns_file)
+        character_names = [
+            str(character)
+            for data in memory.values()
+            for character in data.get("characters", [])
+            if character
+        ]
+        targets = [
+            target
+            for target in targets
+            if any(
+                _name_matches_glossary(character, target)
+                for character in character_names
+            )
+        ]
+    return targets
+
+
+def load_context(file_path=CONTEXT_YAML, raw_text=None):
     if not os.path.exists(file_path):
         return ""
     with open(file_path, "r", encoding="utf-8") as f:
-        ctx = yaml.safe_load(f)
+        ctx = yaml.safe_load(f) or {}
     parts = []
     if "glossary" in ctx:
-        parts.append("Thuật ngữ:\n" + ctx["glossary"])
+        glossary = str(ctx["glossary"] or "")
+        if raw_text is not None:
+            glossary = _filter_glossary(glossary, raw_text)
+        if glossary:
+            parts.append("Thuật ngữ:\n" + glossary)
     if "style_notes" in ctx:
         parts.append("Ghi chú văn phong:\n" + ctx["style_notes"])
     if "previous_translations" in ctx:
@@ -1712,6 +1781,8 @@ Xuất kết quả dưới dạng JSON với format:
 
 Lưu ý:
 - Chỉ trích xuất các cặp xưng hô RÕ RÀNG xuất hiện trong đoạn văn
+- Cả speaker và listener phải là NHÂN VẬT CỤ THỂ có tên hoặc biệt danh xác định
+- Không dùng quốc gia, tổ chức, đám đông, công chúng hoặc nhóm người làm nhân vật
 - CHÚ Ý ghi nhận thay đổi trong cảm xúc và xưng hô (nếu có)
 - Bỏ qua những chỗ chỉ kể chuyện, không có đối thoại
 - Nếu không tìm thấy xưng hô nào, trả về {{"character_pairs": []}}
@@ -1782,8 +1853,12 @@ def update_pronoun_memory(
     new_pronouns = extract_pronouns_from_translation(
         chapter_id, chapter_number, translation_text
     )
+    updated_count = 0
     for key, data in new_pronouns.items():
         key_str = f"{key[0]}---{key[1]}"
+        if key_str in memory and memory[key_str].get("locked"):
+            print(f"🔒 Giữ quy tắc xưng hô đã khóa: {key_str}")
+            continue
         if key_str not in memory:
             memory[key_str] = {"characters": data["characters"], "timeline": []}
         memory[key_str]["timeline"].extend(data["timeline"])
@@ -1791,13 +1866,50 @@ def update_pronoun_memory(
             memory[key_str]["timeline"],
             key=lambda x: x.get("chapter_number", 0),
         )[-25:]  # Giữ 25 chương gần nhất
+        updated_count += 1
     save_pronouns(memory, pronouns_file)
-    if new_pronouns:
-        print(f"✅ Đã cập nhật {len(new_pronouns)} cặp xưng hô từ chương {chapter_id}")
+    if updated_count:
+        print(f"✅ Đã cập nhật {updated_count} cặp xưng hô từ chương {chapter_id}")
+
+
+def _normalized_name_tokens(name):
+    normalized = unicodedata.normalize("NFKC", str(name or "")).casefold()
+    return re.findall(r"[^\W_]+", normalized, flags=re.UNICODE)
+
+
+def _name_matches_glossary(character_name, glossary_name):
+    character_tokens = _normalized_name_tokens(character_name)
+    glossary_tokens = _normalized_name_tokens(glossary_name)
+    if not character_tokens or not glossary_tokens:
+        return False
+    if character_tokens == glossary_tokens:
+        return True
+
+    shorter, longer = sorted(
+        (character_tokens, glossary_tokens), key=len
+    )
+    if len(shorter) < 2:
+        return False
+    width = len(shorter)
+    return any(
+        longer[index : index + width] == shorter
+        for index in range(len(longer) - width + 1)
+    )
+
+
+def _pair_glossary_relevance(data, glossary_names):
+    characters = [str(name) for name in data.get("characters", []) if name]
+    return sum(
+        any(_name_matches_glossary(character, glossary) for glossary in glossary_names)
+        for character in characters[:2]
+    )
 
 
 def format_pronoun_context(
-    current_chapter_number, pronouns_file=PRONOUNS_YAML, max_pairs=10
+    current_chapter_number,
+    pronouns_file=PRONOUNS_YAML,
+    max_pairs=10,
+    glossary_names=None,
 ):
     """Tạo context xưng hô chi tiết để inject vào prompt dịch."""
     memory = load_pronouns(pronouns_file)
@@ -1812,9 +1924,21 @@ def format_pronoun_context(
         ]
         if relevant:
             latest_chapter = max(t.get("chapter_number", 0) for t in relevant)
-            pair_scores.append((key_str, data, latest_chapter, relevant))
+            relevance = _pair_glossary_relevance(data, glossary_names or [])
+            pair_scores.append(
+                (
+                    key_str,
+                    data,
+                    latest_chapter,
+                    relevant,
+                    bool(data.get("locked")),
+                    relevance,
+                )
+            )
 
-    pair_scores.sort(key=lambda x: x[2], reverse=True)
+    if glossary_names and any(item[5] for item in pair_scores):
+        pair_scores = [item for item in pair_scores if item[5]]
+    pair_scores.sort(key=lambda x: (x[5], x[4], x[2]), reverse=True)
     top_pairs = pair_scores[:max_pairs]
     if not top_pairs:
         return ""
@@ -1825,7 +1949,7 @@ def format_pronoun_context(
         "Hãy điều chỉnh linh hoạt theo diễn biến nội tâm nhân vật trong chương này.\n"
     )
 
-    for key_str, data, latest_chap, relevant in top_pairs:
+    for key_str, data, latest_chap, relevant, locked, _relevance in top_pairs:
         last = relevant[-1]
         speaker = last["speaker"]
         listener = last["listener"]
@@ -1866,6 +1990,8 @@ def format_pronoun_context(
                 break
 
         line = f"▸ **{speaker} → {listener}** (chương {last_chap_num}):"
+        if locked:
+            line += "\n  🔒 QUY TẮC ĐÃ ĐƯỢC NGƯỜI DÙNG XÁC NHẬN — PHẢI ƯU TIÊN"
         line += f"\n  • Tự xưng: [{self_p}]  |  Gọi đối phương: [{to_p}]"
         if rel_status:
             line += f"\n  • Trạng thái quan hệ: {rel_status}"
@@ -1943,6 +2069,7 @@ def _build_pronouns_snapshot(pronouns_file=PRONOUNS_YAML, n_chapters=50):
             filtered[key_str] = {
                 "characters": data.get("characters", []),
                 "timeline": tl,
+                "locked": bool(data.get("locked", False)),
             }
 
     if not filtered:
@@ -1973,7 +2100,7 @@ def polish_translation(
 
     Upload qua Files API:
       - characters.md          -> ho so nhan vat day du
-      - pronouns_snapshot.yaml -> lich su xung ho 50 chuong gan nhat
+      - pronouns_snapshot.yaml -> fallback khi khong co context xung ho da loc
 
     Tra ve (title, content) da trau chuot.
     """
@@ -1992,11 +2119,18 @@ def polish_translation(
 
     tmp_pronouns = None
     try:
-        tmp_pronouns = _build_pronouns_snapshot(pronouns_file, n_chapters=50)
+        tmp_pronouns = None
+        if not pronoun_context.strip():
+            tmp_pronouns = _build_pronouns_snapshot(pronouns_file, n_chapters=50)
 
         extra_parts = []
         current_upload_key_index = -1
         system_instruction = ""
+        pronoun_reference = (
+            "- Tra bo nho xung ho lien quan trong prompt de giu cach xung ho nhat quan"
+            if pronoun_context
+            else "- Tra pronouns_snapshot.yaml de biet cach xung ho da dung o cac chuong truoc"
+        )
 
         prompt = f"""## Thuat ngu / Quy tac dich tham chieu:
 {context_text}
@@ -2005,6 +2139,9 @@ def polish_translation(
 Tieu de goc: {raw_title}
 Noi dung goc:
 {raw_content}
+
+## Bo nho xung ho lien quan den nhan vat trong chuong:
+{pronoun_context if pronoun_context else "(Khong tim thay cap xung ho lien quan)"}
 
 ## Ban dich hien tai (Can bien tap):
 Tieu de dich: {title_cur}
@@ -2069,10 +2206,11 @@ Nhiem vu la BIEN TAP LAI ban dich hien co theo hai muc tieu SONG SONG:
 
 2. CHINH XUNG HO:
    - Tra characters.md de biet gioi tinh, tuoi tac, vai tro tung nhan vat
-   - Tra pronouns_snapshot.yaml de biet cach xung ho da dung o cac chuong truoc
+   {pronoun_reference}
    - Trong HOI THOAI: xung ho linh hoat theo cam xuc, khong cung nhac
    - Trong DAN TRUYEN: nhat quan theo bo nho xung ho
    - Uu tien ngu canh hien tai neu xung dot voi bo nho
+   - Muc co locked: true la quy tac do nguoi dung xac nhan, PHAI uu tien va khong tu y thay doi
 
 3. BIEN TAP TIEU DE:
    - Chi sua xung ho hoac van phong neu can, KHONG doi nghia
@@ -2284,7 +2422,11 @@ def run_post_translation_pipeline(
     # ── Bước 1: Biên tập trau chuốt + chỉnh xưng hô ──
     print(f"[PIPELINE] Bước 1 — Biên tập trau chuốt...")
     title_polished, content_polished = polish_translation(
-        chapter, chapter_number, context_text, pronoun_context
+        chapter,
+        chapter_number,
+        context_text,
+        pronoun_context,
+        pronouns_file=pronouns_file,
     )
     chapter["title_translation"] = title_polished
     chapter["translation"] = content_polished

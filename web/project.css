@@ -23,6 +23,7 @@
 .chapter-option-empty { padding: 28px 16px; color: var(--muted); font-size: 12px; text-align: center; }
 .pop-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .target-panel { position: relative; }
+.mobile-mode-switch { display: none; }
 .punctuation-toggle { font-size: 15px; line-height: 1; }
 .punctuation-popover { display: none; position: absolute; z-index: 12; top: 39px; right: 12px; width: 300px; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
 .punctuation-popover.open { display: grid; gap: 11px; }
@@ -37,4 +38,49 @@
   .chapter-nav { flex: 1; }
   .chapter-nav span { display: none; }
   .punctuation-popover { right: 8px; width: min(300px, calc(100% - 16px)); }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    grid-template-columns: 32px minmax(0,1fr) auto;
+    column-gap: 7px;
+    height: 64px;
+    padding: 7px 9px;
+    display: grid;
+  }
+  .menu-button { width: 32px; margin: 0; padding: 4px; }
+  .topbar > div:not(.top-actions) { min-width: 0; }
+  .topbar .eyebrow { overflow: hidden; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar h1 { overflow: hidden; margin-top: 1px; font-size: 14px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+  .top-actions { gap: 5px; margin: 0; }
+  #retranslateButton, #saveButton { min-width: 42px; height: 40px; padding: 0 8px; font-size: 0; }
+  #retranslateButton::after { content: "Dịch"; font-size: 11px; }
+  #saveButton::after { content: "Lưu"; font-size: 11px; }
+
+  #workspaceView { padding: 9px; }
+  .workspace-toolbar { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin-bottom: 9px; }
+  .workspace-toolbar .chapter-select { grid-column: 1 / -1; min-width: 0; margin: 0; }
+  .workspace-toolbar #previousChapter { grid-column: 1; width: 100%; }
+  .workspace-toolbar #nextChapter { grid-column: 2; width: 100%; }
+  .workspace-toolbar #reviewToggle { grid-column: 1 / -1; width: 100%; }
+  .workspace-toolbar .segmented { display: none; }
+  .workspace-toolbar #copyTargetPreview { grid-column: 1 / -1; }
+  .workspace-toolbar #focusButton { display: none; }
+  .mobile-mode-switch { position: sticky; top: 64px; z-index: 11; display: flex; width: 100%; margin: 0 0 9px; padding: 4px; border: 1px solid var(--line); background: var(--bg); background: color-mix(in srgb,var(--bg) 92%,transparent); backdrop-filter: blur(14px); }
+  .mobile-mode-switch button { min-height: 38px; flex: 1; font-size: 11px; }
+
+  .editor-grid { gap: 10px; }
+  .editor-grid .editor-panel { height: auto; }
+  .editor-grid .source-panel { min-height: 220px; height: 38dvh; }
+  .editor-grid .target-panel { min-height: 360px; height: 62dvh; }
+  .editor-grid.source .source-panel, .editor-grid.target .target-panel { height: calc(100dvh - 124px); min-height: 320px; }
+  .panel-head { display: grid; grid-template-columns: minmax(0,1fr); gap: 5px; min-height: 62px; padding: 7px 10px; }
+  .panel-head > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .editor-actions { justify-content: flex-start; gap: 5px; overflow-x: auto; padding-bottom: 2px; flex-wrap: nowrap; scrollbar-width: none; }
+  .editor-actions::-webkit-scrollbar { display: none; }
+  .editor-actions > span { display: none; }
+  .editor-actions button { min-width: 38px; min-height: 32px; flex: 0 0 auto; }
+  .editor-shell, .markdown-preview { min-height: 0; }
+  .editor-shell .CodeMirror { height: 100%; }
+  .markdown-preview { padding: 16px; font-size: 15px; line-height: 1.7; }
 }

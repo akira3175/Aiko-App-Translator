@@ -4,8 +4,11 @@ import json
 import hashlib
 import mimetypes
 import os
+import ipaddress
 import re
+import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -56,6 +59,8 @@ job_processes: dict[str, subprocess.Popen] = {}
 TRANSLATION_KINDS = {"v1", "v2", "v3", "gpt", "gpt-api", "manual"}
 TRANSLATION_LOCK = ROOT / ".runtime" / "translation.lock"
 translation_guard = threading.RLock()
+lan_sessions: set[str] = set()
+lan_login_attempts: dict[str, list[float]] = {}
 
 SETTINGS_FILE = ROOT / ".runtime" / "settings.json"
 GEMINI_API_KEYS_FILE = ROOT / "apikeys.txt"
@@ -95,6 +100,8 @@ SETTING_DEFAULTS = {
     "gpt_api_timeout": 300,
     "gpt_api_retries": 3,
     "gpt_api_temperature": "",
+    "lan_enabled": "off",
+    "lan_pin": "",
 }
 SETTING_LABELS = {
     "link_gemini": "Đường dẫn Gemini Gem",
@@ -132,8 +139,10 @@ SETTING_LABELS = {
     "gpt_api_timeout": "Thời gian chờ GPT API (giây)",
     "gpt_api_retries": "Số lần thử lại GPT API",
     "gpt_api_temperature": "Temperature GPT API (để trống = mặc định)",
+    "lan_enabled": "Truy cập từ điện thoại cùng Wi-Fi",
+    "lan_pin": "Mã PIN truy cập LAN",
 }
-SECRET_SETTINGS = {"hako_password", "r2_access_key_id", "r2_secret_access_key", "gpt_api_key"}
+SECRET_SETTINGS = {"hako_password", "r2_access_key_id", "r2_secret_access_key", "gpt_api_key", "lan_pin"}
 SETTING_RANGES = {
     "fix_max_retry": (1, 20),
     "previous_context_chapters": (0, 20),
@@ -171,6 +180,17 @@ SETTING_META = {
     "gpt_api_translate_effort": {"group": "gpt-api"}, "gpt_api_polish_effort": {"group": "gpt-api"},
     "gpt_api_max_output_tokens": {"group": "gpt-api"}, "gpt_api_timeout": {"group": "gpt-api"},
     "gpt_api_retries": {"group": "gpt-api"}, "gpt_api_temperature": {"group": "gpt-api"},
+    "lan_enabled": {
+        "group": "general",
+        "type": "select",
+        "options": [["off", "Tắt (chỉ máy tính này)"], ["on", "Bật trong mạng LAN"]],
+        "description": "Cần khởi động lại app sau khi thay đổi.",
+    },
+    "lan_pin": {
+        "group": "general",
+        "inputmode": "numeric",
+        "description": "6–12 chữ số. Để trống khi bật để app tự sinh mã 6 số.",
+    },
 }
 OPTIONAL_SETTINGS = set(SETTING_DEFAULTS) - {
     "link_gemini", "translate_model", "polish_model", "review_bg_model",
@@ -237,6 +257,10 @@ def write_settings(payload: dict):
                 raise ValueError(f"{SETTING_LABELS[key]} không hợp lệ")
             if value and key == "gemini_api_thinking" and value not in {"auto", "off", "minimal", "low", "medium", "high"}:
                 raise ValueError("Cấp độ suy nghĩ Gemini API không hợp lệ")
+            if key == "lan_enabled" and value not in {"off", "on"}:
+                raise ValueError("Chế độ truy cập LAN không hợp lệ")
+            if key == "lan_pin" and value and not re.fullmatch(r"\d{6,12}", value):
+                raise ValueError("Mã PIN LAN phải gồm 6–12 chữ số")
             if value and key in {"gemini_api_temperature", "gemini_api_top_p", "gemini_api_top_k", "gemini_api_max_output_tokens"}:
                 try:
                     number = float(value)
@@ -253,6 +277,8 @@ def write_settings(payload: dict):
                     raise ValueError(f"{SETTING_LABELS[key]} phải là số nguyên")
         if value != default:
             cleaned[key] = value
+    if cleaned.get("lan_enabled") == "on" and not cleaned.get("lan_pin"):
+        cleaned["lan_pin"] = f"{secrets.randbelow(1_000_000):06d}"
     SETTINGS_FILE.parent.mkdir(exist_ok=True)
     if cleaned:
         temporary = SETTINGS_FILE.with_suffix(".tmp")
@@ -523,6 +549,8 @@ def translation_stop_file(claim_id: str) -> Path:
 
 
 def terminate_process_tree(pid: int):
+    if pid <= 0 or pid in {os.getpid(), os.getppid()}:
+        raise ValueError("Từ chối dừng tiến trình điều khiển ứng dụng")
     if os.name == "nt":
         subprocess.run(
             ["taskkill", "/PID", str(pid), "/T", "/F"],
@@ -531,6 +559,12 @@ def terminate_process_tree(pid: int):
         )
     else:
         os.kill(pid, 15)
+
+
+def isolated_process_kwargs():
+    if os.name == "nt":
+        return {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)}
+    return {"start_new_session": True}
 
 
 def google_translate(text: str):
@@ -788,6 +822,101 @@ def characters_data(project_name: str):
         "backup": path.with_name(path.name + ".bak").exists(),
         "updated_at": path.stat().st_mtime if path.exists() else None,
     }
+
+
+def pronouns_data(project_name: str):
+    path = safe_project(project_name) / "pronouns.yaml"
+    raw_yaml = path.read_text(encoding="utf-8") if path.exists() else ""
+    data = yaml.safe_load(raw_yaml) or {}
+    if not isinstance(data, dict):
+        raise ValueError("pronouns.yaml không hợp lệ")
+    pairs = []
+    for key, value in data.items():
+        if not isinstance(value, dict):
+            continue
+        timeline = [item for item in value.get("timeline", []) if isinstance(item, dict)]
+        timeline.sort(key=lambda item: item.get("chapter_number", 0))
+        latest = timeline[-1] if timeline else {}
+        previous = timeline[-2] if len(timeline) > 1 else {}
+        changed = bool(
+            previous
+            and (
+                previous.get("speaker_self") != latest.get("speaker_self")
+                or previous.get("speaker_to_listener") != latest.get("speaker_to_listener")
+            )
+        )
+        pairs.append(
+            {
+                "key": str(key),
+                "characters": [str(item) for item in value.get("characters", [])[:2]],
+                "timeline": timeline,
+                "latest": latest,
+                "locked": bool(value.get("locked", False)),
+                "changed": changed,
+            }
+        )
+    pairs.sort(
+        key=lambda item: item["latest"].get("chapter_number", 0), reverse=True
+    )
+    return {
+        "pairs": pairs,
+        "count": len(pairs),
+        "locked_count": sum(item["locked"] for item in pairs),
+        "exists": path.exists(),
+        "raw_yaml": raw_yaml,
+    }
+
+
+def save_pronouns(project_name: str, payload: dict):
+    path = safe_project(project_name) / "pronouns.yaml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {} if path.exists() else {}
+    if not isinstance(data, dict):
+        raise ValueError("pronouns.yaml không hợp lệ")
+    key = str(payload.get("key", "")).strip()
+    if not key or key not in data or not isinstance(data[key], dict):
+        raise ValueError("Không tìm thấy cặp xưng hô")
+    if payload.get("action") == "delete":
+        del data[key]
+    else:
+        pair = data[key]
+        timeline = pair.get("timeline", [])
+        if not isinstance(timeline, list) or not timeline:
+            raise ValueError("Cặp xưng hô chưa có lịch sử để chỉnh sửa")
+        latest_entry = max(
+            (
+                (index, item)
+                for index, item in enumerate(timeline)
+                if isinstance(item, dict)
+            ),
+            key=lambda entry: (entry[1].get("chapter_number", 0), entry[0]),
+            default=None,
+        )
+        if latest_entry is None:
+            raise ValueError("Bản ghi xưng hô gần nhất không hợp lệ")
+        latest = latest_entry[1]
+        fields = {
+            "speaker_self": str(payload.get("speaker_self", "")).strip(),
+            "speaker_to_listener": str(payload.get("speaker_to_listener", "")).strip(),
+            "relationship_status": str(payload.get("relationship_status", "")).strip(),
+            "emotional_tone": str(payload.get("emotional_tone", "")).strip(),
+        }
+        if not fields["speaker_self"] or not fields["speaker_to_listener"]:
+            raise ValueError("Cách tự xưng và gọi đối phương không được để trống")
+        if any(len(value) > 300 for value in fields.values()):
+            raise ValueError("Nội dung quy tắc xưng hô quá dài")
+        latest.update(fields)
+        latest["source"] = "manual"
+        pair["locked"] = bool(payload.get("locked", False))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False, width=1000),
+        encoding="utf-8",
+    )
+    if path.exists():
+        shutil.copy2(path, path.with_name(path.name + ".bak"))
+    os.replace(temporary, path)
+    return pronouns_data(project_name)
 
 
 def publishing_data(project_name: str):
@@ -1098,6 +1227,7 @@ def run_job(
                 "NOVEL_STOP_FILE": str(translation_stop_file(translation_claim))
                 if translation_claim else str(stop_file),
             },
+            **isolated_process_kwargs(),
         )
         job_processes[kind] = process
         if translation_claim:
@@ -1162,7 +1292,9 @@ def retranslate_job(
                 "NOVEL_WEB_CONFIG": json.dumps(effective_config, ensure_ascii=False),
                 "NOVEL_STOP_FILE": str(translation_stop_file(translation_claim)),
             },
+            **isolated_process_kwargs(),
         )
+        job_processes[job_key] = process
         update_translation_pid(translation_claim, process.pid)
         output = stream_process_output(process, job_key)
         cancelled = jobs.get(job_key, {}).get("cancel_mode") == "immediate"
@@ -1184,7 +1316,37 @@ def retranslate_job(
             backup.replace(target)
         jobs[job_key] = {"status": "error", "output": str(exc)}
     finally:
+        job_processes.pop(job_key, None)
         release_translation(translation_claim)
+
+
+def lan_configuration():
+    settings = saved_settings()
+    enabled = settings.get("lan_enabled") == "on"
+    pin = str(settings.get("lan_pin", ""))
+    return enabled and bool(re.fullmatch(r"\d{6,12}", pin)), pin
+
+
+def local_network_ip():
+    connection = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        connection.connect(("8.8.8.8", 80))
+        return connection.getsockname()[0]
+    except OSError:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except OSError:
+            return "127.0.0.1"
+    finally:
+        connection.close()
+
+
+LAN_LOGIN_HTML = """<!doctype html><html lang="vi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Novel Translator Studio</title><style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:20px;background:#101412;color:#e9efeb;font-family:Segoe UI,Arial,sans-serif}.card{width:min(100%,390px);padding:28px;border:1px solid #2b332f;border-radius:18px;background:#171c19;box-shadow:0 20px 70px #0008}.mark{display:grid;place-items:center;width:46px;height:46px;border-radius:13px;background:#d6f064;color:#18211e;font-size:22px;font-weight:800}h1{margin:22px 0 8px;font-size:24px}p{margin:0 0 22px;color:#a8b2ad;line-height:1.55}label{display:grid;gap:8px;font-size:13px;font-weight:700}input{width:100%;padding:14px;border:1px solid #36413b;border-radius:11px;background:#0f1311;color:#fff;font-size:20px;letter-spacing:.25em;text-align:center;outline:0}input:focus{border-color:#55b89d}button{width:100%;margin-top:14px;padding:13px;border:0;border-radius:11px;background:#177e68;color:#fff;font-weight:750}small{display:block;min-height:20px;margin-top:12px;color:#f08b7c;text-align:center}</style></head><body><main class="card"><div class="mark">N</div><h1>Truy cập từ điện thoại</h1><p>Nhập mã PIN đang hiển thị trong Cài đặt trên máy tính.</p><form><label>Mã PIN<input name="pin" inputmode="numeric" pattern="[0-9]{6,12}" maxlength="12" autocomplete="one-time-code" required></label><button>Đăng nhập</button><small></small></form></main><script>
+const f=document.querySelector('form'),m=document.querySelector('small');f.onsubmit=async e=>{e.preventDefault();m.textContent='';const b=f.querySelector('button');b.disabled=true;try{const r=await fetch('/api/lan/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:new FormData(f).get('pin')})});const d=await r.json();if(!r.ok)throw Error(d.error||'Không đăng nhập được');location.reload()}catch(e){m.textContent=e.message}finally{b.disabled=false}};
+</script></body></html>"""
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1204,9 +1366,52 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(length) or b"{}")
 
+    def is_loopback(self):
+        try:
+            return ipaddress.ip_address(self.client_address[0]).is_loopback
+        except ValueError:
+            return False
+
+    def lan_authorized(self):
+        if self.is_loopback():
+            return True
+        configured, _pin = lan_configuration()
+        if not configured:
+            return False
+        cookie = self.headers.get("Cookie", "")
+        token = next(
+            (
+                part.split("=", 1)[1]
+                for part in cookie.split(";")
+                if part.strip().startswith("nts_lan_session=")
+            ),
+            "",
+        ).strip()
+        return token in lan_sessions
+
+    def require_lan_authorization(self, api_request=False):
+        if self.lan_authorized():
+            return False
+        if api_request:
+            self.json_response(
+                {"error": "Điện thoại chưa đăng nhập mã PIN LAN."},
+                HTTPStatus.UNAUTHORIZED,
+            )
+        else:
+            body = LAN_LOGIN_HTML.encode("utf-8")
+            self.send_response(HTTPStatus.UNAUTHORIZED)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+        return True
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path, query = parsed.path, parse_qs(parsed.query)
+        if self.require_lan_authorization(path.startswith("/api/")):
+            return
         project = query.get("project", [""])[0]
         if path == "/api/projects":
             return self.json_response({"items": projects()})
@@ -1219,6 +1424,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/health":
             return self.json_response({"ok": True, "version": APP_VERSION})
+        if path == "/api/lan/status":
+            configured, pin = lan_configuration()
+            return self.json_response(
+                {
+                    "configured": configured,
+                    "active": HOST == "0.0.0.0",
+                    "url": f"http://{local_network_ip()}:{PORT}" if configured else "",
+                    "pin": pin if self.is_loopback() else "",
+                }
+            )
         if path == "/api/publishing":
             try:
                 return self.json_response(publishing_data(project))
@@ -1248,6 +1463,11 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self.json_response(characters_data(project))
             except (ValueError, OSError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/pronouns":
+            try:
+                return self.json_response(pronouns_data(project))
+            except (ValueError, OSError, yaml.YAMLError) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/chapters":
             try:
@@ -1305,6 +1525,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            path = urlparse(self.path).path
+            if path == "/api/lan/login":
+                return self.lan_login()
+            if self.require_lan_authorization(True):
+                return
             return self._do_POST()
         except Exception as exc:
             traceback.print_exc()
@@ -1315,6 +1540,44 @@ class Handler(BaseHTTPRequestHandler):
                 )
             except (BrokenPipeError, ConnectionResetError, OSError):
                 return None
+
+    def lan_login(self):
+        configured, expected_pin = lan_configuration()
+        if not configured:
+            return self.json_response(
+                {"error": "Truy cập LAN chưa được bật."}, HTTPStatus.FORBIDDEN
+            )
+        address = self.client_address[0]
+        now = time.time()
+        attempts = [stamp for stamp in lan_login_attempts.get(address, []) if now - stamp < 300]
+        if len(attempts) >= 10:
+            return self.json_response(
+                {"error": "Đã nhập sai quá nhiều lần. Hãy chờ 5 phút."},
+                HTTPStatus.TOO_MANY_REQUESTS,
+            )
+        try:
+            supplied_pin = str(self.body().get("pin", "")).strip()
+        except (ValueError, json.JSONDecodeError):
+            supplied_pin = ""
+        if not secrets.compare_digest(supplied_pin, expected_pin):
+            attempts.append(now)
+            lan_login_attempts[address] = attempts
+            return self.json_response(
+                {"error": "Mã PIN không đúng."}, HTTPStatus.UNAUTHORIZED
+            )
+        lan_login_attempts.pop(address, None)
+        token = secrets.token_urlsafe(32)
+        lan_sessions.add(token)
+        body = json.dumps({"ok": True}).encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header(
+            "Set-Cookie", f"nts_lan_session={token}; Path=/; HttpOnly; SameSite=Strict"
+        )
+        self.end_headers()
+        self.wfile.write(body)
 
     def _do_POST(self):
         parsed = urlparse(self.path)
@@ -1386,6 +1649,11 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self.json_response(save_characters(project, self.body()))
             except (ValueError, OSError, json.JSONDecodeError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/pronouns":
+            try:
+                return self.json_response(save_pronouns(project, self.body()))
+            except (ValueError, OSError, yaml.YAMLError, json.JSONDecodeError) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/settings":
             try:
@@ -1505,25 +1773,39 @@ class Handler(BaseHTTPRequestHandler):
                 if not active:
                     raise ValueError("Không có tác vụ dịch đang chạy")
                 claim_id = str(active.get("claim_id", ""))
-                matching_job = next(
-                    (job for job in jobs.values() if job.get("claim_id") == claim_id),
+                matching_entry = next(
+                    (
+                        (job_key, job)
+                        for job_key, job in jobs.items()
+                        if job.get("claim_id") == claim_id
+                        and job.get("status") == "running"
+                    ),
                     None,
                 )
+                matching_job = matching_entry[1] if matching_entry else None
                 if mode == "after_current":
                     translation_stop_file(claim_id).touch()
                     if matching_job is not None:
                         matching_job["cancel_mode"] = mode
-                        matching_job["output"] = (
-                            "Đã yêu cầu dừng sau chương/batch hiện tại…"
-                        )
                 else:
-                    pid = int(active.get("pid") or 0)
                     translation_stop_file(claim_id).touch()
                     if matching_job is not None:
                         matching_job["cancel_mode"] = mode
                         matching_job["output"] = "Đang hủy dịch ngay lập tức…"
-                    if pid and process_is_running(pid):
-                        terminate_process_tree(pid)
+                    process = (
+                        job_processes.get(matching_entry[0])
+                        if matching_entry else None
+                    )
+                    active_pid = int(active.get("pid") or 0)
+                    if (
+                        process is None
+                        or process.poll() is not None
+                        or process.pid != active_pid
+                    ):
+                        raise ValueError(
+                            "Không xác định được đúng tiến trình dịch; server vẫn được giữ nguyên"
+                        )
+                    terminate_process_tree(process.pid)
                 return self.json_response({"ok": True, "mode": mode})
             except (ValueError, OSError, json.JSONDecodeError) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
@@ -1592,9 +1874,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    lan_ready, _lan_pin = lan_configuration()
+    HOST = "0.0.0.0" if lan_ready else "127.0.0.1"
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    url = f"http://{HOST}:{PORT}"
+    url = f"http://127.0.0.1:{PORT}"
     print(f"Novel Translator is running at {url} - press Ctrl+C to stop")
+    if lan_ready:
+        print(f"Mobile LAN access: http://{local_network_ip()}:{PORT}")
     threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()

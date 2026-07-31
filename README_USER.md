@@ -2,6 +2,8 @@
 
 **Aiko App Translator · Tác giả: Akira Satoh (@akira3175) · Copyright © 2026**
 
+Thông tin tác giả: GitHub https://github.com/akira3175 · Hako https://docln.sbs/thanh-vien/21133
+
 Ứng dụng chính thức luôn miễn phí và chỉ được phát hành tại
 https://github.com/akira3175/Aiko-App-Translator. Không trả tiền cho bên thứ ba để tải bản chính thức. Việc sử dụng và phân phối thương mại cần có sự cho phép bằng văn bản của tác giả. Xem `LICENSE`.
 
@@ -12,6 +14,17 @@ https://github.com/akira3175/Aiko-App-Translator. Không trả tiền cho bên t
 3. App tự mở tại `http://127.0.0.1:8765`.
 
 Không cần cài Python, package, Chrome hoặc ChromeDriver. Tất cả đã nằm trong thư mục `runtime`.
+
+## Dùng trên điện thoại cùng Wi-Fi
+
+1. Trên máy tính, mở **Cài đặt → Chung**.
+2. Chọn **Bật trong mạng LAN** tại mục truy cập điện thoại.
+3. Nhập PIN 6–12 số, hoặc để trống để app tự sinh PIN, rồi lưu.
+4. Đóng app và chạy lại `start_app.bat`.
+5. Nếu Windows Firewall hỏi, chỉ cho phép trên **Private networks**.
+6. Trên điện thoại cùng Wi-Fi, mở địa chỉ LAN hiển thị trong Cài đặt và nhập PIN.
+
+Chế độ LAN mặc định tắt. Không chuyển tiếp cổng 8765 trên router và không public app trực tiếp ra Internet.
 
 ## Đăng nhập Gemini và ChatGPT
 

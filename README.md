@@ -5,6 +5,8 @@
 > **Tác giả:** Akira Satoh ([@akira3175](https://github.com/akira3175))
 > **Aiko App Translator được phát hành chính thức hoàn toàn miễn phí. Không trả tiền cho bên thứ ba để tải bản chính thức.**
 
+Thông tin tác giả: [GitHub](https://github.com/akira3175) · [Hako](https://docln.sbs/thanh-vien/21133)
+
 Nguồn phát hành chính thức duy nhất: [akira3175/Aiko-App-Translator](https://github.com/akira3175/Aiko-App-Translator).
 
 ## Chạy từ mã nguồn
