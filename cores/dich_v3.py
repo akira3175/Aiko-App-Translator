@@ -2,7 +2,6 @@
 dich_v3_md.py
 =============
 Dịch batch từ MD files (truyen/raw/*.md) → truyen/translated/*.md.
-Logic y hệt dich_v3.py — chỉ thay YAML I/O bằng MD I/O.
 
 - Phân biệt đã dịch: file vx_cy_sz.md có trong cả raw/ và translated/
 - Pipeline hậu dịch (fix_translation, pronouns, review) giữ nguyên hoàn toàn

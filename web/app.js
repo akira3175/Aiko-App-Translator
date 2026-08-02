@@ -10,9 +10,19 @@ const punctuationStyles = [
   ['double-curly', '“ ”', '“', '”'],
   ['book-title', '《 》', '《', '》']
 ];
-const findState = { source: { matches: [], index: -1 }, target: { matches: [], index: -1 } };
+const findState = {
+  source: { matches: [], index: -1, case: false, word: false, regex: false, error: '' },
+  target: { matches: [], index: -1, case: false, word: false, regex: false, error: '' }
+};
 let selectionTranslationRequest=0;
 let activeJobKind=null;
+let novelStreamSequence=0;
+let novelStreamLine=null;
+let novelStreamCursor=null;
+let novelStreamSource=null;
+let novelStreamPending=[];
+let novelStreamFrame=null;
+let novelStreamApplying=false;
 let settingsItems=[];
 let activeSettingsGroup='gemini-api';
 let geminiApiKeys=[];
@@ -47,6 +57,133 @@ function setEditorValue(kind,value) {
   $(`#${kind}Editor`).value=value||'';
   syncingEditors=false;
 }
+
+function replaceStreamValue(value) {
+  const editor=editorViews.target;
+  const next=value||'';
+  if(!editor){$('#targetEditor').value=next;return;}
+  const current=editor.getValue();
+  if(current===next)return;
+  let prefix=0;
+  const maxPrefix=Math.min(current.length,next.length);
+  while(prefix<maxPrefix&&current[prefix]===next[prefix])prefix++;
+  let suffix=0;
+  const maxSuffix=Math.min(current.length-prefix,next.length-prefix);
+  while(suffix<maxSuffix&&current[current.length-1-suffix]===next[next.length-1-suffix])suffix++;
+  syncingEditors=true;
+  editor.operation(()=>editor.replaceRange(
+    next.slice(prefix,next.length-suffix),
+    editor.posFromIndex(prefix),
+    editor.posFromIndex(current.length-suffix),
+    '+ai-stream'
+  ));
+  $('#targetEditor').value=next;
+  syncingEditors=false;
+}
+
+function replaceStreamLine(line,text) {
+  const editor=editorViews.target;
+  if(!editor)return;
+  const safeLine=Math.max(0,Number(line)||0);
+  syncingEditors=true;
+  editor.operation(()=>{
+    while(editor.lineCount()<=safeLine){
+      const last=editor.lineCount()-1;
+      editor.replaceRange('\n',{line:last,ch:editor.getLine(last).length},null,'+ai-stream');
+    }
+    editor.replaceRange(text||'',{line:safeLine,ch:0},{line:safeLine,ch:editor.getLine(safeLine).length},'+ai-stream');
+  });
+  $('#targetEditor').value=editor.getValue();
+  syncingEditors=false;
+}
+
+function markNovelStreamLine(line,text) {
+  const editor=editorViews.target;
+  if(!editor)return;
+  if(novelStreamLine!==null)editor.removeLineClass(novelStreamLine,'background','ai-stream-line');
+  if(novelStreamCursor){novelStreamCursor.clear();novelStreamCursor=null;}
+  const safeLine=Math.max(0,Math.min(line,editor.lineCount()-1));
+  editor.addLineClass(safeLine,'background','ai-stream-line');
+  novelStreamLine=safeLine;
+  const cursor=document.createElement('span');cursor.className='ai-edit-cursor';cursor.textContent='▌';cursor.title='AI đang biên tập tại đây';
+  novelStreamCursor=editor.setBookmark({line:safeLine,ch:(text||'').length},{widget:cursor,insertLeft:true});
+  const viewport=editor.getViewport();
+  if(safeLine<viewport.from+1||safeLine>=viewport.to-1)editor.scrollIntoView({line:safeLine,ch:0},80);
+}
+
+async function applyNovelStreamEvents(job) {
+  const events=(job.stream_events||[]).filter(event=>Number(event.sequence)>novelStreamSequence);
+  let marker=null;
+  let changed=false;
+  let workspaceShown=novelStreamSequence>0;
+  for(const event of events){
+    novelStreamSequence=Math.max(novelStreamSequence,Number(event.sequence)||0);
+    if(!event.chapter)continue;
+    if(state.current!==event.chapter){
+      if(!state.chapters.some(chapter=>chapter.name===event.chapter))continue;
+      await openChapter(event.chapter);
+    }
+    if(!workspaceShown){showView('workspace');workspaceShown=true;}
+    if(event.type==='translation_snapshot'){
+      replaceStreamValue(event.text||'');
+      const last=Math.max(0,editorViews.target.lineCount()-1);
+      marker={line:last,text:editorViews.target.getLine(last)||''};
+      changed=true;
+    } else if(event.type==='polish_line'){
+      const line=Math.max(0,Number(event.line)||0);
+      replaceStreamLine(line,event.text||'');
+      marker={line,text:event.text||''};
+      changed=true;
+    } else if(event.type==='polish_complete'){
+      replaceStreamValue(event.text||'');
+      changed=true;
+    }
+  }
+  if(marker)markNovelStreamLine(marker.line,marker.text);
+  if(changed){
+    state.dirty=false;
+    updateCounts();
+  }
+}
+
+function queueNovelStreamEvent(event) {
+  const previous=novelStreamPending[novelStreamPending.length-1];
+  if(previous&&previous.type==='translation_snapshot'&&event.type==='translation_snapshot'&&previous.chapter===event.chapter)novelStreamPending[novelStreamPending.length-1]=event;
+  else novelStreamPending.push(event);
+  if(!novelStreamFrame)novelStreamFrame=requestAnimationFrame(flushNovelStreamEvents);
+}
+
+async function flushNovelStreamEvents() {
+  novelStreamFrame=null;
+  if(novelStreamApplying){novelStreamFrame=requestAnimationFrame(flushNovelStreamEvents);return;}
+  const events=novelStreamPending.splice(0);
+  if(!events.length)return;
+  novelStreamApplying=true;
+  try { await applyNovelStreamEvents({stream_events:events}); }
+  finally {
+    novelStreamApplying=false;
+    if(novelStreamPending.length&&!novelStreamFrame)novelStreamFrame=requestAnimationFrame(flushNovelStreamEvents);
+  }
+}
+
+function openNovelEventStream(kind) {
+  if(novelStreamSource)novelStreamSource.close();
+  novelStreamPending=[];
+  const source=new EventSource(`/api/job-stream/${encodeURIComponent(kind)}?after=${novelStreamSequence}`);
+  novelStreamSource=source;
+  source.onmessage=event=>{
+    try { queueNovelStreamEvent(JSON.parse(event.data)); }
+    catch(_error) {}
+  };
+  source.addEventListener('done',()=>{
+    source.close();
+    if(novelStreamSource===source)novelStreamSource=null;
+  });
+  source.onerror=()=>{
+    source.close();
+    if(novelStreamSource===source)novelStreamSource=null;
+  };
+}
 const pipelineGroups = {
   translation:{title:'Dịch thuật',description:'Các engine dịch chương và hậu xử lý bản dịch.'},
   memory:{title:'Bộ nhớ',description:'Tạo context, glossary và hồ sơ nhân vật cho truyện.'},
@@ -56,6 +193,7 @@ const pipelineGroups = {
 let activePipelineGroup='translation';
 const pipelineItems = [
   {id:'v1',code:'V1',group:'translation',title:'Gemini API',desc:'Dịch chương chưa xử lý bằng Gemini API.'},
+  {id:'v1-interactions',code:'VI',group:'translation',title:'Gemini Interactions (Beta)',desc:'Dịch trực tiếp trong editor; biên tập chỉ hiện từng dòng thay đổi.'},
   {id:'v2',code:'V2',group:'translation',title:'Gemini Web',desc:'Dịch đơn chương qua hồ sơ trình duyệt Gemini.'},
   {id:'v3',code:'V3',group:'translation',title:'Gemini Web Batch',desc:'Dịch nhiều chương mỗi batch và chạy hậu xử lý.'},
   {id:'gpt',code:'GPT',group:'translation',title:'ChatGPT Web',desc:'Dịch batch qua hồ sơ trình duyệt ChatGPT.'},
@@ -72,6 +210,7 @@ const pipelineItems = [
 ];
 const taskSchemas = {
   v1:{title:'Gemini API V1',description:'Chọn số lượng công việc thực hiện trong lần chạy này.',fields:[['run_until_complete','Chạy liên tục đến hết truyện','checkbox',false]]},
+  'v1-interactions':{title:'V1 · Gemini Interactions Streaming (Beta)',description:'Dịch trực tiếp trong Không gian truyện; khi biên tập chỉ cập nhật dòng thay đổi và đặt con trỏ tại vị trí AI đang sửa. Dùng bộ lọc an toàn mặc định của Google.',fields:[['run_until_complete','Chạy liên tục đến hết truyện','checkbox',false]]},
   review: {title:'Review đối chiếu toàn bộ',description:'So sánh từng chương raw Hàn với bản dịch Việt. Chọn phạm vi và mức song song trước khi gửi API.',fields:[['start','Bắt đầu từ chương','number','1'],['end','Kết thúc tại chương','number',''],['force','Review lại chương đã có','checkbox',false],['batch_size','Số chương mỗi batch','number','10'],['workers','Số luồng song song','number','10'],['sleep','Giây nghỉ giữa batch','number','4']]},
   'split-review': {title:'Tách review',description:'Để trống để xử lý toàn bộ file review.',fields:[['from','Từ chương','text',''],['to','Đến chương','text','']]},
   hako:{title:'Đăng chương lên Hako',description:'Chọn chương đầu và chương cuối. App tự xác định volume, Book ID và ảnh cần tải lên.',fields:[['set_as_incomplete','Đánh dấu chương chưa hoàn thành','checkbox',false]]},
@@ -297,7 +436,7 @@ async function loadChapters() {
   } catch (error) { if(state.project===project&&state.projectRevision===revision)toast(error.message); }
 }
 
-async function loadProjects() {
+async function loadProjects(preferredProject='') {
   try {
     const data = await api('/api/projects');
     state.projects = data.items;
@@ -305,7 +444,7 @@ async function loadProjects() {
       ? state.projects.map(name => `<button class="pop-item" data-project="${name}"><span>${name}</span></button>`).join('')
       : '<div class="empty-state"><p>Chưa tìm thấy truyện.</p></div>';
     const remembered = localStorage.getItem('novel-project');
-    const first = state.projects.includes(remembered) ? remembered : state.projects[0];
+    const first = state.projects.includes(preferredProject) ? preferredProject : (state.projects.includes(remembered) ? remembered : state.projects[0]);
     if (first) await selectProject(first); else toast('Chưa có truyện nào trong thư mục truyen');
   } catch (error) { toast(error.message); }
 }
@@ -707,32 +846,54 @@ function openFind(kind,replace=false) {
   if(replace&&kind==='target')$('#targetReplace').focus();
 }
 
+function findPattern(kind) {
+  const current=findState[kind], query=$(`#${kind}Find`).value;
+  if(!query)return null;
+  const source=current.regex?query:query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return new RegExp(source,`gu${current.case?'':'i'}`);
+}
+
+function isWordCharacter(value) {
+  return Boolean(value&&/[\p{L}\p{N}_]/u.test(value));
+}
+
 function refreshFind(kind) {
-  const editor=$(`#${kind}Editor`), query=$(`#${kind}Find`).value;
-  const matches=[];
-  if(query){
-    const haystack=editorValue(kind).toLocaleLowerCase('vi'), needle=query.toLocaleLowerCase('vi');
-    let position=0;
-    while((position=haystack.indexOf(needle,position))!==-1){matches.push(position);position+=Math.max(needle.length,1);}
+  const current=findState[kind], input=$(`#${kind}Find`), count=$(`#${kind}FindCount`), text=editorValue(kind), matches=[];
+  current.error='';
+  try {
+    const pattern=findPattern(kind);
+    if(pattern){
+      let match;
+      while((match=pattern.exec(text))!==null){
+        const end=match.index+match[0].length;
+        if(!current.word||(!isWordCharacter(text[match.index-1])&&!isWordCharacter(text[end])))matches.push({index:match.index,length:match[0].length,text:match[0],captures:match.slice(1)});
+        if(!match[0].length)pattern.lastIndex+=text.codePointAt(pattern.lastIndex)>0xFFFF?2:1;
+      }
+    }
+  } catch(error) {
+    current.error=error.message;
   }
-  findState[kind].matches=matches;
-  if(!matches.length)findState[kind].index=-1;
-  else if(findState[kind].index>=matches.length)findState[kind].index=0;
+  current.matches=matches;
+  if(!matches.length)current.index=-1;
+  else if(current.index>=matches.length)current.index=0;
+  input.classList.toggle('invalid',Boolean(current.error));
+  input.title=current.error||'';
+  count.classList.toggle('invalid',Boolean(current.error));
   updateFindCount(kind);
 }
 
 function updateFindCount(kind) {
   const current=findState[kind];
-  $(`#${kind}FindCount`).textContent=current.matches.length?`${current.index+1}/${current.matches.length}`:'0/0';
+  $(`#${kind}FindCount`).textContent=current.error?'Regex lỗi':current.matches.length?`${current.index+1}/${current.matches.length}`:'0/0';
 }
 
 function selectFind(kind,direction=1) {
   refreshFind(kind);
   const current=findState[kind];
   if(!current.matches.length)return;
-  current.index=(current.index+direction+current.matches.length)%current.matches.length;
-  const editor=editorViews[kind], start=current.matches[current.index], length=$(`#${kind}Find`).value.length;
-  editor.setSelection(editor.posFromIndex(start),editor.posFromIndex(start+length));
+  current.index=current.index<0?(direction<0?current.matches.length-1:0):(current.index+direction+current.matches.length)%current.matches.length;
+  const editor=editorViews[kind], match=current.matches[current.index], start=match.index;
+  editor.setSelection(editor.posFromIndex(start),editor.posFromIndex(start+match.length));
   editor.focus(); editor.scrollIntoView(editor.posFromIndex(start),90); updateFindCount(kind);
 }
 
@@ -741,21 +902,30 @@ function markTargetChanged() {
   clearTimeout(state.timer); if($('#autosave').checked)state.timer=setTimeout(saveChapter,1200);
 }
 
+function expandFindReplacement(replacement,match) {
+  return replacement.replace(/\$(\$|&|\d{1,2})/g,(token,key)=>{
+    if(key==='$')return '$';
+    if(key==='&')return match.text;
+    const capture=match.captures[Number(key)-1];
+    return capture===undefined?token:capture;
+  });
+}
+
 function replaceCurrent(all=false) {
   const editor=editorViews.target, query=$('#targetFind').value, replacement=$('#targetReplace').value;
   if(!query)return;
   refreshFind('target');
+  if(findState.target.error)return toast('Regex không hợp lệ');
   if(all){
-    const escaped=query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-    const matches=findState.target.matches.length;
-    if(!matches)return;
-    editor.setValue(editor.getValue().replace(new RegExp(escaped,'giu'),()=>replacement));
-    toast(`Đã thay ${matches} kết quả`); return;
+    const matches=[...findState.target.matches];
+    if(!matches.length)return;
+    editor.operation(()=>[...matches].reverse().forEach(match=>editor.replaceRange(expandFindReplacement(replacement,match),editor.posFromIndex(match.index),editor.posFromIndex(match.index+match.length))));
+    toast(`Đã thay ${matches.length} kết quả`); return;
   }
   const current=findState.target;
   if(!current.matches.length)return;
-  const start=current.matches[Math.max(current.index,0)];
-  editor.replaceRange(replacement,editor.posFromIndex(start),editor.posFromIndex(start+query.length));
+  const match=current.matches[Math.max(current.index,0)], start=match.index;
+  editor.replaceRange(expandFindReplacement(replacement,match),editor.posFromIndex(start),editor.posFromIndex(start+match.length));
   selectFind('target',0);
 }
 
@@ -1083,17 +1253,56 @@ function confirmTask() {
 
 async function executePipeline(kind,config) {
   activeJobKind=kind;
+  novelStreamSequence=0;
   const pipelineItem=pipelineItems.find(item=>item.id===kind);
   if(pipelineItem)selectPipelineGroup(pipelineItem.group);
   const button = $(`[data-run="${kind}"]`); button.disabled=true; button.textContent='Đang chạy…'; $('#console').classList.add('open'); updateConsoleOutput('Đang khởi động tác vụ…');
-  const translation=['v1','v2','v3','gpt','gpt-api','manual'].includes(kind);
+  const translation=['v1','v1-interactions','v2','v3','gpt','gpt-api','manual'].includes(kind);
   $('#stopAfterCurrent').style.display=translation?'':'none'; $('#stopImmediately').style.display=translation?'':'none'; $('#stopCurrentTask').style.display=translation?'none':'';
   if (!state.project) { button.disabled=false; button.textContent='Chạy tác vụ'; return toast('Hãy chọn truyện trước'); }
   showView('pipeline');
-  try { await api('/api/run/'+kind+'?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({config:{skip_login_prompt:true,...config}})}); pollJob(kind,button); } catch(error){ button.disabled=false; button.textContent='Chạy lại'; toast(error.message); }
+  try { await api('/api/run/'+kind+'?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({config:{skip_login_prompt:true,...config}})}); if(kind==='v1-interactions')openNovelEventStream(kind); pollJob(kind,button); } catch(error){ button.disabled=false; button.textContent='Chạy lại'; toast(error.message); }
 }
 async function pollJob(kind, button) {
-  try { const job=await api('/api/job/'+kind); updateConsoleOutput(job.output || 'Đang xử lý…'); if(job.status==='running') return setTimeout(()=>pollJob(kind,button),500); activeJobKind=null; button.disabled=false; button.textContent=job.status==='done'?'Chạy lại':'Thử lại'; toast(job.status==='done'?'Tác vụ đã hoàn tất':job.status==='cancelled'?'Đã dừng tác vụ':'Tác vụ gặp lỗi'); await loadChapters(); if(['review','split-review'].includes(kind))await loadReviews(); if(['context-api','context-v1','context-gpt','glossary'].includes(kind))await loadContext(); if(kind==='characters')await loadCharacters(); } catch(error){ button.disabled=false; toast(error.message); }
+  try { const job=await api('/api/job/'+kind); if(!novelStreamSource)await applyNovelStreamEvents(job); updateConsoleOutput(job.output || 'Đang xử lý…'); if(job.status==='running') return setTimeout(()=>pollJob(kind,button),500); activeJobKind=null; button.disabled=false; button.textContent=job.status==='done'?'Chạy lại':'Thử lại'; toast(job.status==='done'?'Tác vụ đã hoàn tất':job.status==='cancelled'?'Đã dừng tác vụ':'Tác vụ gặp lỗi'); await loadChapters(); if(['review','split-review'].includes(kind))await loadReviews(); if(['context-api','context-v1','context-gpt','glossary'].includes(kind))await loadContext(); if(kind==='characters')await loadCharacters(); } catch(error){ button.disabled=false; toast(error.message); }
+}
+
+async function restoreActiveJob(job) {
+  if(!job)return;
+  if(job.project&&state.project!==job.project&&state.projects.includes(job.project))await selectProject(job.project);
+  novelStreamSequence=0;
+  $('#console').classList.add('open');
+  updateConsoleOutput(job.output||'Đang xử lý…');
+  showView('pipeline');
+  const translation=['v1','v1-interactions','v2','v3','gpt','gpt-api','manual','retranslate'].includes(job.kind);
+  $('#stopAfterCurrent').style.display=translation?'':'none';
+  $('#stopImmediately').style.display=translation?'':'none';
+  $('#stopCurrentTask').style.display=translation?'none':'';
+  if(job.kind==='retranslate'){
+    activeJobKind='retranslate';
+    if(job.streaming)openNovelEventStream('retranslate');
+    pollRetranslate();
+    return;
+  }
+  const pipelineItem=pipelineItems.find(item=>item.id===job.kind);
+  if(pipelineItem)selectPipelineGroup(pipelineItem.group);
+  const button=$(`[data-run="${job.kind}"]`);
+  if(!button)return;
+  activeJobKind=job.kind;
+  button.disabled=true;
+  button.textContent='Đang chạy…';
+  if(job.streaming)openNovelEventStream(job.kind);
+  pollJob(job.kind,button);
+}
+
+async function bootstrapWorkspace() {
+  let activeJob=null;
+  try {
+    const data=await api('/api/jobs/active');
+    activeJob=(data.items||[])[0]||null;
+  } catch(_error) {}
+  await loadProjects(activeJob?.project||'');
+  await restoreActiveJob(activeJob);
 }
 
 async function cancelCurrentTask() {
@@ -1119,12 +1328,14 @@ async function startRetranslate() {
   if (!state.current) return toast('Hãy chọn một chương trước');
   if (state.dirty) await saveChapter();
   const engine = $('input[name="engine"]:checked').value;
+  novelStreamSequence=0;
   $('#retranslateModal').classList.remove('open');
   $('#console').classList.add('open');
   showView('pipeline');
   updateConsoleOutput(`Đang dịch lại ${state.current} bằng ${engine.toUpperCase()}…`);
   try {
     await api('/api/retranslate?project='+encodeURIComponent(state.project), {method:'POST', body:JSON.stringify({engine,chapter:state.current})});
+    if(engine==='v1-interactions')openNovelEventStream('retranslate');
     pollRetranslate();
   } catch(error) { toast(error.message); }
 }
@@ -1132,6 +1343,7 @@ async function startRetranslate() {
 async function pollRetranslate() {
   try {
     const job=await api('/api/job/retranslate');
+    if(!novelStreamSource)await applyNovelStreamEvents(job);
     updateConsoleOutput(job.output || 'Đang xử lý…');
     if(job.status==='running') return setTimeout(pollRetranslate,500);
     if(job.status==='done') { toast('Đã dịch lại chương'); await openChapter(state.current); }
@@ -1198,6 +1410,13 @@ $('#closeSelectionTranslation').onclick=closeSelectionTranslation;
 });
 $('#targetReplace').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();replaceCurrent(false);}if(event.key==='Escape')$('#targetFindBar').classList.remove('open');});
 $$('[data-find-panel]').forEach(button=>button.onclick=()=>openFind(button.dataset.findPanel));
+$$('[data-find-option]').forEach(button=>button.onclick=()=>{
+  const kind=button.dataset.findEditor, option=button.dataset.findOption, current=findState[kind];
+  current[option]=!current[option]; current.index=-1;
+  button.classList.toggle('active',current[option]);
+  button.setAttribute('aria-pressed',String(current[option]));
+  refreshFind(kind);
+});
 $$('[data-find-action]').forEach(button=>button.onclick=()=>{
   const kind=button.dataset.findEditor, action=button.dataset.findAction;
   if(action==='next')selectFind(kind,1);
@@ -1235,7 +1454,6 @@ function setWorkspaceMode(mode,remember=true){
 $$('[data-mode]').forEach(button=>button.onclick=()=>setWorkspaceMode(button.dataset.mode));
 $$('[data-editor-mode]').forEach(button=>button.onclick=()=>setEditorMode(button.dataset.editorMode));
 $$('[data-format]').forEach(button=>button.onclick=()=>applyFormat(button.dataset.format));
-$('#closeConsole').onclick=()=>$('#console').classList.remove('open');
 $('#stopAfterCurrent').onclick=()=>cancelTranslation('after_current');
 $('#stopImmediately').onclick=()=>cancelTranslation('immediate');
 $('#stopCurrentTask').onclick=cancelCurrentTask;
@@ -1260,4 +1478,4 @@ setEditorMode('source-text');
 updateLineNumbers('source'); updateLineNumbers('target');
 initCodeEditors();
 setWorkspaceMode(window.matchMedia('(max-width:560px)').matches?(localStorage.getItem('mobileWorkspaceMode')||'target'):'split',false);
-initPunctuationOptions(); initPipeline(); loadProjects(); loadPythonSettings(); loadGeminiApiKeys(); loadUpdateStatus(); loadLanStatus();
+initPunctuationOptions(); initPipeline(); bootstrapWorkspace(); loadPythonSettings(); loadGeminiApiKeys(); loadUpdateStatus(); loadLanStatus();

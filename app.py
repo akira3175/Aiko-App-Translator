@@ -40,6 +40,7 @@ UPDATER_SOURCE = ROOT / "apply_update.ps1"
 
 PIPELINES = {
     "v1": ROOT / "cores" / "dich_v1.py",
+    "v1-interactions": ROOT / "cores" / "dich_interactions.py",
     "v2": ROOT / "cores" / "dich_v2.py",
     "v3": ROOT / "cores" / "dich_v3.py",
     "gpt": ROOT / "cores" / "dich_gpt.py",
@@ -56,7 +57,8 @@ PIPELINES = {
 }
 jobs: dict[str, dict] = {}
 job_processes: dict[str, subprocess.Popen] = {}
-TRANSLATION_KINDS = {"v1", "v2", "v3", "gpt", "gpt-api", "manual"}
+job_stream_events: dict[str, list[dict]] = {}
+TRANSLATION_KINDS = {"v1", "v1-interactions", "v2", "v3", "gpt", "gpt-api", "manual"}
 TRANSLATION_LOCK = ROOT / ".runtime" / "translation.lock"
 translation_guard = threading.RLock()
 lan_sessions: set[str] = set()
@@ -1126,6 +1128,31 @@ def stream_process_output(process: subprocess.Popen, job_key: str) -> str:
         for line in iter(process.stdout.readline, ""):
             if not line:
                 break
+            if line.startswith("@@NOVEL_STREAM@@"):
+                try:
+                    event = json.loads(line[len("@@NOVEL_STREAM@@") :])
+                    current = jobs.get(job_key)
+                    if current is not None and isinstance(event, dict):
+                        sequence = int(current.get("stream_sequence", 0)) + 1
+                        current["stream_sequence"] = sequence
+                        event["sequence"] = sequence
+                        live_events = job_stream_events.setdefault(job_key, [])
+                        live_events.append(dict(event))
+                        del live_events[:-1000]
+                        events = current.setdefault("stream_events", [])
+                        if (
+                            events
+                            and event.get("type") == "translation_snapshot"
+                            and events[-1].get("type") == "translation_snapshot"
+                            and events[-1].get("chapter") == event.get("chapter")
+                        ):
+                            events[-1] = event
+                        else:
+                            events.append(event)
+                            del events[:-300]
+                    continue
+                except (ValueError, TypeError, json.JSONDecodeError):
+                    pass
             output = (output + line)[-12000:]
             current = jobs.get(job_key)
             if current is not None:
@@ -1190,6 +1217,7 @@ def run_job(
     translation_claim: str | None = None,
 ):
     script = PIPELINES[kind]
+    job_stream_events[kind] = []
     task_config = dict(config or {})
     if kind == "manual":
         manual_result = str(task_config.pop("manual_result", ""))
@@ -1206,7 +1234,11 @@ def run_job(
     jobs[kind] = {
         "status": "running",
         "output": "Đang khởi động…",
+        "project": project_name,
+        "streaming": kind == "v1-interactions",
         "claim_id": translation_claim,
+        "stream_events": [],
+        "stream_sequence": 0,
     }
     try:
         process = subprocess.Popen(
@@ -1234,14 +1266,23 @@ def run_job(
             update_translation_pid(translation_claim, process.pid)
         output = stream_process_output(process, kind)
         cancelled = jobs.get(kind, {}).get("cancel_mode") == "immediate"
+        stream_state = jobs.get(kind, {})
         jobs[kind] = {
             "status": "cancelled"
             if cancelled
             else ("done" if process.returncode == 0 else "error"),
             "output": output,
+            "stream_events": stream_state.get("stream_events", []),
+            "stream_sequence": stream_state.get("stream_sequence", 0),
         }
     except Exception as exc:
-        jobs[kind] = {"status": "error", "output": str(exc)}
+        stream_state = jobs.get(kind, {})
+        jobs[kind] = {
+            "status": "error",
+            "output": str(exc),
+            "stream_events": stream_state.get("stream_events", []),
+            "stream_sequence": stream_state.get("stream_sequence", 0),
+        }
     finally:
         job_processes.pop(kind, None)
         stop_file.unlink(missing_ok=True)
@@ -1256,6 +1297,7 @@ def retranslate_job(
     translation_claim: str,
 ):
     job_key = "retranslate"
+    job_stream_events[job_key] = []
     _, translated = project_folders(project_name)
     target = safe_file(translated, chapter_name)
     backup = target.with_suffix(target.suffix + ".web-backup")
@@ -1268,7 +1310,11 @@ def retranslate_job(
     jobs[job_key] = {
         "status": "running",
         "output": f"Retranslating {chapter_name} with {engine.upper()}...",
+        "project": project_name,
+        "streaming": engine == "v1-interactions",
         "claim_id": translation_claim,
+        "stream_events": [],
+        "stream_sequence": 0,
     }
     try:
         if backup.exists():
@@ -1301,20 +1347,35 @@ def retranslate_job(
         if cancelled or process.returncode != 0 or not target.exists():
             if backup.exists():
                 backup.replace(target)
+            stream_state = jobs.get(job_key, {})
             jobs[job_key] = {
                 "status": "cancelled" if cancelled else "error",
                 "output": output or "Translation did not create an output file",
+                "stream_events": stream_state.get("stream_events", []),
+                "stream_sequence": stream_state.get("stream_sequence", 0),
             }
             return
         if backup.exists():
             backup.unlink()
-        jobs[job_key] = {"status": "done", "output": output}
+        stream_state = jobs.get(job_key, {})
+        jobs[job_key] = {
+            "status": "done",
+            "output": output,
+            "stream_events": stream_state.get("stream_events", []),
+            "stream_sequence": stream_state.get("stream_sequence", 0),
+        }
     except Exception as exc:
         if backup.exists():
             if target.exists():
                 target.unlink()
             backup.replace(target)
-        jobs[job_key] = {"status": "error", "output": str(exc)}
+        stream_state = jobs.get(job_key, {})
+        jobs[job_key] = {
+            "status": "error",
+            "output": str(exc),
+            "stream_events": stream_state.get("stream_events", []),
+            "stream_sequence": stream_state.get("stream_sequence", 0),
+        }
     finally:
         job_processes.pop(job_key, None)
         release_translation(translation_claim)
@@ -1365,6 +1426,39 @@ class Handler(BaseHTTPRequestHandler):
     def body(self):
         length = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(length) or b"{}")
+
+    def stream_job_events(self, job_key: str, after: int):
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        last_sequence = after
+        last_ping = time.monotonic()
+        try:
+            while True:
+                pending = [
+                    event
+                    for event in job_stream_events.get(job_key, [])
+                    if int(event.get("sequence", 0)) > last_sequence
+                ]
+                for event in pending:
+                    payload = json.dumps(event, ensure_ascii=False)
+                    self.wfile.write(f"data: {payload}\n\n".encode("utf-8"))
+                    last_sequence = int(event.get("sequence", last_sequence))
+                if pending:
+                    self.wfile.flush()
+                job = jobs.get(job_key, {})
+                if job.get("status") in {"done", "error", "cancelled"} and not pending:
+                    self.wfile.write(b"event: done\ndata: {}\n\n")
+                    self.wfile.flush()
+                    return
+                if time.monotonic() - last_ping >= 10:
+                    self.wfile.write(b": ping\n\n")
+                    self.wfile.flush()
+                    last_ping = time.monotonic()
+                time.sleep(0.03)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return
 
     def is_loopback(self):
         try:
@@ -1503,6 +1597,25 @@ class Handler(BaseHTTPRequestHandler):
             return self.json_response(
                 jobs.get(path.rsplit("/", 1)[-1], {"status": "idle", "output": ""})
             )
+        if path == "/api/jobs/active":
+            return self.json_response(
+                {
+                    "items": [
+                        {"kind": kind, **job}
+                        for kind, job in jobs.items()
+                        if job.get("status") == "running"
+                    ]
+                }
+            )
+        if path.startswith("/api/job-stream/"):
+            job_key = unquote(path.rsplit("/", 1)[-1])
+            if job_key not in PIPELINES and job_key != "retranslate":
+                return self.json_response({"error": "Unknown job"}, HTTPStatus.NOT_FOUND)
+            try:
+                after = max(0, int(query.get("after", ["0"])[0]))
+            except ValueError:
+                after = 0
+            return self.stream_job_events(job_key, after)
         if path.startswith("/api/image/"):
             try:
                 target = safe_image(project, unquote(path.rsplit("/", 1)[-1]))
@@ -1830,7 +1943,7 @@ class Handler(BaseHTTPRequestHandler):
                 engine, chapter = payload.get("engine", ""), payload.get("chapter", "")
                 raw, _ = project_folders(project)
                 safe_file(raw, chapter)
-                if engine not in {"v1", "v2", "v3", "gpt", "gpt-api"}:
+                if engine not in {"v1", "v1-interactions", "v2", "v3", "gpt", "gpt-api"}:
                     raise ValueError("Invalid translation engine")
                 if jobs.get("retranslate", {}).get("status") == "running":
                     return self.json_response(
