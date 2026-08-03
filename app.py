@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import difflib
 import mimetypes
 import os
 import ipaddress
@@ -14,6 +15,7 @@ import sys
 import threading
 import time
 import traceback
+import unicodedata
 import webbrowser
 import zipfile
 from http import HTTPStatus
@@ -58,6 +60,7 @@ PIPELINES = {
 jobs: dict[str, dict] = {}
 job_processes: dict[str, subprocess.Popen] = {}
 job_stream_events: dict[str, list[dict]] = {}
+chapter_import_previews: dict[str, dict] = {}
 TRANSLATION_KINDS = {"v1", "v1-interactions", "v2", "v3", "gpt", "gpt-api", "manual"}
 TRANSLATION_LOCK = ROOT / ".runtime" / "translation.lock"
 translation_guard = threading.RLock()
@@ -1121,6 +1124,215 @@ def save_context(project_name: str, payload: dict):
     return result
 
 
+CHAPTER_FILE_RE = re.compile(r"^v(\d+)_c(\d+)_s(\d+)\.md$", re.IGNORECASE)
+
+
+def _import_chapter_groups(raw_dir: Path):
+    groups: dict[tuple[int, int], list[Path]] = {}
+    for path in raw_dir.glob("v*_c*_s*.md") if raw_dir.is_dir() else []:
+        match = CHAPTER_FILE_RE.match(path.name)
+        if match:
+            key = (int(match.group(1)), int(match.group(2)))
+            groups.setdefault(key, []).append(path)
+    for paths in groups.values():
+        paths.sort(key=lambda item: int(CHAPTER_FILE_RE.match(item.name).group(3)))
+    return groups
+
+
+def _import_chapter_text(paths):
+    parts = [path.read_text(encoding="utf-8", errors="replace") for path in paths]
+    return "\n".join(parts)
+
+
+def _normalized_anchor_text(value, *, title=False):
+    value = unicodedata.normalize("NFKC", str(value)).casefold()
+    if title:
+        value = re.sub(r"^(?:chapter|chap|chương|第|제)\s*\d+\s*(?:章|話|话|幕|화|장)?", "", value)
+    value = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", value)
+    return re.sub(r"[^\w\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]+", "", value)[:1600]
+
+
+def _chapter_anchor_features(text):
+    lines = text.splitlines()
+    return (
+        _normalized_anchor_text(lines[0] if lines else "", title=True),
+        _normalized_anchor_text("\n".join(lines[1:])),
+    )
+
+
+def _chapter_anchor(source_features, existing_features):
+    source_title, source_body = source_features
+    existing_title, existing_body = existing_features
+    title_score = difflib.SequenceMatcher(None, source_title, existing_title).ratio() if source_title and existing_title else 0
+    body_score = difflib.SequenceMatcher(None, source_body, existing_body).ratio() if source_body and existing_body else 0
+    score = title_score * 0.4 + body_score * 0.6
+    valid = body_score >= 0.72 or (title_score >= 0.9 and body_score >= 0.35)
+    return score if valid else 0
+
+
+def create_chapter_import_preview(project_name, source_format, segment_limit, content):
+    project = safe_project(project_name)
+    raw_dir, _translated = project_folders(project_name)
+    if source_format not in {"epub", "txt"}:
+        raise ValueError("Chỉ hỗ trợ file EPUB hoặc TXT")
+    if not 500 <= segment_limit <= 50000:
+        raise ValueError("Giới hạn segment phải từ 500 đến 50.000")
+    if not content or len(content) > 300 * 1024 * 1024:
+        raise ValueError("File trống hoặc vượt quá 300 MB")
+    token = secrets.token_urlsafe(18)
+    staging = ROOT / ".runtime" / "chapter-imports" / token
+    staging.mkdir(parents=True)
+    upload = staging / f"source.{source_format}"
+    upload.write_bytes(content)
+    try:
+        from split.chapter_splitter_novelpia_md import split_epub_to_md, split_txt_to_md
+
+        splitter = split_epub_to_md if source_format == "epub" else split_txt_to_md
+        result = splitter(
+            str(upload), 0, str(ROOT), project_dir=str(staging),
+            segment_limit=segment_limit, return_details=True,
+        )
+        upload.unlink(missing_ok=True)
+        source_groups = _import_chapter_groups(staging / "raw")
+        if not source_groups:
+            raise ValueError(f"Không tách được chương nào từ {source_format.upper()}")
+        existing_groups = _import_chapter_groups(raw_dir)
+        existing_texts = {key: _import_chapter_text(paths) for key, paths in existing_groups.items()}
+        existing_features = {key: _chapter_anchor_features(text) for key, text in existing_texts.items()}
+        title_keys = {}
+        body_keys = {}
+        for key, (title, body) in existing_features.items():
+            if title:
+                title_keys.setdefault(title, []).append(key)
+            if body:
+                body_keys.setdefault(body[:240], []).append(key)
+        anchors = []
+        chapters = []
+        for (_volume, source_index), paths in sorted(source_groups.items()):
+            text = _import_chapter_text(paths)
+            title = text.splitlines()[0].removeprefix("# ").strip() if text else f"Chương {source_index}"
+            source_features = _chapter_anchor_features(text)
+            source_title, source_body = source_features
+            candidate_keys = set(title_keys.get(source_title, [])) | set(body_keys.get(source_body[:240], []))
+            if not candidate_keys and source_title:
+                for close_title in difflib.get_close_matches(source_title, title_keys, n=5, cutoff=0.55):
+                    candidate_keys.update(title_keys[close_title])
+            if not candidate_keys and source_body:
+                for close_body in difflib.get_close_matches(source_body[:240], body_keys, n=5, cutoff=0.55):
+                    candidate_keys.update(body_keys[close_body])
+            ranked = sorted(
+                ((_chapter_anchor(source_features, existing_features[key]), key) for key in candidate_keys),
+                reverse=True,
+            )
+            best_score, best_key = ranked[0] if ranked else (0, None)
+            second_score = ranked[1][0] if len(ranked) > 1 else 0
+            matched = best_key if best_score >= 0.62 and best_score - second_score >= 0.08 else None
+            if matched:
+                anchors.append((source_index, matched[0], matched[1], best_score))
+            chapters.append({
+                "source_index": source_index,
+                "title": title,
+                "segments": len(paths),
+                "match": f"v{matched[0]}_c{matched[1]}" if matched else "",
+                "match_score": round(best_score, 2) if matched else 0,
+            })
+        mappings = {}
+        for source_index, volume, chapter, _score in anchors:
+            mappings.setdefault((volume, chapter - source_index), []).append(source_index)
+        best_mapping, mapped_sources = max(mappings.items(), key=lambda item: len(item[1])) if mappings else ((None, None), [])
+        if mapped_sources:
+            volume, offset = best_mapping
+            suggested_from = max(mapped_sources) + 1
+            no_new = suggested_from > chapters[-1]["source_index"]
+            source_from = chapters[-1]["source_index"] if no_new else suggested_from
+            target_start = source_from + offset
+            confidence = "high" if len(mapped_sources) >= 2 else "medium"
+        else:
+            latest = max(existing_groups, default=(1, -1))
+            volume, source_from, target_start, confidence = latest[0], chapters[0]["source_index"], latest[1] + 1, "manual"
+            no_new = False
+        source_to = chapters[-1]["source_index"]
+        for chapter in chapters:
+            chapter["selected"] = not no_new and source_from <= chapter["source_index"] <= source_to
+        chapter_import_previews[token] = {
+            "project": project.name,
+            "staging": staging,
+            "created": time.time(),
+            "source_groups": source_groups,
+        }
+        return {
+            **result,
+            "token": token,
+            "chapters": chapters,
+            "chapter_count": result.get("chapters", len(chapters)),
+            "source_from": source_from,
+            "source_to": source_to,
+            "target_volume": volume,
+            "target_start": target_start,
+            "anchors": len(mapped_sources),
+            "confidence": confidence,
+            "no_new": no_new,
+        }
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+
+def confirm_chapter_import(project_name, payload):
+    token = str(payload.get("token", ""))
+    preview = chapter_import_previews.get(token)
+    if not preview or preview["project"] != project_name:
+        raise ValueError("Bản xem trước đã hết hạn; hãy phân tích lại file")
+    source_from = int(payload.get("source_from", 0))
+    source_to = int(payload.get("source_to", -1))
+    target_volume = int(payload.get("target_volume", 0))
+    target_start = int(payload.get("target_start", 0))
+    conflict = str(payload.get("conflict", "skip"))
+    if source_from < 0 or source_to < source_from or target_volume < 0 or target_start < 0:
+        raise ValueError("Range hoặc chương đích không hợp lệ")
+    if conflict not in {"skip", "overwrite"}:
+        raise ValueError("Cách xử lý chương trùng không hợp lệ")
+    selected = {int(value) for value in payload.get("selected", [])}
+    project = safe_project(project_name)
+    raw_dir, _translated = project_folders(project_name)
+    image_dir = project / "image"
+    image_dir.mkdir(exist_ok=True)
+    imported = skipped = overwritten = 0
+    first_file = ""
+    imported_images = set()
+    try:
+        for (_source_volume, source_index), paths in sorted(preview["source_groups"].items()):
+            if not source_from <= source_index <= source_to or (selected and source_index not in selected):
+                continue
+            target_chapter = target_start + source_index - source_from
+            existing = list(raw_dir.glob(f"v{target_volume}_c{target_chapter}_s*.md"))
+            if existing and conflict == "skip":
+                skipped += 1
+                continue
+            if existing:
+                for path in existing:
+                    shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
+                    path.unlink()
+                overwritten += 1
+            for segment, source_path in enumerate(paths, 1):
+                target = raw_dir / f"v{target_volume}_c{target_chapter}_s{segment}.md"
+                shutil.copy2(source_path, target)
+                imported_images.update(
+                    Path(match).name
+                    for match in re.findall(r"\.\./image/([^\s)]+)", source_path.read_text(encoding="utf-8", errors="replace"))
+                )
+                first_file = first_file or target.name
+            imported += 1
+        for image_name in imported_images:
+            image = preview["staging"] / "image" / image_name
+            if image.is_file():
+                shutil.copy2(image, image_dir / image.name)
+        return {"ok": True, "imported": imported, "skipped": skipped, "overwritten": overwritten, "first_file": first_file}
+    finally:
+        chapter_import_previews.pop(token, None)
+        shutil.rmtree(preview["staging"], ignore_errors=True)
+
+
 def stream_process_output(process: subprocess.Popen, job_key: str) -> str:
     """Publish child-process output to the web console as each line arrives."""
     output = ""
@@ -1696,6 +1908,30 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path, query = parsed.path, parse_qs(parsed.query)
         project = query.get("project", [""])[0]
+        if path == "/api/chapters/import-preview":
+            try:
+                source_format = query.get("format", ["epub"])[0].lower()
+                segment_limit = int(query.get("segment_limit", ["5000"])[0])
+                length = int(self.headers.get("Content-Length", 0))
+                if not length or length > 300 * 1024 * 1024:
+                    raise ValueError("File trống hoặc vượt quá 300 MB")
+                content = self.rfile.read(length) if length else b""
+                return self.json_response(
+                    create_chapter_import_preview(project, source_format, segment_limit, content)
+                )
+            except Exception as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/chapters/import-confirm":
+            try:
+                return self.json_response(confirm_chapter_import(project, self.body()))
+            except Exception as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/chapters/import-cancel":
+            payload = self.body()
+            preview = chapter_import_previews.pop(str(payload.get("token", "")), None)
+            if preview:
+                shutil.rmtree(preview["staging"], ignore_errors=True)
+            return self.json_response({"ok": True})
         if path == "/api/projects":
             project_path = None
             created_project = False

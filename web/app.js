@@ -29,6 +29,7 @@ let geminiApiKeys=[];
 let publishingBooks=[];
 let manualPromptRequest=0;
 let availableUpdate=null;
+let chapterImportPreview=null;
 const settingsGroups={
   'gemini-api':['Gemini API','Model và thông số sinh nội dung khi dịch, hậu dịch và review qua API.'],
   'gemini-web':['Gemini Web','Gem, model và mức suy nghĩ khi tự động hóa trình duyệt Gemini.'],
@@ -37,6 +38,17 @@ const settingsGroups={
   publishing:['Xuất bản','Tài khoản Hako và kho ảnh Cloudflare R2.'],
   general:['Chung','Hành vi chung của workspace và quy trình hậu xử lý.'],
 };
+const appThemes=[
+  {id:'quiet-light',name:'Quiet Light',description:'Sáng, nhẹ mắt',color:'#f5f5f5'},
+  {id:'dark-modern',name:'Dark Modern',description:'Tối mặc định',color:'#101412'},
+  {id:'synthwave-84',name:"SynthWave '84",description:'Neon hoài cổ',color:'#21182d'},
+  {id:'solarized-dark',name:'Solarized Dark',description:'Tương phản dịu',color:'#002b36'},
+  {id:'monokai-dimmed',name:'Monokai Dimmed',description:'Ấm và tập trung',color:'#1e1f1c'},
+  {id:'sakura-night',name:'Sakura Night',description:'Anime đêm hoa anh đào',color:'#101625'},
+  {id:'tokyo-night',name:'Tokyo Night',description:'Xanh tím Tokyo',color:'#1a1b26'},
+  {id:'abyss',name:'Abyss',description:'Xanh vực sâu',color:'#000c18'},
+  {id:'kimbie-dark',name:'Kimbie Dark',description:'Nâu hổ phách',color:'#221a0f'},
+];
 const views = { workspace: ['BÀN DỊCH','Không gian dịch'], chapters: ['THƯ VIỆN','Kho chương'], pipeline: ['TỰ ĐỘNG HÓA','Quy trình AI'], terminology: ['BỘ NHỚ','Thuật ngữ'], characters: ['BỘ NHỚ','Hồ sơ nhân vật'], pronouns: ['BỘ NHỚ','Xưng hô'], help: ['TRỢ GIÚP','Hướng dẫn sử dụng'], settings: ['HỆ THỐNG','Cài đặt'] };
 
 function initCodeEditors() {
@@ -247,6 +259,21 @@ async function api(path, options) {
       throw error;
     }
   }
+}
+
+function renderThemeOptions() {
+  const current=document.documentElement.dataset.theme||'dark-modern';
+  $('#themeOptions').innerHTML=appThemes.map(theme=>`<button class="theme-option ${theme.id===current?'active':''}" type="button" data-theme-option="${theme.id}" aria-pressed="${theme.id===current}"><span class="theme-swatch" aria-hidden="true"></span><span><strong>${theme.name}</strong><small>${theme.description}</small></span></button>`).join('');
+  $$('[data-theme-option]').forEach(button=>button.onclick=()=>applyTheme(button.dataset.themeOption));
+}
+
+function applyTheme(themeId) {
+  const theme=appThemes.find(item=>item.id===themeId)||appThemes[1];
+  document.documentElement.dataset.theme=theme.id;
+  localStorage.setItem('novel-theme',theme.id);
+  $('#themeColor').setAttribute('content',theme.color);
+  renderThemeOptions();
+  requestAnimationFrame(()=>{editorViews.source?.refresh();editorViews.target?.refresh();});
 }
 
 function renderPythonSettings(items) {
@@ -991,6 +1018,92 @@ async function createProject() {
   } catch(error){toast(error.message);} finally {button.disabled=false;button.textContent='Tạo và tách truyện';}
 }
 
+function openChapterImport() {
+  if(!state.project)return toast('Hãy chọn truyện trước');
+  chapterImportPreview=null;
+  $('#chapterImportFile').value='';
+  $('#chapterImportPreview').classList.remove('open');
+  $('#analyzeChapterImport').style.display='';
+  $('#confirmChapterImport').style.display='none';
+  $('#chapterImportModal').classList.add('open');
+}
+
+function renderChapterImportPreview() {
+  if(!chapterImportPreview)return;
+  const sourceFrom=Number($('#chapterImportFrom').value);
+  const sourceTo=Number($('#chapterImportTo').value);
+  const volume=Number($('#chapterImportVolume').value);
+  const targetStart=Number($('#chapterImportStart').value);
+  const confidence={high:'Cao',medium:'Khá',manual:'Cần kiểm tra'}[chapterImportPreview.confidence]||'Cần kiểm tra';
+  $('#chapterImportSuggestion').innerHTML=chapterImportPreview.no_new
+    ? `<strong>Chưa thấy chương mới rõ ràng</strong><span>Đã tìm thấy ${chapterImportPreview.anchors} điểm neo. Hãy chọn range thủ công nếu EPUB có cấu trúc khác.</span>`
+    : `<strong>Đề xuất · độ tin cậy ${confidence}</strong><span>${chapterImportPreview.anchors} chương trùng dùng làm điểm neo · nguồn ${sourceFrom}–${sourceTo} → v${volume}_c${targetStart}…</span>`;
+  $('#chapterImportRows').innerHTML=chapterImportPreview.chapters.map(chapter=>{
+    const inRange=chapter.source_index>=sourceFrom&&chapter.source_index<=sourceTo;
+    const target=targetStart+chapter.source_index-sourceFrom;
+    const checked=inRange&&chapter.selected?'checked':'';
+    return `<tr class="${inRange?'':'outside-range'}"><td><input type="checkbox" data-import-source="${chapter.source_index}" ${checked} ${inRange?'':'disabled'}></td><td><strong>${chapter.source_index}</strong><span>${escapeHtml(chapter.title)}</span></td><td><code>v${volume}_c${target}_s*.md</code></td><td>${chapter.match?`<b>${chapter.match}</b><small>${Math.round(chapter.match_score*100)}%</small>`:'—'}</td></tr>`;
+  }).join('');
+  $$('[data-import-source]').forEach(input=>input.onchange=()=>{
+    const chapter=chapterImportPreview.chapters.find(item=>item.source_index===Number(input.dataset.importSource));
+    if(chapter)chapter.selected=input.checked;
+  });
+}
+
+function updateChapterImportRange() {
+  if(!chapterImportPreview)return;
+  const sourceFrom=Number($('#chapterImportFrom').value), sourceTo=Number($('#chapterImportTo').value);
+  chapterImportPreview.chapters.forEach(chapter=>{chapter.selected=chapter.source_index>=sourceFrom&&chapter.source_index<=sourceTo;});
+  renderChapterImportPreview();
+}
+
+async function analyzeChapterImport() {
+  const file=$('#chapterImportFile').files[0], limit=Number($('#chapterImportSegmentLimit').value), button=$('#analyzeChapterImport');
+  if(!file)return toast('Hãy chọn file EPUB hoặc TXT');
+  const format=file.name.toLowerCase().endsWith('.epub')?'epub':file.name.toLowerCase().endsWith('.txt')?'txt':'';
+  if(!format)return toast('File phải có định dạng EPUB hoặc TXT');
+  if(!Number.isInteger(limit)||limit<500||limit>50000)return toast('Giới hạn segment phải từ 500 đến 50.000');
+  button.disabled=true;button.textContent='Đang tìm điểm neo…';
+  try {
+    const query=new URLSearchParams({project:state.project,format,segment_limit:String(limit)});
+    chapterImportPreview=await api('/api/chapters/import-preview?'+query,{method:'POST',headers:{'Content-Type':format==='epub'?'application/epub+zip':'text/plain;charset=utf-8'},body:file});
+    $('#chapterImportFrom').value=chapterImportPreview.source_from;
+    $('#chapterImportTo').value=chapterImportPreview.source_to;
+    $('#chapterImportVolume').value=chapterImportPreview.target_volume;
+    $('#chapterImportStart').value=chapterImportPreview.target_start;
+    $('#chapterImportPreview').classList.add('open');
+    button.style.display='none';
+    $('#confirmChapterImport').style.display='';
+    renderChapterImportPreview();
+  } catch(error){toast(error.message);} finally {button.disabled=false;button.textContent='Phân tích file';}
+}
+
+async function confirmChapterImport() {
+  if(!chapterImportPreview)return;
+  const button=$('#confirmChapterImport');
+  const sourceFrom=Number($('#chapterImportFrom').value), sourceTo=Number($('#chapterImportTo').value);
+  const targetVolume=Number($('#chapterImportVolume').value), targetStart=Number($('#chapterImportStart').value);
+  const selected=$$('[data-import-source]:checked').map(input=>Number(input.dataset.importSource));
+  if(!Number.isInteger(sourceFrom)||!Number.isInteger(sourceTo)||sourceTo<sourceFrom||targetVolume<0||targetStart<0)return toast('Range hoặc chương đích không hợp lệ');
+  if(!selected.length)return toast('Hãy chọn ít nhất một chương để nhập');
+  button.disabled=true;button.textContent='Đang nhập…';
+  try {
+    const result=await api('/api/chapters/import-confirm?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({token:chapterImportPreview.token,source_from:sourceFrom,source_to:sourceTo,target_volume:targetVolume,target_start:targetStart,selected,conflict:$('#chapterImportConflict').value})});
+    $('#chapterImportModal').classList.remove('open');
+    chapterImportPreview=null;
+    await loadChapters();
+    if(result.first_file)await openChapter(result.first_file);
+    toast(`Đã thêm ${result.imported} chương${result.skipped?` · bỏ qua ${result.skipped} chương trùng`:''}${result.overwritten?` · ghi đè ${result.overwritten}`:''}`);
+  } catch(error){toast(error.message);} finally {button.disabled=false;button.textContent='Nhập các chương đã chọn';}
+}
+
+async function cancelChapterImport() {
+  const preview=chapterImportPreview;
+  chapterImportPreview=null;
+  $('#chapterImportModal').classList.remove('open');
+  if(preview)try { await api('/api/chapters/import-cancel',{method:'POST',body:JSON.stringify({token:preview.token})}); } catch(_error) {}
+}
+
 async function saveChapter() {
   if (!state.current) return toast('Hãy chọn một chương trước');
   setSaveState('Đang lưu…');
@@ -1369,6 +1482,12 @@ $('#projectSelect').onclick = () => togglePopover($('#projectPopover'),$('#proje
 $('#addProjectButton').onclick=()=>$('#newProjectModal').classList.add('open');
 $('#cancelNewProject').onclick=()=>$('#newProjectModal').classList.remove('open');
 $('#confirmNewProject').onclick=createProject;
+$('#addChaptersButton').onclick=openChapterImport;
+$('#cancelChapterImport').onclick=cancelChapterImport;
+$('#analyzeChapterImport').onclick=analyzeChapterImport;
+$('#confirmChapterImport').onclick=confirmChapterImport;
+['chapterImportFrom','chapterImportTo'].forEach(id=>$(`#${id}`).oninput=updateChapterImportRange);
+['chapterImportVolume','chapterImportStart'].forEach(id=>$(`#${id}`).oninput=renderChapterImportPreview);
 $('#helpSearch').oninput=event=>filterHelp(event.target.value);
 $$('[data-help-topic-button]').forEach(button=>button.onclick=()=>openHelpTopic(button.dataset.helpTopicButton));
 $('#chapterSearch').oninput = e => renderChapterList(e.target.value);
@@ -1478,4 +1597,4 @@ setEditorMode('source-text');
 updateLineNumbers('source'); updateLineNumbers('target');
 initCodeEditors();
 setWorkspaceMode(window.matchMedia('(max-width:560px)').matches?(localStorage.getItem('mobileWorkspaceMode')||'target'):'split',false);
-initPunctuationOptions(); initPipeline(); bootstrapWorkspace(); loadPythonSettings(); loadGeminiApiKeys(); loadUpdateStatus(); loadLanStatus();
+renderThemeOptions(); initPunctuationOptions(); initPipeline(); bootstrapWorkspace(); loadPythonSettings(); loadGeminiApiKeys(); loadUpdateStatus(); loadLanStatus();
