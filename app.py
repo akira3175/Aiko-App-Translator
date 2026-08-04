@@ -27,6 +27,17 @@ from urllib.request import Request, urlopen
 
 import yaml
 
+from cores.translation_prompts import (
+    DEFAULT_POLISH_ROLE,
+    DEFAULT_POLISH_TASK,
+    DEFAULT_ROLE,
+    DEFAULT_TASK,
+    POLISH_PROMPT_PRESETS,
+    PROMPT_PRESETS,
+    polish_prompt_presets_payload,
+    prompt_presets_payload,
+)
+
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "web"
 LIBRARY = ROOT / "truyen"
@@ -806,7 +817,20 @@ def review_data(project_name: str, source: str):
 def context_data(project_name: str):
     path = safe_project(project_name) / "context.yaml"
     if not path.exists():
-        return {"index": 0, "glossary": [], "style_notes": "", "raw_yaml": ""}
+        return {
+            "index": 0,
+            "glossary": [],
+            "style_notes": "",
+            "prompt_preset": "default",
+            "prompt_role": DEFAULT_ROLE,
+            "prompt_task": DEFAULT_TASK,
+            "prompt_presets": prompt_presets_payload(),
+            "polish_prompt_preset": "default",
+            "polish_prompt_role": DEFAULT_POLISH_ROLE,
+            "polish_prompt_task": DEFAULT_POLISH_TASK,
+            "polish_prompt_presets": polish_prompt_presets_payload(),
+            "raw_yaml": "",
+        }
     raw_yaml = path.read_text(encoding="utf-8")
     data = yaml.safe_load(raw_yaml) or {}
     if not isinstance(data, dict):
@@ -821,6 +845,14 @@ def context_data(project_name: str):
         "index": data.get("index", 0),
         "glossary": glossary,
         "style_notes": str(data.get("style_notes", "")).strip(),
+        "prompt_preset": str(data.get("prompt_preset", "default")),
+        "prompt_role": str(data.get("prompt_role", "")).strip() or DEFAULT_ROLE,
+        "prompt_task": str(data.get("prompt_task", "")).strip() or DEFAULT_TASK,
+        "prompt_presets": prompt_presets_payload(),
+        "polish_prompt_preset": str(data.get("polish_prompt_preset", "default")),
+        "polish_prompt_role": str(data.get("polish_prompt_role", "")).strip() or DEFAULT_POLISH_ROLE,
+        "polish_prompt_task": str(data.get("polish_prompt_task", "")).strip() or DEFAULT_POLISH_TASK,
+        "polish_prompt_presets": polish_prompt_presets_payload(),
         "raw_yaml": raw_yaml,
     }
 
@@ -1085,6 +1117,50 @@ def save_context(project_name: str, payload: dict):
         data["index"] = index
         data["glossary"] = "\n".join(glossary_lines)
         data["style_notes"] = str(fields.get("style_notes", "")).strip()
+        prompt_preset = str(
+            fields.get("prompt_preset", data.get("prompt_preset", "default"))
+        ).strip()
+        if prompt_preset not in {*PROMPT_PRESETS, "custom"}:
+            raise ValueError("Preset prompt không hợp lệ")
+        prompt_role = str(
+            fields.get("prompt_role", data.get("prompt_role", DEFAULT_ROLE))
+        ).strip()
+        prompt_task = str(
+            fields.get("prompt_task", data.get("prompt_task", DEFAULT_TASK))
+        ).strip()
+        if not prompt_role or len(prompt_role) > 20000:
+            raise ValueError("Prompt vai trò phải có từ 1 đến 20.000 ký tự")
+        if not prompt_task or len(prompt_task) > 20000:
+            raise ValueError("Prompt nhiệm vụ phải có từ 1 đến 20.000 ký tự")
+        data["prompt_preset"] = prompt_preset
+        data["prompt_role"] = prompt_role
+        data["prompt_task"] = prompt_task
+        polish_prompt_preset = str(
+            fields.get(
+                "polish_prompt_preset", data.get("polish_prompt_preset", "default")
+            )
+        ).strip()
+        if polish_prompt_preset not in {*POLISH_PROMPT_PRESETS, "custom"}:
+            raise ValueError("Mẫu prompt hiệu đính không hợp lệ")
+        polish_prompt_role = str(
+            fields.get(
+                "polish_prompt_role",
+                data.get("polish_prompt_role", DEFAULT_POLISH_ROLE),
+            )
+        ).strip()
+        polish_prompt_task = str(
+            fields.get(
+                "polish_prompt_task",
+                data.get("polish_prompt_task", DEFAULT_POLISH_TASK),
+            )
+        ).strip()
+        if not polish_prompt_role or len(polish_prompt_role) > 20000:
+            raise ValueError("Vai trò hiệu đính phải có từ 1 đến 20.000 ký tự")
+        if not polish_prompt_task or len(polish_prompt_task) > 20000:
+            raise ValueError("Nhiệm vụ hiệu đính phải có từ 1 đến 20.000 ký tự")
+        data["polish_prompt_preset"] = polish_prompt_preset
+        data["polish_prompt_role"] = polish_prompt_role
+        data["polish_prompt_task"] = polish_prompt_task
         write_context_safely(path, data)
         result = context_data(project_name)
         result["backup"] = path.with_name(path.name + ".bak").exists()

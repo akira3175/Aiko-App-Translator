@@ -1,0 +1,34 @@
+{
+  "versions": [
+    {
+      "version": "0.9.0",
+      "date": "2026-08-05",
+      "title": "Prompt theo phong cách riêng, dịch web chính xác hơn",
+      "summary": "Bản cập nhật mở rộng khả năng tùy chỉnh prompt theo từng truyện và ngăn Gemini, ChatGPT lấy nhầm bản dịch cũ trong cùng cuộc trò chuyện.",
+      "highlights": [
+        "Cho phép chọn prompt dịch mẫu hoặc tự chỉnh vai trò và nhiệm vụ theo từng truyện.",
+        "Thêm prompt hiệu đính tùy chỉnh với các mẫu cân bằng, sát nguyên tác, biên tập văn học và sửa lỗi tối thiểu.",
+        "Áp dụng prompt hiệu đính riêng cho cả Gemini API và GPT API.",
+        "Ngăn ChatGPT Web và Gemini Web lấy nhầm câu trả lời cũ khi tiếp tục dùng cùng cuộc trò chuyện.",
+        "Bổ sung đầy đủ dấu tiếng Việt cho prompt hiệu đính Gemini.",
+        "Thêm cửa sổ Có gì mới để giới thiệu nội dung sau khi cập nhật.",
+        "Tinh gọn danh sách tác vụ bằng cách ẩn Chèn thuật ngữ và Tách review khỏi giao diện chính."
+      ]
+    },
+    {
+      "version": "0.8.0",
+      "date": "2026-08-04",
+      "title": "Dịch linh hoạt hơn, xuất bản liền mạch hơn",
+      "summary": "Bản cập nhật tập trung vào khả năng tùy chỉnh engine dịch, độ an toàn của glossary và quy trình đăng chương lên Hako.",
+      "highlights": [
+        "Mở cuộc trò chuyện ChatGPT đã chuẩn bị sẵn prompt mớm trước khi gửi prompt dịch chính.",
+        "Cho phép bỏ qua các model phụ Gemini API và GPT API khi để trống hoặc nhập none.",
+        "Thêm model cập nhật xưng hô riêng cho Gemini API và GPT API.",
+        "Cảnh báo khi chương dịch vượt quá phạm vi glossary đã duyệt.",
+        "Tự tạo ghi chú Hako từ cú pháp (note: nội dung) và gắn note đúng vị trí.",
+        "Thay logo, brandmark và favicon mới; cải thiện hiển thị tên truyện dài.",
+        "Bản portable có thể tự chuẩn bị môi trường build khi máy không cài Python hệ thống."
+      ]
+    }
+  ]
+}

@@ -54,9 +54,7 @@ TRANSLATE_MODEL = str(option("translate_model", "gemini-3.5-flash"))
 
 
 def _build_prompt(chapter, context_text, pronoun_context, pre_chapters):
-    return build_single_prompt(
-        chapter, context_text, pronoun_context, pre_chapters, detailed_pronouns=False
-    )
+    return build_single_prompt(chapter, context_text, pronoun_context, pre_chapters)
 
 
 # ==== DỊCH ĐƠN CHƯƠNG (API) ====

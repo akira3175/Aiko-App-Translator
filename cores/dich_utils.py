@@ -21,6 +21,7 @@ from selenium import webdriver
 from selenium.common.exceptions import (
     NoSuchElementException,
     SessionNotCreatedException,
+    StaleElementReferenceException,
     TimeoutException,
 )
 from selenium.webdriver.chrome.options import Options
@@ -33,6 +34,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
 from cores.runtime_config import bool_option, int_option, option, web_mode
+from cores.translation_prompts import project_polish_prompt
 
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORTABLE_CHROME = os.path.join(
@@ -695,6 +697,93 @@ def copy_response_text(driver):
     return None
 
 
+_GEMINI_SNAPSHOT_SCRIPT = r"""
+const token = arguments[0];
+const uniqueRoots = (selector, closestSelector) => {
+    const result = [];
+    for (const el of document.querySelectorAll(selector)) {
+        const root = el.closest(closestSelector) || el;
+        if (!result.includes(root)) result.push(root);
+    }
+    return result;
+};
+const users = uniqueRoots(
+    'user-query,.user-query,[data-test-id="user-query"],.query-content',
+    'user-query,.user-query,[data-test-id="user-query"]'
+);
+const responses = uniqueRoots(
+    'model-response,message-content .model-response-text,.model-response-text,response-container,.response-container-content',
+    'model-response,response-container,[data-test-id*="response"]'
+);
+for (const root of users) root.setAttribute('data-novel-before-user', token);
+for (const root of responses) root.setAttribute('data-novel-before-response', token);
+return {users: users.length, responses: responses.length};
+"""
+
+
+_GEMINI_NEW_RESPONSE_SCRIPT = r"""
+const token = arguments[0];
+const oldResponseCount = arguments[1];
+const uniqueRoots = (selector, closestSelector) => {
+    const result = [];
+    for (const el of document.querySelectorAll(selector)) {
+        const root = el.closest(closestSelector) || el;
+        if (!result.includes(root)) result.push(root);
+    }
+    return result;
+};
+const users = uniqueRoots(
+    'user-query,.user-query,[data-test-id="user-query"],.query-content',
+    'user-query,.user-query,[data-test-id="user-query"]'
+);
+const responses = uniqueRoots(
+    'model-response,message-content .model-response-text,.model-response-text,response-container,.response-container-content',
+    'model-response,response-container,[data-test-id*="response"]'
+);
+const newUsers = users.filter(
+    (root) => root.getAttribute('data-novel-before-user') !== token
+);
+if (newUsers.length) {
+    const latestUser = newUsers[newUsers.length - 1];
+    const afterPrompt = responses.filter((root) =>
+        Boolean(latestUser.compareDocumentPosition(root) & Node.DOCUMENT_POSITION_FOLLOWING)
+    );
+    return afterPrompt.length ? afterPrompt[afterPrompt.length - 1] : null;
+}
+if (responses.length > oldResponseCount) {
+    const newResponses = responses.filter(
+        (root) => root.getAttribute('data-novel-before-response') !== token
+    );
+    return newResponses.length ? newResponses[newResponses.length - 1] : null;
+}
+return null;
+"""
+
+
+def _snapshot_gemini_conversation(driver, token):
+    snapshot = driver.execute_script(_GEMINI_SNAPSHOT_SCRIPT, token) or {}
+    return int(snapshot.get("responses", 0))
+
+
+def _find_new_gemini_response(driver, token, old_response_count):
+    return driver.execute_script(
+        _GEMINI_NEW_RESPONSE_SCRIPT, token, old_response_count
+    )
+
+
+def _gemini_response_text(response_root):
+    content_blocks = response_root.find_elements(
+        By.CSS_SELECTOR,
+        "message-content .model-response-text, .model-response-text, "
+        "message-content, .response-container-content, .markdown-main-container",
+    )
+    for block in reversed(content_blocks):
+        text = block.text.strip()
+        if text:
+            return text
+    return response_root.text.strip()
+
+
 def generate_content_with_selenium(prompt, max_retries=3, web_model=SELECT_MODEL):
     """
     Gửi prompt đến Gemini web và lấy response.
@@ -791,6 +880,13 @@ def generate_content_with_selenium(prompt, max_retries=3, web_model=SELECT_MODEL
             )
             time.sleep(1)
 
+            # Đánh dấu lịch sử ngay trước khi gửi để không nhận lại câu trả lời
+            # cuối của lần dịch trước trong cùng cuộc chat Gemini.
+            response_token = f"novel-{time.time_ns()}"
+            old_response_count = _snapshot_gemini_conversation(
+                driver, response_token
+            )
+
             # Selectors theo cấu trúc HTML mới (test.html):
             # <gem-icon-button class="send-button ... has-input submit">
             #   <button aria-label="Gửi tin nhắn"> → icon arrow_upward
@@ -838,27 +934,20 @@ def generate_content_with_selenium(prompt, max_retries=3, web_model=SELECT_MODEL
             start_time = time.time()
             last_text = ""
             stable_count = 0
+            response_root = None
 
             while time.time() - start_time < max_wait:
-                # Selectors cho response — thử nhiều vì Gemini thay đổi thường xuyên
-                response_selectors = [
-                    "message-content .model-response-text",
-                    ".model-response-text",
-                    "message-content",
-                    ".response-container-content",
-                    ".markdown-main-container",
-                    ".conversation-container message-content",
-                ]
                 current_text = ""
-                for selector in response_selectors:
-                    try:
-                        elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                        if elements:
-                            current_text = elements[-1].text.strip()
-                            if current_text:
-                                break
-                    except:
-                        continue
+                try:
+                    if response_root is None:
+                        response_root = _find_new_gemini_response(
+                            driver, response_token, old_response_count
+                        )
+                    if response_root is not None:
+                        current_text = _gemini_response_text(response_root)
+                except StaleElementReferenceException:
+                    response_root = None
+                    continue
 
                 current_len = len(current_text) if current_text else 0
                 last_len = len(last_text) if last_text else 0
@@ -1230,6 +1319,97 @@ def select_chatgpt_model(driver, model=CHATGPT_SELECT_MODEL):
         return False
 
 
+_CHATGPT_SNAPSHOT_SCRIPT = r"""
+const token = arguments[0];
+const rootOf = (el) => el.closest(
+    'article,[data-testid^="conversation-turn-"],[data-message-id],.group\\/conversation-turn,.agent-turn'
+) || el;
+const uniqueRoots = (selector) => {
+    const result = [];
+    for (const el of document.querySelectorAll(selector)) {
+        const root = rootOf(el);
+        if (!result.includes(root)) result.push(root);
+    }
+    return result;
+};
+const users = uniqueRoots('[data-message-author-role="user"]');
+const assistants = uniqueRoots(
+    '[data-message-author-role="assistant"],article[data-turn="assistant"],.agent-turn'
+);
+for (const root of users) root.setAttribute('data-novel-before-user', token);
+for (const root of assistants) {
+    root.setAttribute('data-novel-before-assistant', token);
+}
+return {users: users.length, assistants: assistants.length};
+"""
+
+
+_CHATGPT_NEW_RESPONSE_SCRIPT = r"""
+const token = arguments[0];
+const oldAssistantCount = arguments[1];
+const rootOf = (el) => el.closest(
+    'article,[data-testid^="conversation-turn-"],[data-message-id],.group\\/conversation-turn,.agent-turn'
+) || el;
+const uniqueRoots = (selector) => {
+    const result = [];
+    for (const el of document.querySelectorAll(selector)) {
+        const root = rootOf(el);
+        if (!result.includes(root)) result.push(root);
+    }
+    return result;
+};
+const users = uniqueRoots('[data-message-author-role="user"]');
+const assistants = uniqueRoots(
+    '[data-message-author-role="assistant"],article[data-turn="assistant"],.agent-turn'
+);
+
+// Chỉ lấy câu trả lời nằm SAU prompt vừa gửi. Nhờ vậy một bản dịch cũ
+// có ###END### trong cùng cuộc chat sẽ không thể bị nhận nhầm.
+const newUsers = users.filter(
+    (root) => root.getAttribute('data-novel-before-user') !== token
+);
+if (newUsers.length) {
+    const latestUser = newUsers[newUsers.length - 1];
+    const afterPrompt = assistants.filter((root) =>
+        Boolean(latestUser.compareDocumentPosition(root) & Node.DOCUMENT_POSITION_FOLLOWING)
+    );
+    return afterPrompt.length ? afterPrompt[afterPrompt.length - 1] : null;
+}
+
+// Giao diện cũ có thể không gắn role cho tin nhắn user. Khi đó chỉ chấp
+// nhận một assistant turn thật sự mới, không dùng response cuối có sẵn.
+if (assistants.length > oldAssistantCount) {
+    const newAssistants = assistants.filter(
+        (root) => root.getAttribute('data-novel-before-assistant') !== token
+    );
+    return newAssistants.length ? newAssistants[newAssistants.length - 1] : null;
+}
+return null;
+"""
+
+
+def _snapshot_chatgpt_conversation(driver, token):
+    snapshot = driver.execute_script(_CHATGPT_SNAPSHOT_SCRIPT, token) or {}
+    return int(snapshot.get("assistants", 0))
+
+
+def _find_new_chatgpt_response(driver, token, old_assistant_count):
+    return driver.execute_script(
+        _CHATGPT_NEW_RESPONSE_SCRIPT, token, old_assistant_count
+    )
+
+
+def _chatgpt_response_text(response_turn):
+    markdown_blocks = response_turn.find_elements(
+        By.CSS_SELECTOR, "div.markdown, div.markdown.prose"
+    )
+    for block in reversed(markdown_blocks):
+        text = block.text.strip()
+        if text:
+            return text
+    return response_turn.text.strip()
+
+
 def generate_content_with_chatgpt(
     prompt,
     max_retries=3,
@@ -1319,6 +1499,13 @@ def generate_content_with_chatgpt(
             print("⏳ Đang đợi 30s để ChatGPT xử lý file text đính kèm...")
             time.sleep(30)
 
+            # Ghi dấu toàn bộ hội thoại cũ ngay trước lúc gửi. Không được lấy
+            # response cuối trang vì nó có thể là bản dịch của lần chạy trước.
+            response_token = f"novel-{time.time_ns()}"
+            old_assistant_count = _snapshot_chatgpt_conversation(
+                driver, response_token
+            )
+
             # ── Bước 3: Nhấn nút gửi ──
             send_selectors = [
                 'button[data-testid="send-button"]',
@@ -1360,28 +1547,21 @@ def generate_content_with_chatgpt(
             start_time = time.time()
             last_text = ""
             stable_count = 0
+            response_turn = None
 
             while time.time() - start_time < max_wait:
-                response_selectors = [
-                    # ChatGPT response markdown containers
-                    'div[data-message-author-role="assistant"] div.markdown',
-                    'div[data-message-author-role="assistant"]',
-                    "div.agent-turn div.markdown",
-                    "div.markdown.prose",
-                    'div[class*="message"][class*="assistant"]',
-                    "div.group\\/conversation-turn div.markdown",
-                ]
                 current_text = ""
-                for selector in response_selectors:
-                    try:
-                        elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                        if elements:
-                            # Lấy response cuối cùng (mới nhất)
-                            current_text = elements[-1].text.strip()
-                            if current_text:
-                                break
-                    except:
-                        continue
+                try:
+                    if response_turn is None:
+                        response_turn = _find_new_chatgpt_response(
+                            driver, response_token, old_assistant_count
+                        )
+                    if response_turn is not None:
+                        current_text = _chatgpt_response_text(response_turn)
+                except StaleElementReferenceException:
+                    # React thay node lúc stream: tìm lại đúng turn sau prompt mới.
+                    response_turn = None
+                    continue
 
                 current_len = len(current_text) if current_text else 0
                 last_len = len(last_text) if last_text else 0
@@ -2143,28 +2323,27 @@ def polish_translation(
         current_upload_key_index = -1
         system_instruction = ""
         pronoun_reference = (
-            "- Tra bo nho xung ho lien quan trong prompt de giu cach xung ho nhat quan"
+            "- Tra bộ nhớ xưng hô liên quan trong prompt để giữ cách xưng hô nhất quán."
             if pronoun_context
-            else "- Tra pronouns_snapshot.yaml de biet cach xung ho da dung o cac chuong truoc"
+            else "- Tra pronouns_snapshot.yaml để biết cách xưng hô đã dùng ở các chương trước."
         )
 
-        prompt = f"""## Thuat ngu / Quy tac dich tham chieu:
+        prompt = f"""## Thuật ngữ / Quy tắc dịch tham chiếu:
 {context_text}
 
-## Van ban goc (Tham khao de khong sai nghia):
-Tieu de goc: {raw_title}
-Noi dung goc:
+## Văn bản gốc (tham khảo để không sai nghĩa):
+Tiêu đề gốc: {raw_title}
+Nội dung gốc:
 {raw_content}
 
-## Bo nho xung ho lien quan den nhan vat trong chuong:
-{pronoun_context if pronoun_context else "(Khong tim thay cap xung ho lien quan)"}
+## Bộ nhớ xưng hô liên quan đến nhân vật trong chương:
+{pronoun_context if pronoun_context else "(Không tìm thấy cặp xưng hô liên quan)"}
 
-## Ban dich hien tai (Can bien tap):
-Tieu de dich: {title_cur}
-Noi dung dich:
+## Bản dịch hiện tại (cần hiệu đính):
+Tiêu đề dịch: {title_cur}
+Nội dung dịch:
 {content_cur}
-
-Hay bien tap trau chuot ban dich tieng Viet cho muot ma, cam xuc nhung PHAI dam bao dung nghia voi ban goc. Dong thoi chinh xung ho theo huong dan."""
+"""
 
         while True:
             try:
@@ -2210,34 +2389,31 @@ Hay bien tap trau chuot ban dich tieng Viet cho muot ma, cam xuc nhung PHAI dam 
                         else ""
                     )
 
-                    system_instruction = f"""Ban la bien tap vien dich thuat chuyen nghiep tieu thuyet Han-Viet.
-Nhiem vu la BIEN TAP LAI ban dich hien co theo hai muc tieu SONG SONG:
+                    polish_role, polish_task = project_polish_prompt()
+                    system_instruction = f"""# Vai trò hiệu đính
+{polish_role}
+
+# Nhiệm vụ hiệu đính
+{polish_task}
+
+Các quy tắc kỹ thuật bắt buộc dưới đây luôn được ưu tiên:
 {attach_block}
-1. TRAU CHUOT VAN PHONG:
-   - Sua cac cau con dich sot ngon ngu goc.
-   - Tranh dich sai nghia goc (hay tham khao ban goc de dam bao do nguyen ban)
-   - Giu nguyen dau ngoac kep \u201c\u2026\u201d \u2018\u2026\u2019 danh dau hoi thoai
-   - KHONG them markdown, KHONG them giai thich
-   - Giu toan bo noi dung, KHONG cat bot hay them y moi
-
-2. CHINH XUNG HO:
-   - Tra characters.md de biet gioi tinh, tuoi tac, vai tro tung nhan vat
+1. XƯNG HÔ:
+   - Tra characters.md để biết giới tính, tuổi tác, vai trò và biệt danh của nhân vật.
    {pronoun_reference}
-   - Trong HOI THOAI: xung ho linh hoat theo cam xuc, khong cung nhac
-   - Trong DAN TRUYEN: nhat quan theo bo nho xung ho
-   - Uu tien ngu canh hien tai neu xung dot voi bo nho
-   - Muc co locked: true la quy tac do nguoi dung xac nhan, PHAI uu tien va khong tu y thay doi
+   - Mục có locked: true là quy tắc người dùng đã xác nhận, không được tự ý thay đổi.
 
-3. BIEN TAP TIEU DE:
-   - Chi sua xung ho hoac van phong neu can, KHONG doi nghia
-   - Giu dang Title Case (viet hoa chu cai dau moi tu)
+2. BẢO TOÀN NỘI DUNG:
+   - Giữ toàn bộ nội dung, dấu ngoặc kép “…” ‘…’, Markdown ảnh và ký hiệu cần thiết.
+   - Không thêm giải thích hoặc nội dung mới.
 
-Xuat ket qua DUNG THEO dinh dang sau (khong them bat ky text nao ngoai format):
+3. ĐỊNH DẠNG ĐẦU RA:
+Chỉ xuất đúng định dạng sau:
 ###TITLE###
-<tieu de da bien tap>
+<tiêu đề đã hiệu đính>
 
 ###CONTENT###
-<noi dung da bien tap>
+<nội dung đã hiệu đính>
 """
 
                 text = call_gemini(

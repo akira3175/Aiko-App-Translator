@@ -38,11 +38,17 @@
 .context-field { display: grid; gap: 7px; }
 .context-field>span { color: var(--ink); font-size: 12px; font-weight: 750; }
 .context-field>small { color: var(--muted); font-size: 11px; }
-.context-field input, .context-field textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; outline: 0; padding: 11px 13px; background: var(--bg); color: var(--ink); }
-.context-field input:focus, .context-field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(23,126,104,.12); }
+.context-field input, .context-field select, .context-field textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; outline: 0; padding: 11px 13px; background: var(--bg); color: var(--ink); }
+.context-field input:focus, .context-field select:focus, .context-field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(23,126,104,.12); }
 .context-index-field input { min-height: 50px; font-size: 22px; font-weight: 750; }
 .context-style-field, .context-glossary-field { height: 100%; min-height: 0; }
 .context-style-field textarea { flex: 1; min-height: 380px; resize: none; font: 14px/1.7 "Segoe UI Variable Text","Segoe UI",sans-serif; }
+.prompt-editor { min-height: 0; }
+.prompt-preset-field { grid-template-columns: minmax(160px,240px) minmax(0,1fr); align-items: center; }
+.prompt-preset-field>span { grid-column: 1/-1; }
+.prompt-preset-field small { line-height: 1.5; }
+.prompt-editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.prompt-editor-grid textarea { height: clamp(280px,42dvh,440px); min-height: 280px; resize: vertical; font: 13px/1.65 Consolas,"Courier New",monospace; }
 .context-glossary-field>span { display: flex; justify-content: space-between; align-items: center; }
 .context-glossary-field>span small { color: var(--muted); font-weight: 500; }
 .context-glossary-field textarea { flex: 1; min-height: 410px; resize: none; font: 13px/1.65 Consolas,"Courier New",monospace; }
@@ -52,4 +58,4 @@
 .context-yaml-editor { width: 100%; min-height: min(52dvh, 520px); resize: vertical; border: 1px solid var(--line); border-radius: 10px; outline: 0; padding: 14px 16px; background: var(--bg); color: var(--ink); font: 13px/1.65 Consolas, "Courier New", monospace; tab-size: 2; }
 .context-yaml-editor:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(23,126,104,.12); }
 .glossary-import { min-height: 300px; margin-top: 16px; }
-@media (max-width: 900px) { .terminology-head { align-items: stretch; } .context-actions { flex-wrap: wrap; } .context-actions .search { flex: 1 1 100%; } .context-modal-head { display: block; } .context-safety-mark { display: none; } .context-writing-layout { grid-template-columns: 1fr; } .context-style-field textarea, .context-glossary-field textarea { min-height: 44dvh; } .context-status { display: grid; gap: 4px; } }
+@media (max-width: 900px) { .terminology-head { align-items: stretch; } .context-actions { flex-wrap: wrap; } .context-actions .search { flex: 1 1 100%; } .context-modal-head { display: block; } .context-safety-mark { display: none; } .context-writing-layout, .prompt-editor-grid { grid-template-columns: 1fr; } .prompt-preset-field { grid-template-columns: 1fr; } .context-style-field textarea, .context-glossary-field textarea { min-height: 44dvh; } .prompt-editor-grid textarea { height: 38dvh; min-height: 240px; } .context-status { display: grid; gap: 4px; } }

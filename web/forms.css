@@ -218,8 +218,22 @@
 .update-card > div { display: grid; gap: 5px; }
 .update-card strong { font-size: 15px; }
 .update-card small { color: var(--muted); line-height: 1.45; }
+.update-actions { display: flex!important; grid-auto-flow: column; gap: 8px!important; }
 .update-label { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+.whats-new-modal { width: min(680px,calc(100vw - 28px)); overflow: hidden; }
+.whats-new-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.whats-new-head h2 { margin: 6px 0 8px; }
+.whats-new-head p:last-child { max-width: 58ch; margin: 0; color: var(--muted); line-height: 1.55; }
+.whats-new-head>span { flex: none; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--accent); font: 700 11px Consolas,"Courier New",monospace; }
+.whats-new-list { display: grid; gap: 9px; max-height: min(48dvh,420px); margin-top: 20px; overflow-y: auto; overscroll-behavior: contain; }
+.whats-new-item { display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 10px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.whats-new-item span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; background: var(--soft); color: var(--accent); font-size: 12px; font-weight: 800; }
+.whats-new-item p { margin: 1px 0 0; color: var(--ink); font-size: 13px; line-height: 1.5; }
+.whats-new-empty { padding: 24px; color: var(--muted); text-align: center; }
 @media(max-width:600px) {
   .update-card { align-items: stretch; flex-direction: column; }
+  .update-actions { grid-auto-flow: row; }
   .update-card button { width: 100%; }
+  .whats-new-head { display: grid; }
+  .whats-new-head>span { justify-self: start; }
 }

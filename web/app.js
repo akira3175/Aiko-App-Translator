@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
-const state = { projects: [], project: null, projectRevision: 0, chapters: [], reviews: [], context: {index:0,glossary:[],style_notes:'',raw_yaml:''}, characters: {content:'',count:0,exists:false,backup:false}, pronouns: {pairs:[],count:0,locked_count:0,raw_yaml:''}, pronounCurrent: null, characterDirty: false, reviewCurrent: null, currentImages: [], current: null, dirty: false, timer: null };
+const state = { projects: [], project: null, projectRevision: 0, chapters: [], reviews: [], context: {index:0,glossary:[],style_notes:'',prompt_preset:'default',prompt_role:'',prompt_task:'',prompt_presets:[],polish_prompt_preset:'default',polish_prompt_role:'',polish_prompt_task:'',polish_prompt_presets:[],raw_yaml:''}, characters: {content:'',count:0,exists:false,backup:false}, pronouns: {pairs:[],count:0,locked_count:0,raw_yaml:''}, pronounCurrent: null, characterDirty: false, reviewCurrent: null, currentImages: [], current: null, dirty: false, timer: null };
 const editorViews = {};
 let syncingEditors = false;
 const punctuationStyles = [
@@ -29,6 +29,7 @@ let geminiApiKeys=[];
 let publishingBooks=[];
 let manualPromptRequest=0;
 let availableUpdate=null;
+let whatsNewData=null;
 let chapterImportPreview=null;
 const settingsGroups={
   'gemini-api':['Gemini API','Model và thông số sinh nội dung khi dịch, hậu dịch và review qua API.'],
@@ -215,16 +216,13 @@ const pipelineItems = [
   {id:'context-v1',code:'C1',group:'memory',title:'Tạo context bằng Gemini Web',desc:'Sinh glossary qua hồ sơ trình duyệt Gemini.'},
   {id:'context-gpt',code:'CG',group:'memory',title:'Tạo context bằng ChatGPT Web',desc:'Sinh glossary qua hồ sơ trình duyệt ChatGPT.'},
   {id:'characters',code:'CH',group:'memory',title:'Hồ sơ nhân vật',desc:'Phân tích và cập nhật thông tin nhân vật.'},
-  {id:'glossary',code:'GL',group:'memory',title:'Chèn thuật ngữ',desc:'Đồng bộ glossary vào dữ liệu truyện.'},
   {id:'review',code:'RV',group:'quality',title:'Review toàn bộ',desc:'Đối chiếu raw và bản dịch để tìm lỗi nội dung.'},
-  {id:'split-review',code:'SP',group:'quality',title:'Tách review',desc:'Tách dữ liệu review theo khoảng chương.'},
   {id:'hako',code:'UP',group:'publishing',title:'Đăng lên Hako',desc:'Đăng chương Markdown và tải ảnh lên R2 khi cần.'},
 ];
 const taskSchemas = {
   v1:{title:'Gemini API V1',description:'Chọn số lượng công việc thực hiện trong lần chạy này.',fields:[['run_until_complete','Chạy liên tục đến hết truyện','checkbox',false]]},
   'v1-interactions':{title:'V1 · Gemini Interactions Streaming (Beta)',description:'Dịch trực tiếp trong Không gian truyện; khi biên tập chỉ cập nhật dòng thay đổi và đặt con trỏ tại vị trí AI đang sửa. Dùng bộ lọc an toàn mặc định của Google.',fields:[['run_until_complete','Chạy liên tục đến hết truyện','checkbox',false]]},
   review: {title:'Review đối chiếu toàn bộ',description:'So sánh từng chương raw Hàn với bản dịch Việt. Chọn phạm vi và mức song song trước khi gửi API.',fields:[['start','Bắt đầu từ chương','number','1'],['end','Kết thúc tại chương','number',''],['force','Review lại chương đã có','checkbox',false],['batch_size','Số chương mỗi batch','number','10'],['workers','Số luồng song song','number','10'],['sleep','Giây nghỉ giữa batch','number','4']]},
-  'split-review': {title:'Tách review',description:'Để trống để xử lý toàn bộ file review.',fields:[['from','Từ chương','text',''],['to','Đến chương','text','']]},
   hako:{title:'Đăng chương lên Hako',description:'Chọn chương đầu và chương cuối. App tự xác định volume, Book ID và ảnh cần tải lên.',fields:[['set_as_incomplete','Đánh dấu chương chưa hoàn thành','checkbox',false]]},
   v2:{title:'Gemini Web V2',description:'Cấu hình browser và phạm vi chạy ngay tại đây.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập Gemini','checkbox',true],['run_until_complete','Chạy liên tục đến hết truyện','checkbox',false]]},
   v3:{title:'Gemini Web V3',description:'Cấu hình browser, batch và phạm vi chạy.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập Gemini','checkbox',true],['run_until_complete','Chạy liên tục đến hết truyện','checkbox',false],['batch_size','Số chương mỗi batch','number','2']]},
@@ -416,6 +414,43 @@ async function loadUpdateStatus(check=false) {
   }
 }
 
+function renderWhatsNew(entry) {
+  $('#whatsNewVersion').textContent=`v${entry.version}${entry.date?` · ${entry.date}`:''}`;
+  $('#whatsNewTitle').textContent=entry.title||'Có gì mới?';
+  $('#whatsNewSummary').textContent=entry.summary||'Ứng dụng đã được cập nhật lên phiên bản mới.';
+  const highlights=Array.isArray(entry.highlights)?entry.highlights.filter(Boolean):[];
+  $('#whatsNewList').innerHTML=highlights.length
+    ?highlights.map(item=>`<div class="whats-new-item"><span>✓</span><p>${escapeHtml(item)}</p></div>`).join('')
+    :'<div class="whats-new-empty">Chưa có ghi chú chi tiết cho phiên bản này.</div>';
+}
+
+async function loadWhatsNew(force=false) {
+  try {
+    const [update,notes]=await Promise.all([api('/api/update'),api('/release-notes.json')]);
+    const versions=Array.isArray(notes.versions)?notes.versions:[];
+    const entry=versions.find(item=>String(item.version)===String(update.current_version))||{
+      version:update.current_version,
+      title:`Aiko App Translator ${update.current_version}`,
+      summary:'Ứng dụng đã được cập nhật lên phiên bản mới.',
+      highlights:[],
+    };
+    whatsNewData=entry;
+    renderWhatsNew(entry);
+    const seen=localStorage.getItem('novel-whats-new-version');
+    if(force||seen!==String(entry.version)){
+      $('#whatsNewModal').classList.add('open');
+      requestAnimationFrame(()=>$('#closeWhatsNew').focus());
+    }
+  } catch(error) {
+    if(force)toast(error.message);
+  }
+}
+
+function closeWhatsNew() {
+  if(whatsNewData?.version)localStorage.setItem('novel-whats-new-version',String(whatsNewData.version));
+  $('#whatsNewModal').classList.remove('open');
+}
+
 async function installUpdate() {
   if(state.dirty||state.characterDirty)return toast('Hãy lưu thay đổi đang soạn trước khi cập nhật');
   if(!confirm(`Tải và cập nhật lên phiên bản ${availableUpdate.latest_version}? App sẽ tự khởi động lại.`))return;
@@ -490,7 +525,7 @@ async function selectProject(name) {
   updateChapterNavigation();
   setEditorValue('source',''); setEditorValue('target','');
   updateLineNumbers('source'); updateLineNumbers('target');
-  state.reviews=[]; state.context={index:0,glossary:[],style_notes:'',raw_yaml:''};
+  state.reviews=[]; state.context={index:0,glossary:[],style_notes:'',prompt_preset:'default',prompt_role:'',prompt_task:'',prompt_presets:[],polish_prompt_preset:'default',polish_prompt_role:'',polish_prompt_task:'',polish_prompt_presets:[],raw_yaml:''};
   renderContext();
   state.currentImages=[]; renderMarkdownEditors();
   $('#projectPopover').classList.remove('open');
@@ -506,7 +541,7 @@ async function loadContext() {
     state.context=context;
   } catch(error) {
     if(state.project!==project||state.projectRevision!==revision)return;
-    state.context={index:0,glossary:[],style_notes:'',raw_yaml:''}; toast(error.message);
+    state.context={index:0,glossary:[],style_notes:'',prompt_preset:'default',prompt_role:'',prompt_task:'',prompt_presets:[],polish_prompt_preset:'default',polish_prompt_role:'',polish_prompt_task:'',polish_prompt_presets:[],raw_yaml:''}; toast(error.message);
   }
   renderContext($('#glossarySearch')?.value||'');
 }
@@ -654,9 +689,79 @@ function openContextEditor() {
   $('#contextIndexHint').textContent=`Đã xử lý ${state.context.index||0}/${state.chapters.length||0} chương.`;
   $('#contextStyleEditor').value=state.context.style_notes||'';
   $('#contextGlossaryEditor').value=(state.context.glossary||[]).map(item=>`${item.source} = ${item.target}`).join('\n');
+  renderPromptPresets();
+  $('#contextPromptRole').value=state.context.prompt_role||'';
+  $('#contextPromptTask').value=state.context.prompt_task||'';
+  syncPromptPreset();
+  renderPolishPromptPresets();
+  $('#contextPolishPromptRole').value=state.context.polish_prompt_role||'';
+  $('#contextPolishPromptTask').value=state.context.polish_prompt_task||'';
+  syncPolishPromptPreset();
   setContextTab('writing');
   updateContextEditorStatus();
   $('#contextModal').classList.add('open');
+}
+
+function renderPromptPresets() {
+  const presets=state.context.prompt_presets||[];
+  const selected=state.context.prompt_preset||'default';
+  $('#contextPromptPreset').innerHTML=presets.map(item=>`<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join('')+'<option value="custom">Tự viết</option>';
+  $('#contextPromptPreset').value=presets.some(item=>item.key===selected)?selected:'custom';
+}
+
+function selectedPromptPreset() {
+  const key=$('#contextPromptPreset').value;
+  return (state.context.prompt_presets||[]).find(item=>item.key===key);
+}
+
+function applyPromptPreset() {
+  const preset=selectedPromptPreset();
+  if(preset){
+    $('#contextPromptRole').value=preset.role;
+    $('#contextPromptTask').value=preset.task;
+  }
+  syncPromptPreset();
+  updateContextEditorStatus();
+}
+
+function syncPromptPreset() {
+  const preset=selectedPromptPreset();
+  if(preset&&($('#contextPromptRole').value!==preset.role||$('#contextPromptTask').value!==preset.task)){
+    $('#contextPromptPreset').value='custom';
+  }
+  const current=selectedPromptPreset();
+  $('#contextPromptPresetHint').textContent=current?current.description:'Nội dung tự viết được lưu riêng cho truyện này.';
+}
+
+function renderPolishPromptPresets() {
+  const presets=state.context.polish_prompt_presets||[];
+  const selected=state.context.polish_prompt_preset||'default';
+  $('#contextPolishPromptPreset').innerHTML=presets.map(item=>`<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join('')+'<option value="custom">Tự viết</option>';
+  $('#contextPolishPromptPreset').value=presets.some(item=>item.key===selected)?selected:'custom';
+}
+
+function selectedPolishPromptPreset() {
+  const key=$('#contextPolishPromptPreset').value;
+  return (state.context.polish_prompt_presets||[]).find(item=>item.key===key);
+}
+
+function applyPolishPromptPreset() {
+  const preset=selectedPolishPromptPreset();
+  if(preset){
+    $('#contextPolishPromptRole').value=preset.role;
+    $('#contextPolishPromptTask').value=preset.task;
+  }
+  syncPolishPromptPreset();
+  updateContextEditorStatus();
+}
+
+function syncPolishPromptPreset() {
+  const preset=selectedPolishPromptPreset();
+  if(preset&&($('#contextPolishPromptRole').value!==preset.role||$('#contextPolishPromptTask').value!==preset.task)){
+    $('#contextPolishPromptPreset').value='custom';
+  }
+  const current=selectedPolishPromptPreset();
+  $('#contextPolishPromptPresetHint').textContent=current?current.description:'Nội dung tự viết được lưu riêng cho truyện này.';
 }
 
 function setContextTab(tab) {
@@ -670,9 +775,10 @@ function updateContextEditorStatus() {
   $('#contextGlossaryCount').textContent=`${glossary.length} thuật ngữ`;
   $('#contextGlossaryTabCount').textContent=glossary.length;
   const status=$('#contextEditStatus');
-  status.classList.toggle('invalid',invalid.length>0);
-  status.querySelector('span').textContent=invalid.length?`${invalid.length} dòng glossary chưa hợp lệ`:'Sẵn sàng kiểm tra và lưu';
-  status.querySelector('small').textContent=invalid.length?'Mỗi dòng cần có dạng Raw = Dịch.':'Bản cũ sẽ được sao lưu tự động trước khi thay thế.';
+  const promptMissing=!$('#contextPromptRole').value.trim()||!$('#contextPromptTask').value.trim()||!$('#contextPolishPromptRole').value.trim()||!$('#contextPolishPromptTask').value.trim();
+  status.classList.toggle('invalid',invalid.length>0||promptMissing);
+  status.querySelector('span').textContent=invalid.length?`${invalid.length} dòng glossary chưa hợp lệ`:promptMissing?'Vai trò và nhiệm vụ không được để trống':'Sẵn sàng kiểm tra và lưu';
+  status.querySelector('small').textContent=invalid.length?'Mỗi dòng cần có dạng Raw = Dịch.':promptMissing?'Chọn một preset hoặc tự nhập đầy đủ hai phần prompt.':'Bản cũ sẽ được sao lưu tự động trước khi thay thế.';
 }
 
 async function saveContextYaml() {
@@ -680,7 +786,7 @@ async function saveContextYaml() {
   try {
     const nextIndex=Number($('#contextIndexEditor').value);
     if(nextIndex<(state.context.index||0)&&!confirm(`Bạn đang lùi tiến độ từ chương ${state.context.index||0} về ${nextIndex}. Tiếp tục?`))return;
-    const context_fields={index:nextIndex,style_notes:$('#contextStyleEditor').value,glossary:$('#contextGlossaryEditor').value};
+    const context_fields={index:nextIndex,style_notes:$('#contextStyleEditor').value,glossary:$('#contextGlossaryEditor').value,prompt_preset:$('#contextPromptPreset').value,prompt_role:$('#contextPromptRole').value,prompt_task:$('#contextPromptTask').value,polish_prompt_preset:$('#contextPolishPromptPreset').value,polish_prompt_role:$('#contextPolishPromptRole').value,polish_prompt_task:$('#contextPolishPromptTask').value};
     state.context=await api('/api/context?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({context_fields})});
     renderContext($('#glossarySearch').value); $('#contextModal').classList.remove('open'); toast('Đã lưu an toàn · Có bản sao lưu .bak');
   } catch(error) { toast(error.message); }
@@ -1527,6 +1633,10 @@ $('#editContextButton').onclick=openContextEditor;
 $('#cancelContextEdit').onclick=()=>$('#contextModal').classList.remove('open');
 $('#saveContextEdit').onclick=saveContextYaml;
 ['contextIndexEditor','contextStyleEditor','contextGlossaryEditor'].forEach(id=>$(`#${id}`).oninput=updateContextEditorStatus);
+['contextPromptRole','contextPromptTask'].forEach(id=>$(`#${id}`).oninput=()=>{syncPromptPreset();updateContextEditorStatus();});
+$('#contextPromptPreset').onchange=applyPromptPreset;
+['contextPolishPromptRole','contextPolishPromptTask'].forEach(id=>$(`#${id}`).oninput=()=>{syncPolishPromptPreset();updateContextEditorStatus();});
+$('#contextPolishPromptPreset').onchange=applyPolishPromptPreset;
 $$('[data-context-tab]').forEach(button=>button.onclick=()=>setContextTab(button.dataset.contextTab));
 $('#importGlossaryButton').onclick=()=>{if(requireProject()){$('#glossaryModal').classList.add('open');$('#glossaryImportText').focus();}};
 $('#cancelGlossaryImport').onclick=()=>$('#glossaryModal').classList.remove('open');
@@ -1564,7 +1674,10 @@ $$('[data-find-action]').forEach(button=>button.onclick=()=>{
   if(action==='replace-all')replaceCurrent(true);
 });
 document.addEventListener('keydown',event=>{
-  if(event.key==='Escape')closeSelectionTranslation();
+  if(event.key==='Escape'){
+    closeSelectionTranslation();
+    if($('#whatsNewModal').classList.contains('open'))closeWhatsNew();
+  }
   if(!(event.ctrlKey||event.metaKey))return;
   const key=event.key.toLowerCase();
   if(!['f','h'].includes(key))return;
@@ -1605,6 +1718,8 @@ $('#savePythonSettings').onclick=savePythonSettings;
 $('#resetPythonSettings').onclick=resetPythonSettings;
 $('#copyLanAccess').onclick=copyLanAccess;
 $('#checkUpdate').onclick=()=>availableUpdate?installUpdate():loadUpdateStatus(true);
+$('#showWhatsNew').onclick=()=>loadWhatsNew(true);
+$('#closeWhatsNew').onclick=closeWhatsNew;
 $('#addGeminiApiKey').onclick=()=>{ syncGeminiApiKeyDraft(); geminiApiKeys.push(''); renderGeminiApiKeys(); const inputs=$$('[data-gemini-api-key]'); inputs[inputs.length-1]?.focus(); };
 $('#saveGeminiApiKeys').onclick=saveGeminiApiKeys;
 $('#addPublishingBook').onclick=()=>{syncPublishingBookDraft();const used=publishingBooks.map(book=>Number(book.volume)).filter(Number.isFinite);publishingBooks.push({book_id:'',volume:used.length?Math.max(...used)+1:1});renderPublishingBooks();};
@@ -1616,4 +1731,4 @@ setEditorMode('source-text');
 updateLineNumbers('source'); updateLineNumbers('target');
 initCodeEditors();
 setWorkspaceMode(window.matchMedia('(max-width:560px)').matches?(localStorage.getItem('mobileWorkspaceMode')||'target'):'split',false);
-renderThemeOptions(); initPunctuationOptions(); initPipeline(); bootstrapWorkspace(); loadPythonSettings(); loadGeminiApiKeys(); loadUpdateStatus(); loadLanStatus();
+renderThemeOptions(); initPunctuationOptions(); initPipeline(); bootstrapWorkspace(); loadPythonSettings(); loadGeminiApiKeys(); loadUpdateStatus(); loadWhatsNew(); loadLanStatus();

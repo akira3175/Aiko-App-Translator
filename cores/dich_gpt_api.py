@@ -24,7 +24,7 @@ from cores.dich_utils import (
 )
 from cores.gpt_api_client import call_gpt_api
 from cores.runtime_config import bool_option, option, stop_requested, web_mode
-from cores.translation_prompts import build_single_prompt
+from cores.translation_prompts import build_single_prompt, project_polish_prompt
 from cores.translation_workflows import run_single_translation
 
 TRANSLATE_MODEL = str(option("gpt_api_translate_model", "gpt-5.6-luna"))
@@ -53,9 +53,7 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
     if os.path.exists(NOVEL_TXT):
         with open(NOVEL_TXT, "r", encoding="utf-8") as file:
             previous = file.read().strip()
-    prompt = build_single_prompt(
-        chapter, context_text, pronoun_context, previous, detailed_pronouns=True
-    )
+    prompt = build_single_prompt(chapter, context_text, pronoun_context, previous)
     print(f"[GPT API] Dịch chương {chapter_number} bằng {TRANSLATE_MODEL}...")
     text = call_gpt_api(
         prompt,
@@ -70,9 +68,14 @@ def polish_chapter(chapter, chapter_number, context_text="", pronoun_context="")
     if POLISH_MODEL.strip().lower() in {"", "none"}:
         print("[GPT API] Bỏ qua hiệu đính vì chưa cấu hình model.")
         return chapter.get("title_translation", ""), chapter.get("translation", "")
-    prompt = f"""Bạn là biên tập viên hiệu đính bản dịch tiểu thuyết sang tiếng Việt.
+    polish_role, polish_task = project_polish_prompt()
+    prompt = f"""# Vai trò hiệu đính
+{polish_role}
 
-Đối chiếu kỹ nguyên tác với bản dịch hiện tại. Sửa sai nghĩa, thiếu ý, sót ngoại ngữ, tên riêng, xưng hô và câu văn gượng. Giữ nguyên đầy đủ nội dung, dấu hội thoại, Markdown ảnh và định dạng cần thiết. Không giải thích thay đổi.
+# Nhiệm vụ hiệu đính
+{polish_task}
+
+Các quy tắc kỹ thuật bắt buộc: giữ nguyên đầy đủ nội dung, dấu hội thoại, Markdown ảnh và ký hiệu cần thiết. Không giải thích thay đổi. Các mục xưng hô có locked: true phải được ưu tiên.
 
 ## Thuật ngữ và quy tắc
 {context_text}
