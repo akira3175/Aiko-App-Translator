@@ -16,6 +16,7 @@ Cấu hình: up/config_md.json
 """
 
 import asyncio
+import html
 import json
 import re
 import os
@@ -293,6 +294,51 @@ def md_to_html_inline(text: str) -> str:
     return text
 
 
+NOTE_PATTERN = re.compile(r"\(\s*note\s*:\s*(.+?)\s*\)", re.IGNORECASE | re.DOTALL)
+
+
+def extract_hako_notes(elements: list) -> tuple[list, list[str]]:
+    """Tách `(note: ...)` thành placeholder và giữ nguyên đúng vị trí."""
+    notes = []
+    processed = []
+    for elem in elements:
+        if elem["type"] != "text":
+            processed.append(dict(elem))
+            continue
+
+        def replace(match):
+            content = match.group(1).strip()
+            if not content:
+                raise ValueError("Ghi chú Hako không được để trống.")
+            index = len(notes)
+            notes.append(content)
+            return f"HAKO_NOTE_PLACEHOLDER_{index}"
+
+        processed.append({**elem, "content": NOTE_PATTERN.sub(replace, elem["content"])})
+    return processed, notes
+
+
+def note_text_to_html(text: str) -> str:
+    parts = []
+    for line in text.splitlines() or [text]:
+        escaped = html.escape(line.strip())
+        parts.append(f"<p>{md_to_html_inline(escaped)}</p>" if escaped else "<p></p>")
+    return "".join(parts)
+
+
+def insert_hako_note_ids(elements: list, note_ids: list) -> list:
+    processed = []
+    for elem in elements:
+        content = elem["content"]
+        if elem["type"] == "text":
+            for index, note_id in enumerate(note_ids):
+                content = content.replace(
+                    f"HAKO_NOTE_PLACEHOLDER_{index}", f"[note{note_id}]"
+                )
+        processed.append({**elem, "content": content})
+    return processed
+
+
 def elements_to_html_parts(elements: list, chapter_title: str) -> list:
     """
     Chuy\u1ec3n list elements th\u00e0nh list html_parts.
@@ -355,6 +401,31 @@ def elements_to_html_parts(elements: list, chapter_title: str) -> list:
 # UPLOAD L\u00eaN WEBSITE
 # ============================================================
 
+async def create_hako_note(page, content: str) -> str:
+    result = await page.evaluate("""async (content) => {
+        const token = document.querySelector('input[name="_token"]')?.value;
+        const chapterId = document.querySelector('input[name="chapter_id"]')?.value;
+        const bookId = document.querySelector('input[name="book_id"]')?.value;
+        if (!token) throw new Error('Không tìm thấy CSRF token của Hako');
+        const data = new FormData();
+        data.append('_token', token);
+        data.append('content', content);
+        if (chapterId) data.append('chapter_id', chapterId);
+        if (bookId) data.append('book_id', bookId);
+        const response = await fetch('/action/note/store', {
+            method: 'POST',
+            headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'},
+            body: data
+        });
+        const payload = await response.json();
+        if (!response.ok || payload.status !== 'success' || !payload.note_id) {
+            throw new Error(payload.message || `Hako trả lỗi ${response.status}`);
+        }
+        return String(payload.note_id);
+    }""", content)
+    return str(result)
+
+
 async def upload_chapter_to_site(chapter_key, segments_data, upload_url, page, selectors, config):
     """
     Upload 1 ch\u01b0\u01a1ng (g\u1ed3m nhi\u1ec1u segment) l\u00ean website.
@@ -382,17 +453,26 @@ async def upload_chapter_to_site(chapter_key, segments_data, upload_url, page, s
     print(f"\n  Ti\u00eau \u0111\u1ec1: {chapter_title}")
     print(f"  Elements: {len(all_elements)} blocks")
 
-    # Build HTML + upload \u1ea3nh
-    html_parts, img_count = elements_to_html_parts(all_elements, chapter_title)
-    if img_count > 0:
-        print(f"  \u0110\u00e3 upload {img_count} \u1ea3nh")
-
-    html_content = "".join(html_parts)
+    # Tách note trước; Hako sẽ trả ID sau khi mở trang tạo chương.
+    all_elements, note_contents = extract_hako_notes(all_elements)
 
     try:
         print(f"  \u0110i\u1ec1u h\u01b0\u1edbng \u0111\u1ebfn trang t\u1ea1o ch\u01b0\u01a1ng...")
         await page.goto(upload_url)
         await page.wait_for_load_state("networkidle")
+
+        note_ids = []
+        for index, note_content in enumerate(note_contents, 1):
+            print(f"  Tạo ghi chú {index}/{len(note_contents)}...")
+            note_ids.append(await create_hako_note(page, note_text_to_html(note_content)))
+        if note_ids:
+            all_elements = insert_hako_note_ids(all_elements, note_ids)
+            print(f"  Đã tạo {len(note_ids)} ghi chú Hako")
+
+        html_parts, img_count = elements_to_html_parts(all_elements, chapter_title)
+        if img_count > 0:
+            print(f"  Đã upload {img_count} ảnh")
+        html_content = "".join(html_parts)
 
         # \u0110i\u1ec1n ti\u00eau \u0111\u1ec1
         print(f"  \u0110i\u1ec1n ti\u00eau \u0111\u1ec1...")

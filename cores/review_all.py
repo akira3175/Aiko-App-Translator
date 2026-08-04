@@ -326,6 +326,9 @@ def _input_int(prompt, default):
 
 
 def main():
+    if REVIEW_MODEL.strip().lower() in {"", "none"}:
+        print("Bỏ qua review toàn bộ vì chưa cấu hình model Gemini API.")
+        return
     print("=" * 65)
     print("📖 REVIEW TOÀN BỘ TRUYỆN — Ưu tiên Giới Tính & Xưng Hô")
     print("=" * 65)

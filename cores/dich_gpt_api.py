@@ -12,7 +12,16 @@ if root_dir not in sys.path:
 if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-from cores.dich_utils import CONTEXT_YAML, NOVEL_TXT, RAW_DIR, TRANSLATED_DIR, is_translated, scan_md_dir
+from cores.dich_utils import (
+    CONTEXT_YAML,
+    NOVEL_TXT,
+    PRONOUNS_YAML,
+    RAW_DIR,
+    TRANSLATED_DIR,
+    is_translated,
+    scan_md_dir,
+    update_pronoun_memory,
+)
 from cores.gpt_api_client import call_gpt_api
 from cores.runtime_config import bool_option, option, stop_requested, web_mode
 from cores.translation_prompts import build_single_prompt
@@ -20,6 +29,7 @@ from cores.translation_workflows import run_single_translation
 
 TRANSLATE_MODEL = str(option("gpt_api_translate_model", "gpt-5.6-luna"))
 POLISH_MODEL = str(option("gpt_api_polish_model", "gpt-5.6-terra"))
+PRONOUN_MODEL = str(option("gpt_api_pronoun_model", "gpt-5.6-terra"))
 
 
 def _parse_result(text, stage):
@@ -57,6 +67,9 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
 
 
 def polish_chapter(chapter, chapter_number, context_text="", pronoun_context=""):
+    if POLISH_MODEL.strip().lower() in {"", "none"}:
+        print("[GPT API] Bỏ qua hiệu đính vì chưa cấu hình model.")
+        return chapter.get("title_translation", ""), chapter.get("translation", "")
     prompt = f"""Bạn là biên tập viên hiệu đính bản dịch tiểu thuyết sang tiếng Việt.
 
 Đối chiếu kỹ nguyên tác với bản dịch hiện tại. Sửa sai nghĩa, thiếu ý, sót ngoại ngữ, tên riêng, xưng hô và câu văn gượng. Giữ nguyên đầy đủ nội dung, dấu hội thoại, Markdown ảnh và định dạng cần thiết. Không giải thích thay đổi.
@@ -91,13 +104,43 @@ Chỉ trả về:
     return _parse_result(text, "hiệu đính")
 
 
+def postprocess_chapter(chapter, chapter_number, context_text="", pronoun_context=""):
+    title, content = polish_chapter(
+        chapter, chapter_number, context_text, pronoun_context
+    )
+    chapter["title_translation"] = title
+    chapter["translation"] = content
+
+    if PRONOUN_MODEL.strip().lower() in {"", "none"}:
+        print("[GPT API] Bỏ qua cập nhật xưng hô vì chưa cấu hình model.")
+        return title, content
+
+    def generate_pronouns(prompt):
+        return call_gpt_api(
+            prompt,
+            model=PRONOUN_MODEL,
+            reasoning_effort=option("gpt_api_polish_effort", "high"),
+            stage="cập nhật xưng hô",
+        )
+
+    update_pronoun_memory(
+        chapter.get("id", f"chapter_{chapter_number}"),
+        chapter_number,
+        content,
+        PRONOUNS_YAML,
+        model=PRONOUN_MODEL,
+        generate=generate_pronouns,
+    )
+    return title, content
+
+
 def run_translation():
     return run_single_translation(
         translate_chapter,
         RAW_DIR,
         TRANSLATED_DIR,
         CONTEXT_YAML,
-        postprocess=polish_chapter,
+        postprocess=postprocess_chapter,
     )
 
 

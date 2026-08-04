@@ -97,11 +97,24 @@ $pthPath = Join-Path $runtimeRoot "python$pythonMinor._pth"
 
 $sitePackages = Join-Path $runtimeRoot "Lib\site-packages"
 New-Item -ItemType Directory -Force -Path $sitePackages | Out-Null
-$builderVersion = & python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+$builderPython = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $builderPython) {
+    $builderPython = Join-Path $runtimeRoot "python.exe"
+    $getPip = Join-Path $cacheRoot "get-pip.py"
+    & curl.exe --fail --location --retry 3 --output $getPip "https://bootstrap.pypa.io/get-pip.py"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Khong tai duoc get-pip.py"
+    }
+    & $builderPython $getPip --disable-pip-version-check --no-warn-script-location
+    if ($LASTEXITCODE -ne 0) {
+        throw "Khoi tao pip that bai"
+    }
+}
+$builderVersion = & $builderPython -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
 if ($builderVersion.Trim() -ne "3.10") {
     throw "Can Python 3.10 de build package native. Hien tai: $builderVersion"
 }
-& python -m pip install --disable-pip-version-check --no-compile --upgrade --target $sitePackages -r (Join-Path $projectRoot "requirements-portable.txt")
+& $builderPython -m pip install --disable-pip-version-check --no-compile --upgrade --target $sitePackages -r (Join-Path $projectRoot "requirements-portable.txt")
 if ($LASTEXITCODE -ne 0) {
     throw "pip install that bai"
 }

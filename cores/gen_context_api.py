@@ -80,6 +80,9 @@ Không thêm Markdown hoặc lời giải thích."""
 
 
 def main():
+    if CONTEXT_MODEL.strip().lower() in {"", "none"}:
+        print("Bỏ qua tạo context vì chưa cấu hình model Gemini API.")
+        return
     return run_context_generation(
         engine_name="Gemini API",
         setup_browser=None,

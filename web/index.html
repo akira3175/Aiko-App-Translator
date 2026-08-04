@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" id="themeColor" content="#101412">
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-48.png">
   <script>try{const themes=['quiet-light','dark-modern','synthwave-84','solarized-dark','monokai-dimmed','sakura-night','tokyo-night','abyss','kimbie-dark'];const colors={'quiet-light':'#f5f5f5','dark-modern':'#101412','synthwave-84':'#21182d','solarized-dark':'#002b36','monokai-dimmed':'#1e1f1c','sakura-night':'#101625','tokyo-night':'#1a1b26','abyss':'#000c18','kimbie-dark':'#221a0f'};const saved=localStorage.getItem('novel-theme');const theme=themes.includes(saved)?saved:'dark-modern';document.documentElement.dataset.theme=theme;document.getElementById('themeColor').content=colors[theme]}catch(_error){}</script>
   <title>Novel Translator Studio</title>
   <link rel="stylesheet" href="/styles.css">
@@ -21,7 +22,7 @@
 <body>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
-        <div class="brand"><span class="brand-mark">A</span><div><strong>Aiko App Translator</strong><small id="activeProjectLabel">Chưa chọn truyện</small></div></div>
+        <div class="brand"><span class="brand-mark"><img src="/assets/aiko-logo-256.png" alt=""></span><div><strong>Aiko App Translator</strong><small id="activeProjectLabel">Chưa chọn truyện</small></div></div>
         <button class="project-select" id="projectSelect"><span><small>TRUYỆN ĐANG MỞ</small><strong id="currentProject">Chọn truyện</strong></span><span>⌄</span></button>
         <button class="add-project" id="addProjectButton">+ Thêm truyện mới</button>
       <nav aria-label="Điều hướng chính">

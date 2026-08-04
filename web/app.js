@@ -1361,7 +1361,25 @@ function confirmTask() {
     Object.assign(config,{from_vol:start.volume,from_chap:start.chapter,to_vol:end.volume,to_chap:end.chapter});
     delete config.start_target;delete config.end_target;
   }
+  if(!confirmGlossaryCoverage(pendingTask,config))return;
   $('#taskModal').classList.remove('open'); executePipeline(pendingTask,config);
+}
+
+function confirmGlossaryCoverage(kind,config={}) {
+  if(!['v1','v1-interactions','v2','v3','gpt','gpt-api','manual','retranslate'].includes(kind))return true;
+  const glossaryIndex=Number(state.context?.index)||0;
+  let startIndex=kind==='retranslate'
+    ? state.chapters.findIndex(item=>item.name===state.current)
+    : state.chapters.findIndex(item=>!item.translated);
+  if(startIndex<0)return true;
+  let endChapter=startIndex+1;
+  if(kind!=='retranslate'){
+    if(config.run_until_complete===true||config.run_until_complete==='true')endChapter=state.chapters.length;
+    else if(['v3','gpt'].includes(kind))endChapter=Math.min(state.chapters.length,startIndex+Math.max(1,Number(config.batch_size)||1));
+  }
+  if(endChapter<=glossaryIndex)return true;
+  const range=endChapter===startIndex+1?`chương ${endChapter}`:`chương ${startIndex+1}–${endChapter}`;
+  return confirm(`Glossary mới được duyệt đến chương ${glossaryIndex}, nhưng tác vụ có thể dịch ${range}.\n\nNhấn OK để vẫn dịch hoặc Cancel để hủy.`);
 }
 
 async function executePipeline(kind,config) {
@@ -1439,6 +1457,7 @@ async function cancelTranslation(mode) {
 
 async function startRetranslate() {
   if (!state.current) return toast('Hãy chọn một chương trước');
+  if(!confirmGlossaryCoverage('retranslate'))return;
   if (state.dirty) await saveChapter();
   const engine = $('input[name="engine"]:checked').value;
   novelStreamSequence=0;

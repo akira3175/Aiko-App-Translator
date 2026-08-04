@@ -61,6 +61,7 @@ CHARACTERS_MD = os.path.join(
 LINK_GEMINI = str(
     option("link_gemini", "https://gemini.google.com/gem/fdec65ac9c69")
 )
+LINK_CHATGPT = str(option("link_chatgpt", "https://chatgpt.com/"))
 
 # ============================================================
 # ★ CẤU HÌNH CHROME SELENIUM
@@ -110,6 +111,7 @@ WEB_THINKING_LEVEL = str(option("gemini_thinking", "extended"))
 # Model cho pipeline hậu dịch (API)
 POLISH_MODEL = str(option("polish_model", "gemini-3-flash-preview"))
 REVIEW_BG_MODEL = str(option("review_bg_model", "gemini-3.1-flash-lite-preview"))
+PRONOUN_MODEL = str(option("pronoun_model", "gemini-3.1-flash-lite-preview"))
 REVIEW_YAML = os.path.join(_project_dir, "review.yaml")
 LOG_DIR = os.path.join(_project_dir, "logs")
 
@@ -1246,7 +1248,7 @@ def generate_content_with_chatgpt(
             driver = get_chatgpt_driver()
             wait = WebDriverWait(driver, 60)
 
-            driver.get("https://chatgpt.com/")
+            driver.get(LINK_CHATGPT)
             time.sleep(3)
 
             # ── Bước 0: Chọn model và thinking level ──
@@ -1755,7 +1757,13 @@ def save_pronouns(data, file_path=PRONOUNS_YAML):
         yaml.dump(data, f, allow_unicode=True, sort_keys=False)
 
 
-def extract_pronouns_from_translation(chapter_id, chapter_number, translation_text):
+def extract_pronouns_from_translation(
+    chapter_id, chapter_number, translation_text, model=PRONOUN_MODEL, generate=None
+):
+    if str(model).strip().lower() in {"", "none"}:
+        print("Bỏ qua cập nhật xưng hô vì chưa cấu hình model.")
+        return {}
+
     """Dùng AI để trích xuất xưng hô từ bản dịch."""
     prompt = f"""Bạn là chuyên gia phân tích xưng hô trong văn bản tiếng Việt.
 
@@ -1791,9 +1799,12 @@ Lưu ý:
     while True:
         raw_result_text = ""
         try:
-            raw_result_text = call_gemini(
-                prompt, model="gemini-3.1-flash-lite-preview", temperature=0.9
-            ).strip()
+            if generate is None:
+                raw_result_text = call_gemini(
+                    prompt, model=model, temperature=0.9
+                ).strip()
+            else:
+                raw_result_text = generate(prompt).strip()
 
             if not raw_result_text:
                 print("⚠️ [DEBUG] API trả về dữ liệu rỗng! (bị mất text)")
@@ -1846,12 +1857,17 @@ Lưu ý:
 
 
 def update_pronoun_memory(
-    chapter_id, chapter_number, translation_text, pronouns_file=PRONOUNS_YAML
+    chapter_id,
+    chapter_number,
+    translation_text,
+    pronouns_file=PRONOUNS_YAML,
+    model=PRONOUN_MODEL,
+    generate=None,
 ):
     """Cập nhật bộ nhớ xưng hô với ưu tiên cho chương gần nhất."""
     memory = load_pronouns(pronouns_file)
     new_pronouns = extract_pronouns_from_translation(
-        chapter_id, chapter_number, translation_text
+        chapter_id, chapter_number, translation_text, model=model, generate=generate
     )
     updated_count = 0
     for key, data in new_pronouns.items():
@@ -2419,23 +2435,28 @@ def run_post_translation_pipeline(
     print(f"[PIPELINE] Bắt đầu hậu xử lý chương {chapter_number} ({chapter_id})")
     print(f"{'─' * 55}")
 
-    # ── Bước 1: Biên tập trau chuốt + chỉnh xưng hô ──
-    print(f"[PIPELINE] Bước 1 — Biên tập trau chuốt...")
-    title_polished, content_polished = polish_translation(
-        chapter,
-        chapter_number,
-        context_text,
-        pronoun_context,
-        pronouns_file=pronouns_file,
-    )
-    chapter["title_translation"] = title_polished
-    chapter["translation"] = content_polished
+    title_fixed = chapter.get("title_translation", "")
+    content_fixed = chapter.get("translation", "")
+    if POLISH_MODEL.strip().lower() not in {"", "none"}:
+        # ── Bước 1: Biên tập trau chuốt + chỉnh xưng hô ──
+        print(f"[PIPELINE] Bước 1 — Biên tập trau chuốt...")
+        title_polished, content_polished = polish_translation(
+            chapter,
+            chapter_number,
+            context_text,
+            pronoun_context,
+            pronouns_file=pronouns_file,
+        )
+        chapter["title_translation"] = title_polished
+        chapter["translation"] = content_polished
 
-    # ── Bước 2: Xét sót ngôn ngữ ──
-    print(f"[PIPELINE] Bước 2 — Xét sót ngôn ngữ...")
-    title_fixed, content_fixed = fix_translation(
-        chapter, chapter_number, context_text, pronoun_context
-    )
+        # ── Bước 2: Xét sót ngôn ngữ ──
+        print(f"[PIPELINE] Bước 2 — Xét sót ngôn ngữ...")
+        title_fixed, content_fixed = fix_translation(
+            chapter, chapter_number, context_text, pronoun_context
+        )
+    else:
+        print("[PIPELINE] Bỏ qua hậu dịch vì chưa cấu hình model.")
     chapter["title_translation"] = title_fixed
     chapter["translation"] = content_fixed
 
@@ -2444,25 +2465,28 @@ def run_post_translation_pipeline(
     update_pronoun_memory(chapter_id, chapter_number, content_fixed, pronouns_file)
 
     # ── Bước 4: Review ngầm (daemon thread, không block) ──
-    print(f"[PIPELINE] Bước 4 — Khởi động review ngầm (gemini-3.1-flash-lite)...")
-    raw_content = chapter.get("content", "")
-    review_token = object()
-    with _review_lock:
-        _latest_review_tokens[chapter_id] = review_token
-    t = threading.Thread(
-        target=_run_background_review,
-        args=(
-            chapter_id,
-            chapter_number,
-            title_fixed,
-            content_fixed,
-            context_text,
-            raw_content,
-            review_token,
-        ),
-        daemon=True,
-    )
-    t.start()
+    if REVIEW_BG_MODEL.strip().lower() not in {"", "none"}:
+        print(f"[PIPELINE] Bước 4 — Khởi động review ngầm ({REVIEW_BG_MODEL})...")
+        raw_content = chapter.get("content", "")
+        review_token = object()
+        with _review_lock:
+            _latest_review_tokens[chapter_id] = review_token
+        t = threading.Thread(
+            target=_run_background_review,
+            args=(
+                chapter_id,
+                chapter_number,
+                title_fixed,
+                content_fixed,
+                context_text,
+                raw_content,
+                review_token,
+            ),
+            daemon=True,
+        )
+        t.start()
+    else:
+        print("[PIPELINE] Bỏ qua review nền vì chưa cấu hình model.")
 
     print(f"[PIPELINE] ✅ Hoàn tất hậu xử lý chương {chapter_number}")
     return title_fixed, content_fixed
