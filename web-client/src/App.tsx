@@ -1052,13 +1052,13 @@ export function App() {
       </aside>
 
       <section className="workspace">
-        <header className="topbar">
+        <header className={project ? "topbar has-project" : "topbar no-project"}>
           <div className="topbar-project">
             {project ? <input className="project-title" aria-label="Tên dự án" value={project.name} onChange={(event) => void updateProject({ name: event.target.value })} /> : <h1>Studio dịch</h1>}
             <p>{project ? "Tự động lưu trên thiết bị này" : "Tạo dự án để bắt đầu"}</p>
-            <select className="mobile-project-select" aria-label="Chọn dự án" value={projectId} onChange={(event) => setProjectId(event.target.value)}>{projects.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>
+            {!!projects.length && <select className="mobile-project-select" aria-label="Chọn dự án" value={projectId} onChange={(event) => setProjectId(event.target.value)}>{projects.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>}
           </div>
-          {busy ? <button className="button danger" onClick={() => abortRef.current?.abort()}><Stop size={17} weight="fill" />Dừng tác vụ</button> : <div className="top-actions"><button className="mobile-delete-project" aria-label="Xóa truyện" disabled={!project} onClick={() => setDeleteModalOpen(true)}><Trash size={19} /></button><button className="button primary top-import" disabled={importingNovel} onClick={() => novelImportRef.current?.click()}><FilePlus size={17} />Nhập truyện</button></div>}
+          {busy ? <button className="button danger" onClick={() => abortRef.current?.abort()}><Stop size={17} weight="fill" />Dừng tác vụ</button> : <div className="top-actions"><button className="button outline mobile-new-project" onClick={() => void createProject()}><Plus size={18} /><span>Tạo project</span></button><button className="button primary top-import" disabled={importingNovel} onClick={() => novelImportRef.current?.click()}><FilePlus size={17} /><span>{importingNovel ? "Đang tách..." : "Tách EPUB/TXT"}</span></button>{project && <button className="mobile-delete-project" aria-label="Xóa truyện" title="Xóa truyện" onClick={() => setDeleteModalOpen(true)}><Trash size={19} /></button>}</div>}
         </header>
 
         {(notice || error) && <div role="status" className={error ? "message error" : "message success"}>{error || notice}<button aria-label="Đóng thông báo" onClick={() => { setError(""); setNotice(""); }}>×</button></div>}

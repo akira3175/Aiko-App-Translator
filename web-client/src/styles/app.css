@@ -53,6 +53,7 @@ nav { display: grid; gap: 4px; }
 .project-title { border: 0; padding: 0; background: transparent; font-size: 20px; font-weight: 750; color: #202522; width: min(55vw, 620px); }
 .top-actions { display: flex; align-items: center; gap: 12px; }
 .top-import { display: none; }
+.mobile-new-project { display: none; }
 .message { margin: 12px 18px 0; border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
 .message button { border: 0; background: transparent; color: inherit; font-size: 18px; line-height: 1; }
 .message.success { background: #e2f0e8; color: #235e42; }
@@ -483,26 +484,31 @@ body { background: #101412; color: #e9efeb; }
   .nav-item svg { width: 20px; height: 20px; }
   .nav-item.active { font-weight: 700; }
   .workspace { width: 100%; height: calc(100dvh - 62px - env(safe-area-inset-bottom)); overflow: hidden; }
-  .topbar { height: 60px; min-height: 60px; flex-basis: 60px; padding: 8px 12px; }
-  .topbar-project { min-width: 0; flex: 1; }
+  .topbar { height: auto; min-height: 108px; flex: 0 0 auto; padding: 8px 12px; display: grid; grid-template-columns: minmax(0,1fr); gap: 7px; }
+  .topbar-project { min-width: 0; width: 100%; }
   .project-title,.topbar-project > p { display: none; }
   .mobile-project-select { display: block; width: 100%; height: 42px; appearance: none; overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--line); border-radius: 9px; padding: 0 34px 0 11px; background: var(--surface); color: #eef4f0; font-weight: 700; }
-  .topbar .top-actions { flex: none; }
+  .topbar .top-actions { width: 100%; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.35fr) 42px; gap: 7px; }
+  .mobile-new-project { display: inline-flex; }
   .mobile-delete-project { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(224,106,95,.35); border-radius: 9px; background: rgba(224,106,95,.08); color: #e9867d; }
-  .top-import { width: 42px; min-height: 42px; padding: 0; font-size: 0; }
+  .top-import,.mobile-new-project { width: 100%; min-height: 38px; justify-content: center; padding: 7px 9px; font-size: 11px; white-space: nowrap; }
   .top-import svg { width: 20px; height: 20px; }
+  .no-project .topbar-project { display: none; }
+  .no-project.topbar { min-height: 60px; }
+  .no-project .top-actions { grid-template-columns: 1fr 1fr; }
+  .no-project .mobile-new-project,.no-project .top-import { min-height: 42px; font-size: 12px; }
   .topbar .button.danger { min-height: 42px; padding: 7px 10px; font-size: 12px; }
-  .message { position: absolute; z-index: 45; top: 58px; left: 8px; right: 8px; margin: 0; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+  .message { position: absolute; z-index: 45; top: 106px; left: 8px; right: 8px; margin: 0; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
   .translate-layout { padding: 0 10px 10px; }
   .editor-workspace { overflow: hidden; }
-  .workspace-toolbar { min-height: 0; display: grid; grid-template-columns: 44px minmax(0,1fr) 44px 44px 44px; gap: 6px; padding: 8px 0 6px; }
+  .workspace-toolbar { min-height: 0; display: grid; grid-template-columns: 44px minmax(0,1fr) 44px 44px 44px; gap: 6px; padding: 6px 0 2px; }
   .workspace-toolbar > * { min-width: 0; }
   .chapter-picker { width: auto; height: 44px; padding-left: 10px; }
   .chapter-nav span { display: none; }
   .chapter-nav,.icon-add { width: 44px; height: 44px; min-height: 44px; padding: 0; }
-  .chapter-actions { grid-column: 1 / -1; width: 100%; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 5px; overflow: visible; }
-  .chapter-actions .run-all { grid-column: span 2; }
-  .chapter-actions .button { width: 100%; min-width: 0; min-height: 42px; padding: 6px 4px; gap: 4px; overflow: hidden; text-overflow: ellipsis; }
+  .chapter-actions { grid-column: 1 / -1; width: 100%; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px; margin-top: -1px; padding: 0; overflow: visible; }
+  .chapter-actions .run-all { grid-column: auto; }
+  .chapter-actions .button { width: 100%; min-width: 0; min-height: 42px; padding: 5px 2px; gap: 2px; overflow: hidden; font-size: clamp(9px,2.7vw,12px); line-height: 1.15; text-align: center; text-overflow: ellipsis; white-space: normal; }
   .chapter-actions .toolbar-review-button { display: inline-flex; }
   .chapter-actions .button svg { display: none; }
   .chapter-title-input { height: 32px; }
