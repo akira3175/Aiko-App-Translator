@@ -101,12 +101,15 @@ if __name__ == "__main__":
             setup_chatgpt_browser()
 
         consecutive_errors = 0
+        batch_runs = int_option("batch_runs", 1, minimum=0)
+        completed_batches = 0
         while True:
             if stop_requested():
                 print("Da dung truoc khi nhan batch tiep theo.")
                 break
             try:
                 run_translation()
+                completed_batches += 1
                 consecutive_errors = 0
             except Exception as e:
                 consecutive_errors += 1
@@ -140,10 +143,8 @@ if __name__ == "__main__":
                 print("🎉 Đã dịch hết tất cả các chương!")
                 break
 
-            if web_mode():
-                if bool_option("run_until_complete", False):
-                    continue
-                print("✅ Đã xử lý một batch theo cấu hình web.")
+            if web_mode() and batch_runs > 0 and completed_batches >= batch_runs:
+                print(f"✅ Đã xử lý {completed_batches} batch theo cấu hình web.")
                 break
 
             print("⏳ Đang chuẩn bị dịch chương tiếp theo... (nhấn Enter để dừng)")

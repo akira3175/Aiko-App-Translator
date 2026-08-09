@@ -17,7 +17,7 @@ if sys.stderr.encoding != "utf-8":
 
 from cores import dich_utils, dich_v1
 from cores.gemini_interactions import stream_interaction
-from cores.runtime_config import bool_option, option, stop_requested, web_mode
+from cores.runtime_config import chapter_limit, option, stop_requested, web_mode
 
 
 _stage = None
@@ -172,10 +172,12 @@ def main():
     dich_utils.polish_translation = polish_interactions
     print("Gemini Interactions Streaming — V1 (Beta)")
     print(f"Model dịch chính: {dich_v1.TRANSLATE_MODEL}")
+    limit = chapter_limit()
+    processed = 0
     while True:
         if stop_requested():
             break
-        dich_v1.run_translation()
+        processed += dich_v1.run_translation() or 0
         raw_files = dich_utils.scan_md_dir(dich_utils.RAW_DIR)
         if all(
             dich_utils.is_translated(
@@ -186,8 +188,8 @@ def main():
         ):
             print("Đã dịch hết tất cả các chương.")
             break
-        if web_mode() and not bool_option("run_until_complete", False):
-            print("Đã xử lý một chương bằng Interactions API Beta.")
+        if web_mode() and limit is not None and processed >= limit:
+            print(f"Đã xử lý {processed} chương bằng Interactions API Beta.")
             break
         time.sleep(1)
 

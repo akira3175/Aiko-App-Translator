@@ -23,7 +23,7 @@ from cores.dich_utils import (
     update_pronoun_memory,
 )
 from cores.gpt_api_client import call_gpt_api
-from cores.runtime_config import bool_option, option, stop_requested, web_mode
+from cores.runtime_config import chapter_limit, option, stop_requested, web_mode
 from cores.translation_prompts import build_single_prompt, project_polish_prompt
 from cores.translation_workflows import run_single_translation
 
@@ -150,11 +150,13 @@ def run_translation():
 if __name__ == "__main__":
     print("GPT API — dịch và hiệu đính bằng API")
     print(f"Model dịch: {TRANSLATE_MODEL} | Model hiệu đính: {POLISH_MODEL}")
+    limit = chapter_limit()
+    processed = 0
     while True:
         if stop_requested():
             break
         try:
-            run_translation()
+            processed += run_translation() or 0
         except Exception as exc:
             print(f"[GPT API] Lỗi: {exc}")
             if web_mode():
@@ -165,9 +167,7 @@ if __name__ == "__main__":
         if all(is_translated(os.path.splitext(os.path.basename(path))[0], TRANSLATED_DIR) for path in raw_files):
             print("Đã dịch hết tất cả các chương.")
             break
-        if web_mode():
-            if bool_option("run_until_complete", False):
-                continue
+        if web_mode() and limit is not None and processed >= limit:
             break
         print("Nhấn Enter để dừng, phím bất kỳ để tiếp tục.")
         while not msvcrt.kbhit():

@@ -1,6 +1,20 @@
 {
   "versions": [
     {
+      "version": "0.10.0",
+      "date": "2026-08-06",
+      "title": "Chia sẻ truyện riêng tư qua R2, quản lý chương thuận tiện hơn",
+      "summary": "Bản cập nhật bổ sung hệ thống chia sẻ truyện trực tiếp trên Cloudflare R2, tự động thiết lập Cloudflare, cải thiện quản lý glossary và tinh chỉnh phạm vi chạy tác vụ dịch.",
+      "highlights": [
+        "Thêm hệ thống chia sẻ truyện private qua Cloudflare R2 và giao diện đọc truyện trực tuyến.",
+        "Chương được tải theo nhu cầu khi người đọc chuyển chương, không tải toàn bộ truyện ngay từ đầu.",
+        "Tự động tạo bucket, triển khai Share Worker và điền cấu hình R2 từ Cloudflare Account ID cùng API Token.",
+        "Thêm tự động thiết lập R2 Xuất bản, tạo bucket ảnh public và lấy đường dẫn r2.dev.",
+        "Cho phép tìm kiếm, thêm, chỉnh sửa và xóa glossary ngay tại giao diện chính.",
+        "Thêm số chương muốn chạy cho tác vụ dịch đơn; tác vụ batch dùng số lần chạy batch và nhập 0 để chạy đến hết."
+      ]
+    },
+    {
       "version": "0.9.0",
       "date": "2026-08-05",
       "title": "Prompt theo phong cách riêng, dịch web chính xác hơn",

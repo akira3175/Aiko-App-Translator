@@ -54,6 +54,19 @@ def bool_option(name, default=False):
     return bool(value)
 
 
+def chapter_limit(default=1):
+    """Maximum chapters for one web run; a blank value means no limit."""
+    if not web_mode():
+        return None
+    value = option("max_chapters", None)
+    if value in (None, ""):
+        return None if value == "" or bool_option("run_until_complete", False) else default
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return default
+
+
 def stop_requested():
     """Return True when the web controller requested a clean stop."""
     path = os.environ.get("NOVEL_STOP_FILE", "")

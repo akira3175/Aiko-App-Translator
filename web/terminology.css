@@ -1,18 +1,24 @@
 .terminology-head { align-items: center; }
 .terminology-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr); gap: 16px; }
 .memory-card { min-width: 0; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
-.memory-card-head { padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.memory-card-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.memory-card-head>small { color: var(--muted); font-size: 11px; }
 .memory-card-head strong, .memory-kicker { display: block; }
 .memory-kicker { margin-bottom: 5px; color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .14em; }
 .glossary-list { max-height: calc(100dvh - 235px); overflow: auto; }
-.glossary-row { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.glossary-row { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px 10px 18px; border-bottom: 1px solid var(--line); }
 .glossary-row:last-child { border-bottom: 0; }
-.glossary-row span { overflow-wrap: anywhere; line-height: 1.5; }
+.glossary-row input { min-width: 0; width: 100%; padding: 9px 10px; border: 1px solid transparent; border-radius: 8px; outline: 0; background: transparent; color: var(--ink); font: inherit; }
+.glossary-row input:hover { border-color: var(--line); background: var(--bg); }
+.glossary-row input:focus { border-color: var(--accent); background: var(--bg); box-shadow: 0 0 0 3px rgba(23,126,104,.12); }
 .glossary-row i { color: var(--muted); font-style: normal; text-align: center; }
+.glossary-row button { border: 0; padding: 8px 9px; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
+.glossary-row button:hover { background: rgba(208,111,91,.12); color: #d06f5b; }
 .style-card pre { max-height: calc(100dvh - 235px); overflow: auto; margin: 0; padding: 18px; white-space: pre-wrap; color: var(--ink); font: 14px/1.7 "Segoe UI Variable Text", "Segoe UI", sans-serif; }
 .memory-empty { padding: 28px 18px; color: var(--muted); text-align: center; }
 #popoverItems, #projectItems { max-height: min(350px, calc(100dvh - 100px)); overflow-y: auto; overscroll-behavior: contain; }
 @media (max-width: 900px) { .terminology-grid { grid-template-columns: 1fr; } .glossary-list, .style-card pre { max-height: 55dvh; } }
+@media (max-width: 620px) { .glossary-row { grid-template-columns: minmax(0,1fr) auto; } .glossary-row i { display: none; } .glossary-row input[data-glossary-field="target"] { grid-column: 1; } .glossary-row button { grid-column: 2; grid-row: 1 / span 2; } }
 .context-actions { display: flex; align-items: center; gap: 10px; }
 .context-modal { width: min(760px, calc(100vw - 32px)); }
 .safe-context-modal { display: flex; flex-direction: column; width: min(960px, calc(100vw - 32px)); height: min(820px, calc(100dvh - 40px)); overflow: hidden; }

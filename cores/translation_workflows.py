@@ -237,7 +237,7 @@ def run_single_translation(
 
         output_path = save_translated_md(raw_path, translated_dir, title, content)
         print(f"✔ Đã lưu: {output_path}")
-        return
+        return 1
 
 
 def run_batch_translation(
@@ -332,4 +332,4 @@ def run_batch_translation(
             print(f"✅ Đã lưu: {output_path}")
 
         print(f"✅ Hoàn tất Batch {len(batch)} chương!")
-        return
+        return len(batch)

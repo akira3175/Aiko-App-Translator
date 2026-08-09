@@ -1,0 +1,7 @@
+name = "aiko-share-reader"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+[[r2_buckets]]
+binding = "SHARE_BUCKET"
+bucket_name = "private-shares"

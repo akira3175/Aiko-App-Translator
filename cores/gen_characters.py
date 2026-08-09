@@ -17,6 +17,12 @@ import time
 
 import yaml
 
+# Console Windows có thể dùng cp1252 khi script chạy độc lập. Ép UTF-8 trước
+# khi in đường dẫn/tên truyện tiếng Việt để không làm gián đoạn sau khi ghi file.
+for stream in (sys.stdout, sys.stderr):
+    if stream and hasattr(stream, "reconfigure"):
+        stream.reconfigure(encoding="utf-8", errors="replace")
+
 # Dung call_gemini + MD helpers tu dich_utils.py
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if root_dir not in sys.path:
@@ -189,10 +195,23 @@ Doc doan van ban goc ben duoi, sau do **trich xuat / cap nhat** thong tin nhan v
 
 
 def extract_char_block(raw_response: str) -> str:
-    if "###CHAR_START###" in raw_response and "###CHAR_END###" in raw_response:
-        start = raw_response.index("###CHAR_START###") + len("###CHAR_START###")
-        end = raw_response.index("###CHAR_END###")
-        return raw_response[start:end].strip()
+    cleaned = (raw_response or "").strip()
+    cleaned = re.sub(r"^```(?:markdown|md)?\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*```$", "", cleaned).strip()
+    cleaned = re.sub(r"(?m)^\\(?=#+\s*(?:CHAR_START|CHAR_END))", "", cleaned)
+
+    start_match = re.search(
+        r"(?im)^\s*#{3}\s*CHAR_START\s*#{3}\s*$", cleaned
+    )
+    end_match = re.search(
+        r"(?im)^\s*#{3}\s*CHAR_END\s*#{3}\s*$", cleaned
+    )
+    if start_match and end_match and end_match.start() > start_match.end():
+        return cleaned[start_match.end() : end_match.start()].strip()
+
+    # Gemini đôi khi bỏ marker nhưng vẫn trả đúng các block nhân vật.
+    if re.search(r"(?m)^##\s+\S", cleaned):
+        return cleaned
     return ""
 
 
@@ -210,6 +229,38 @@ def parse_characters_from_md(md_text: str) -> dict:
         if name:
             characters[name] = block
     return characters
+
+
+def request_valid_character_block(prompt: str) -> str:
+    request_prompt = prompt
+    for output_attempt in range(1, MAX_RETRIES + 1):
+        raw_response = call_char_analysis(request_prompt) or ""
+        new_block = extract_char_block(raw_response)
+        if new_block and parse_characters_from_md(new_block):
+            return new_block
+
+        marker_state = (
+            "co marker"
+            if "CHAR_START" in raw_response or "CHAR_END" in raw_response
+            else "thieu marker"
+        )
+        print(
+            f"   Output khong hop le ({marker_state}, {len(raw_response)} ky tu), "
+            f"lan {output_attempt}/{MAX_RETRIES}."
+        )
+        if output_attempt < MAX_RETRIES:
+            request_prompt = prompt + """
+
+---
+LƯU Ý SỬA OUTPUT: Lần trả lời trước không có hồ sơ nhân vật Markdown hợp lệ.
+Hãy trả lại kết quả với ít nhất một header `## Tên nhân vật`, đặt toàn bộ nội dung
+giữa `###CHAR_START###` và `###CHAR_END###`. Không trả lời giải thích.
+"""
+
+    raise ValueError(
+        "Gemini trả output sai marker hoặc không có hồ sơ nhân vật hợp lệ "
+        f"sau {MAX_RETRIES} lần; tiến độ chưa được tăng"
+    )
 
 
 def merge_characters(existing_md: str, new_md_block: str) -> str:
@@ -365,16 +416,7 @@ def main():
             )
 
             prompt = build_character_prompt(batch, existing_body, glossary)
-            raw_response = call_char_analysis(prompt)
-
-            if not raw_response.strip():
-                raise ValueError(
-                    "Gemini khong tra ve noi dung; tien do chua duoc tang"
-                )
-
-            new_block = extract_char_block(raw_response)
-            if not new_block or not parse_characters_from_md(new_block):
-                raise ValueError("Response thiếu marker hoặc không có hồ sơ nhân vật hợp lệ; tiến độ chưa được tăng")
+            new_block = request_valid_character_block(prompt)
             existing_body = merge_characters(existing_body, new_block)
 
             final_md = build_header() + existing_body

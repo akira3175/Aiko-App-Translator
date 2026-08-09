@@ -265,12 +265,17 @@ SPECIAL_CHAPTER_PATTERN = re.compile(
 )
 
 
-def uses_character_limit(text):
-    """CJK/Hangul uses characters; space-delimited languages use words."""
+def cjk_character_ratio(text):
+    """Return the CJK/Hangul share of all non-whitespace characters."""
     compact = re.sub(r'\s+', '', text)
     if not compact:
-        return False
-    return len(CJK_PATTERN.findall(compact)) / len(compact) >= 0.2
+        return 0.0
+    return len(CJK_PATTERN.findall(compact)) / len(compact)
+
+
+def uses_character_limit(text):
+    """CJK/Hangul uses characters; space-delimited languages use words."""
+    return cjk_character_ratio(text) >= 0.2
 
 
 def unit_count(text, character_based):
@@ -301,9 +306,10 @@ def split_long_text(text, limit, character_based):
     return parts
 
 
-def segment_elements(elements, limit):
+def segment_elements(elements, limit, character_based=None):
     all_text = '\n'.join(elem.get('content', '') for elem in elements if elem['type'] == 'text')
-    character_based = uses_character_limit(all_text)
+    if character_based is None:
+        character_based = uses_character_limit(all_text)
     segments, current, current_size = [], [], 0
     for elem in elements:
         if elem['type'] == 'image':
@@ -321,8 +327,8 @@ def segment_elements(elements, limit):
     return segments or [[]], ('characters' if character_based else 'words')
 
 
-def write_document_segments(elements, title, vol_num, chap_index, raw_dir, img_dir, segment_limit, archive=None):
-    segments, metric = segment_elements(elements, segment_limit)
+def write_document_segments(elements, title, vol_num, chap_index, raw_dir, img_dir, segment_limit, archive=None, character_based=None):
+    segments, metric = segment_elements(elements, segment_limit, character_based)
     written = 0
     for seg_index, segment in enumerate(segments, 1):
         prefix = f"v{vol_num}_c{chap_index}_s{seg_index}"
@@ -397,9 +403,22 @@ def split_txt_to_md(file_path, vol_num, base_dir, project_dir=None, segment_limi
     os.makedirs(raw_dir, exist_ok=True)
     os.makedirs(img_dir, exist_ok=True)
     documents = txt_documents(file_path)
+    full_text = '\n'.join(
+        elem.get('content', '')
+        for _title, elements in documents
+        for elem in elements
+        if elem['type'] == 'text'
+    )
+    ratio = cjk_character_ratio(full_text)
+    character_based = ratio >= 0.2
+    metric_name = 'characters' if character_based else 'words'
+    print(f"[METRIC] CJK/Hangul: {ratio:.1%} -> {metric_name} cho toàn bộ TXT")
     segment_count, metrics = 0, set()
     for chap_index, (title, elements) in enumerate(documents):
-        written, metric = write_document_segments(elements, title, vol_num, chap_index, raw_dir, img_dir, segment_limit)
+        written, metric = write_document_segments(
+            elements, title, vol_num, chap_index, raw_dir, img_dir, segment_limit,
+            character_based=character_based,
+        )
         segment_count += written
         metrics.add(metric)
     result = {'chapters': len(documents), 'segments': segment_count, 'metrics': sorted(metrics)}
@@ -491,6 +510,17 @@ def split_epub_to_md(epub_path, vol_num, base_dir, project_dir=None, segment_lim
     metrics = set()
     chap_index = 0  # 0-based chapter index (y)
 
+    full_text = '\n'.join(
+        elem.get('content', '')
+        for _href, _title, elements in documents
+        for elem in elements
+        if elem['type'] == 'text'
+    )
+    ratio = cjk_character_ratio(full_text)
+    character_based = ratio >= 0.2
+    metric_name = 'characters' if character_based else 'words'
+    print(f"[METRIC] CJK/Hangul: {ratio:.1%} -> {metric_name} cho toàn bộ EPUB")
+
     for href, title, elements in documents:
         text_elements = [e for e in elements if e['type'] == 'text']
 
@@ -504,7 +534,8 @@ def split_epub_to_md(epub_path, vol_num, base_dir, project_dir=None, segment_lim
             title = f"Chương {chap_index + 1}"
 
         written, metric = write_document_segments(
-            elements, title, vol_num, chap_index, raw_dir, img_dir, segment_limit, archive=z
+            elements, title, vol_num, chap_index, raw_dir, img_dir, segment_limit,
+            archive=z, character_based=character_based,
         )
         segment_count += written
         metrics.add(metric)

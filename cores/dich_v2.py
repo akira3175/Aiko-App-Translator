@@ -40,7 +40,7 @@ from cores.dich_utils import (
     # Selenium
     setup_gemini_browser,
 )
-from cores.runtime_config import bool_option, stop_requested, web_mode
+from cores.runtime_config import bool_option, chapter_limit, stop_requested, web_mode
 from cores.translation_prompts import build_single_prompt
 from cores.translation_workflows import run_single_translation
 
@@ -156,12 +156,14 @@ if __name__ == "__main__":
         if not web_mode() or bool_option("open_browser_setup", True):
             setup_gemini_browser()
 
+        limit = chapter_limit()
+        processed = 0
         while True:
             if stop_requested():
                 print("Da dung truoc khi nhan chuong tiep theo.")
                 break
             try:
-                run_translation()
+                processed += run_translation() or 0
             except Exception as e:
                 print(f"⚠️ Lỗi khi dịch: {e}")
                 print("⏳ Chờ 10s rồi thử lại...")
@@ -181,10 +183,8 @@ if __name__ == "__main__":
                 print("🎉 Đã dịch hết tất cả các chương!")
                 break
 
-            if web_mode():
-                if bool_option("run_until_complete", False):
-                    continue
-                print("✅ Đã xử lý một chương theo cấu hình web.")
+            if web_mode() and limit is not None and processed >= limit:
+                print(f"✅ Đã xử lý {processed} chương theo cấu hình web.")
                 break
 
             print("⏳ Đang chuẩn bị dịch chương tiếp theo... (nhấn Enter để dừng)")

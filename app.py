@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import html as html_lib
 import difflib
 import mimetypes
 import os
@@ -18,14 +19,21 @@ import traceback
 import unicodedata
 import webbrowser
 import zipfile
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from pathlib import PurePosixPath
 from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 import yaml
+
+try:
+    import boto3
+except ImportError:
+    boto3 = None
 
 from cores.translation_prompts import (
     DEFAULT_POLISH_ROLE,
@@ -108,6 +116,11 @@ SETTING_DEFAULTS = {
     "r2_secret_access_key": "",
     "r2_bucket": "",
     "r2_public_url": "",
+    "share_r2_account_id": "",
+    "share_r2_access_key_id": "",
+    "share_r2_secret_access_key": "",
+    "share_r2_bucket": "private-shares",
+    "share_worker_url": "",
     "gpt_api_key": "",
     "gpt_api_endpoint": "https://api.openai.com/v1/responses",
     "gpt_api_translate_model": "gpt-5.6-luna",
@@ -150,6 +163,11 @@ SETTING_LABELS = {
     "r2_secret_access_key": "R2 Secret Access Key",
     "r2_bucket": "Tên bucket R2",
     "r2_public_url": "Đường dẫn public R2",
+    "share_r2_account_id": "Share R2 Account ID",
+    "share_r2_access_key_id": "Share R2 Access Key ID",
+    "share_r2_secret_access_key": "Share R2 Secret Access Key",
+    "share_r2_bucket": "Tên bucket share private",
+    "share_worker_url": "Đường dẫn Share Worker",
     "gpt_api_key": "GPT API key",
     "gpt_api_endpoint": "Endpoint GPT Responses API",
     "gpt_api_translate_model": "Model GPT API dùng để dịch",
@@ -164,7 +182,7 @@ SETTING_LABELS = {
     "lan_enabled": "Truy cập từ điện thoại cùng Wi-Fi",
     "lan_pin": "Mã PIN truy cập LAN",
 }
-SECRET_SETTINGS = {"hako_password", "r2_access_key_id", "r2_secret_access_key", "gpt_api_key", "lan_pin"}
+SECRET_SETTINGS = {"hako_password", "r2_access_key_id", "r2_secret_access_key", "share_r2_access_key_id", "share_r2_secret_access_key", "gpt_api_key", "lan_pin"}
 SETTING_RANGES = {
     "fix_max_retry": (1, 20),
     "previous_context_chapters": (0, 20),
@@ -199,6 +217,11 @@ SETTING_META = {
     "hako_management_url": {"group": "publishing"}, "r2_account_id": {"group": "publishing"},
     "r2_access_key_id": {"group": "publishing"}, "r2_secret_access_key": {"group": "publishing"},
     "r2_bucket": {"group": "publishing"}, "r2_public_url": {"group": "publishing"},
+    "share_r2_account_id": {"group": "sharing"},
+    "share_r2_access_key_id": {"group": "sharing"},
+    "share_r2_secret_access_key": {"group": "sharing"},
+    "share_r2_bucket": {"group": "sharing", "description": "Bucket private riêng; không bật r2.dev hoặc public domain."},
+    "share_worker_url": {"group": "sharing", "description": "URL Worker đã bind bucket share, ví dụ https://aiko-share.example.workers.dev"},
     "gpt_api_key": {"group": "gpt-api"}, "gpt_api_endpoint": {"group": "gpt-api"},
     "gpt_api_translate_model": {"group": "gpt-api"},
     "gpt_api_polish_model": {"group": "gpt-api", "description": "Để trống hoặc nhập none để bỏ qua bước hiệu đính."},
@@ -314,6 +337,159 @@ def write_settings(payload: dict):
     else:
         SETTINGS_FILE.unlink(missing_ok=True)
     return settings_payload()
+
+
+def _cloudflare_api(account_id: str, api_token: str, method: str, path: str, body=None, headers=None):
+    url = (
+        f"https://api.cloudflare.com/client/v4{path}"
+        if path.startswith("/user/")
+        else f"https://api.cloudflare.com/client/v4/accounts/{account_id}{path}"
+    )
+    request_headers = {"Authorization": f"Bearer {api_token}", **(headers or {})}
+    data = body
+    if isinstance(body, dict):
+        data = json.dumps(body).encode("utf-8")
+        request_headers["Content-Type"] = "application/json"
+    try:
+        request = Request(url, data=data, headers=request_headers, method=method)
+        with urlopen(request, timeout=45) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            error_payload = json.loads(exc.read().decode("utf-8"))
+            message = "; ".join(str(item.get("message", "")) for item in error_payload.get("errors", []))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            message = str(exc.reason)
+        raise ValueError(f"Cloudflare trả lỗi {exc.code}: {message or exc.reason}") from None
+    except URLError as exc:
+        raise ValueError(f"Không kết nối được Cloudflare: {exc.reason}") from None
+    if not payload.get("success", False):
+        message = "; ".join(str(item.get("message", "")) for item in payload.get("errors", []))
+        raise ValueError(message or "Cloudflare từ chối yêu cầu")
+    return payload.get("result")
+
+
+def _multipart_worker(source: bytes, bucket: str):
+    boundary = f"----Aiko{secrets.token_hex(16)}"
+    metadata = json.dumps({
+        "main_module": "index.js",
+        "compatibility_date": datetime.now(timezone.utc).date().isoformat(),
+        "bindings": [{"type": "r2_bucket", "name": "SHARE_BUCKET", "bucket_name": bucket}],
+    }).encode("utf-8")
+    chunks = []
+    for name, filename, content_type, value in (
+        ("metadata", None, "application/json", metadata),
+        ("index.js", "index.js", "application/javascript+module", source),
+    ):
+        disposition = f'form-data; name="{name}"' + (f'; filename="{filename}"' if filename else "")
+        chunks.append(
+            f"--{boundary}\r\nContent-Disposition: {disposition}\r\nContent-Type: {content_type}\r\n\r\n".encode()
+            + value + b"\r\n"
+        )
+    chunks.append(f"--{boundary}--\r\n".encode())
+    return b"".join(chunks), f"multipart/form-data; boundary={boundary}"
+
+
+def deploy_share_worker(payload: dict):
+    account_id = str(payload.get("account_id", "")).strip()
+    api_token = str(payload.get("api_token", "")).strip()
+    bucket = str(payload.get("bucket", "private-shares")).strip()
+    worker_name = str(payload.get("worker_name", "aiko-share-reader")).strip().lower()
+    if not re.fullmatch(r"[a-fA-F0-9]{32}", account_id):
+        raise ValueError("Cloudflare Account ID phải gồm 32 ký tự hex")
+    if not api_token or len(api_token) > 500:
+        raise ValueError("API Token không hợp lệ")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,62}[a-z0-9]", bucket):
+        raise ValueError("Tên bucket phải gồm 3–64 ký tự thường, số hoặc dấu gạch ngang")
+    if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", worker_name):
+        raise ValueError("Tên Worker phải gồm 1–63 ký tự thường, số hoặc dấu gạch ngang")
+
+    token_identity = _cloudflare_api(account_id, api_token, "GET", "/user/tokens/verify") or {}
+    access_key_id = str(token_identity.get("id", "")).strip()
+    if not re.fullmatch(r"[a-fA-F0-9]{32}", access_key_id):
+        raise ValueError("Cloudflare không trả về ID hợp lệ cho API Token")
+    secret_access_key = hashlib.sha256(api_token.encode("utf-8")).hexdigest()
+
+    result = _cloudflare_api(account_id, api_token, "GET", "/r2/buckets") or {}
+    bucket_names = {item.get("name") for item in result.get("buckets", [])}
+    bucket_created = bucket not in bucket_names
+    if bucket_created:
+        _cloudflare_api(account_id, api_token, "POST", "/r2/buckets", {"name": bucket})
+
+    source = (ROOT / "cloudflare" / "share-worker" / "src" / "index.js").read_bytes()
+    worker_body, content_type = _multipart_worker(source, bucket)
+    script_path = f"/workers/scripts/{quote(worker_name, safe='')}"
+    _cloudflare_api(account_id, api_token, "PUT", script_path, worker_body, {"Content-Type": content_type})
+    try:
+        subdomain_result = _cloudflare_api(account_id, api_token, "GET", "/workers/subdomain") or {}
+    except ValueError:
+        subdomain_result = {}
+    account_subdomain = str(subdomain_result.get("subdomain", "")).strip()
+    if not account_subdomain:
+        generated_subdomain = "aiko-" + hashlib.sha256(account_id.encode("ascii")).hexdigest()[:10]
+        result = _cloudflare_api(account_id, api_token, "PUT", "/workers/subdomain", {"subdomain": generated_subdomain}) or {}
+        account_subdomain = str(result.get("subdomain", generated_subdomain)).strip()
+    _cloudflare_api(account_id, api_token, "POST", f"{script_path}/subdomain", {"enabled": True, "previews_enabled": False})
+    worker_url = f"https://{worker_name}.{account_subdomain}.workers.dev"
+
+    saved = saved_settings()
+    saved.update({
+        "share_r2_account_id": account_id,
+        "share_r2_access_key_id": access_key_id,
+        "share_r2_secret_access_key": secret_access_key,
+        "share_r2_bucket": bucket,
+        "share_worker_url": worker_url,
+    })
+    write_settings({"values": {key: saved.get(key, default) for key, default in SETTING_DEFAULTS.items()}})
+    return {"ok": True, "bucket_created": bucket_created, "worker_url": worker_url, **settings_payload()}
+
+
+def setup_publishing_r2(payload: dict):
+    account_id = str(payload.get("account_id", "")).strip()
+    api_token = str(payload.get("api_token", "")).strip()
+    bucket = str(payload.get("bucket", "")).strip() or "aiko-images"
+    if not re.fullmatch(r"[a-fA-F0-9]{32}", account_id):
+        raise ValueError("Cloudflare Account ID phải gồm 32 ký tự hex")
+    if not api_token or len(api_token) > 500:
+        raise ValueError("API Token không hợp lệ")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,62}[a-z0-9]", bucket):
+        raise ValueError("Tên bucket phải gồm 3–64 ký tự thường, số hoặc dấu gạch ngang")
+
+    token_identity = _cloudflare_api(account_id, api_token, "GET", "/user/tokens/verify") or {}
+    access_key_id = str(token_identity.get("id", "")).strip()
+    if not re.fullmatch(r"[a-fA-F0-9]{32}", access_key_id):
+        raise ValueError("Cloudflare không trả về ID hợp lệ cho API Token")
+    secret_access_key = hashlib.sha256(api_token.encode("utf-8")).hexdigest()
+
+    result = _cloudflare_api(account_id, api_token, "GET", "/r2/buckets") or {}
+    bucket_names = {item.get("name") for item in result.get("buckets", [])}
+    bucket_created = bucket not in bucket_names
+    if bucket_created:
+        _cloudflare_api(account_id, api_token, "POST", "/r2/buckets", {"name": bucket})
+    managed = _cloudflare_api(
+        account_id, api_token, "PUT",
+        f"/r2/buckets/{quote(bucket, safe='')}/domains/managed",
+        {"enabled": True},
+    ) or {}
+    public_domain = str(managed.get("domain", "")).strip()
+    if not public_domain:
+        raise ValueError("Cloudflare chưa trả về đường dẫn public của bucket")
+
+    saved = saved_settings()
+    saved.update({
+        "r2_account_id": account_id,
+        "r2_access_key_id": access_key_id,
+        "r2_secret_access_key": secret_access_key,
+        "r2_bucket": bucket,
+        "r2_public_url": f"https://{public_domain}",
+    })
+    write_settings({"values": {key: saved.get(key, default) for key, default in SETTING_DEFAULTS.items()}})
+    return {
+        "ok": True,
+        "bucket_created": bucket_created,
+        "public_url": f"https://{public_domain}",
+        **settings_payload(),
+    }
 
 
 def version_parts(value: str):
@@ -714,11 +890,17 @@ def chapters(project_name: str):
         {p.name for p in raw.glob("*.md")} | {p.name for p in translated.glob("*.md")},
         key=chapter_key,
     )
+    project_text = "\n".join(
+        read_live_utf8(raw / name)
+        for name in names
+        if (raw / name).exists()
+    )
+    project_character_based = cjk_character_ratio(project_text) > 0.5
     items = []
     for name in names:
         title_path = translated / name if (translated / name).exists() else raw / name
         metric_path = raw / name if (raw / name).exists() else translated / name
-        metric = text_metric(metric_path)
+        metric = text_metric(metric_path, character_based=project_character_based)
         items.append(
             {
                 "name": name,
@@ -763,17 +945,31 @@ def read_live_utf8(path: Path) -> str:
     return data.decode("utf-8", errors="replace")
 
 
-def text_metric(path: Path) -> dict:
-    try:
-        text = read_live_utf8(path)
-    except OSError:
-        return {"count": 0, "unit": "từ"}
+def clean_metric_text(text: str) -> str:
     clean = re.sub(r"\[img\][\s\S]*?\[/img\]", " ", text, flags=re.IGNORECASE)
     clean = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", clean)
     clean = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", clean)
     clean = re.sub(r"^[#>\-+*]+\s*", " ", clean, flags=re.MULTILINE)
-    clean = re.sub(r"[*_~`]+", " ", clean)
-    if re.search(r"[\u3400-\u9fff\u3040-\u30ff]", clean):
+    return re.sub(r"[*_~`]+", " ", clean)
+
+
+def cjk_character_ratio(text: str) -> float:
+    clean = re.sub(r"\s+", "", clean_metric_text(text))
+    if not clean:
+        return 0.0
+    cjk = re.findall(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]", clean)
+    return len(cjk) / len(clean)
+
+
+def text_metric(path: Path, character_based=None) -> dict:
+    try:
+        text = read_live_utf8(path)
+    except OSError:
+        return {"count": 0, "unit": "từ"}
+    clean = clean_metric_text(text)
+    if character_based is None:
+        character_based = cjk_character_ratio(clean) > 0.5
+    if character_based:
         return {"count": sum(char.isalnum() for char in clean), "unit": "ký tự"}
     return {
         "count": len(re.findall(r"[^\W_]+", clean, flags=re.UNICODE)),
@@ -1044,6 +1240,241 @@ def save_publishing(project_name: str, payload: dict):
     return publishing_data(project_name)
 
 
+def _share_store_path(project_name: str) -> Path:
+    return safe_project(project_name) / "sharing.yaml"
+
+
+def _share_r2_config() -> dict:
+    settings = {**SETTING_DEFAULTS, **saved_settings()}
+    config = {
+        "account_id": str(settings.get("share_r2_account_id", "")).strip(),
+        "access_key_id": str(settings.get("share_r2_access_key_id", "")).strip(),
+        "secret_access_key": str(settings.get("share_r2_secret_access_key", "")).strip(),
+        "bucket": str(settings.get("share_r2_bucket", "")).strip(),
+        "worker_url": str(settings.get("share_worker_url", "")).strip().rstrip("/"),
+    }
+    missing = [key for key in ("account_id", "access_key_id", "secret_access_key", "bucket") if not config[key]]
+    if missing:
+        raise ValueError("Chưa cấu hình đầy đủ bucket R2 share private")
+    return config
+
+
+def _share_r2_client(config: dict):
+    if boto3 is None:
+        raise ValueError("Thiếu boto3; hãy cài requirements-portable.txt")
+    return boto3.client(
+        "s3",
+        endpoint_url=f"https://{config['account_id']}.r2.cloudflarestorage.com",
+        aws_access_key_id=config["access_key_id"],
+        aws_secret_access_key=config["secret_access_key"],
+        region_name="auto",
+    )
+
+
+def _load_shares(project_name: str) -> list[dict]:
+    path = _share_store_path(project_name)
+    if not path.exists():
+        return []
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    shares = data.get("shares", []) if isinstance(data, dict) else []
+    return shares if isinstance(shares, list) else []
+
+
+def _save_shares(project_name: str, shares: list[dict]):
+    path = _share_store_path(project_name)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(yaml.safe_dump({"shares": shares}, allow_unicode=True, sort_keys=False, width=1000), encoding="utf-8")
+    if path.exists():
+        shutil.copy2(path, path.with_name(path.name + ".bak"))
+    os.replace(temporary, path)
+
+
+def shares_data(project_name: str) -> dict:
+    config = {**SETTING_DEFAULTS, **saved_settings()}
+    worker_url = str(config.get("share_worker_url", "")).strip().rstrip("/")
+    items = []
+    for share in _load_shares(project_name):
+        item = dict(share)
+        token = str(item.pop("token", ""))
+        item["url"] = f"{worker_url}/?share={quote(str(item.get('id', '')))}&token={quote(token)}" if worker_url and token else ""
+        items.append(item)
+    return {"items": items, "configured": bool(worker_url and config.get("share_r2_bucket"))}
+
+
+def _share_manifest(share: dict) -> dict:
+    return {
+        "version": 1,
+        "id": share["id"],
+        "title": share["title"],
+        "recipient": share.get("recipient", ""),
+        "expires_at": share["expires_at"],
+        "token_hash": hashlib.sha256(str(share["token"]).encode("utf-8")).hexdigest(),
+        "chapters": share.get("chapters", []),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _share_chapter_html(project_name: str, text: str, share_id: str):
+    images = []
+    output = []
+    for raw_line in unicodedata.normalize("NFC", text).splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        local_image = re.fullmatch(r"!\[([^\]]*)\]\((?:\.\./)?image/([\w.-]+)\)", line)
+        remote_image = re.fullmatch(r"\[img(?:=[^\]]+)?\](https?://[^\[]+)\[/img\]", line, re.IGNORECASE)
+        if local_image:
+            name = local_image.group(2)
+            path = safe_image(project_name, name)
+            if path.is_file():
+                item = {
+                    "name": name,
+                    "key": f"shares/{share_id}/images/{name}",
+                    "content_type": mimetypes.guess_type(name)[0] or "application/octet-stream",
+                }
+                images.append((item, path))
+                caption = html_lib.escape(local_image.group(1).strip() or Path(name).stem)
+                output.append(f'<figure><img data-share-image="{html_lib.escape(name, quote=True)}" alt="{caption}" loading="lazy"><figcaption>{caption}</figcaption></figure>')
+            continue
+        if remote_image:
+            url = html_lib.escape(remote_image.group(1).strip(), quote=True)
+            output.append(f'<figure><img src="{url}" alt="" loading="lazy"></figure>')
+            continue
+        escaped = html_lib.escape(raw_line)
+        escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+        escaped = re.sub(r"(^|[^*])\*([^*]+?)\*", r"\1<em>\2</em>", escaped)
+        if escaped.startswith("### "):
+            output.append(f"<h3>{escaped[4:]}</h3>")
+        elif escaped.startswith("## "):
+            output.append(f"<h2>{escaped[3:]}</h2>")
+        elif escaped.startswith("# "):
+            output.append(f"<h1>{escaped[2:]}</h1>")
+        else:
+            output.append(f"<p>{escaped}</p>")
+    return "".join(output), images
+
+
+def remove_shared_chapter(project_name: str, share_id: str, chapter_name: str) -> dict:
+    shares = _load_shares(project_name)
+    share = next((item for item in shares if str(item.get("id")) == share_id), None)
+    if share is None:
+        raise ValueError("Không tìm thấy bản share")
+    chapter = next((item for item in share.get("chapters", []) if str(item.get("name")) == chapter_name), None)
+    if chapter is None:
+        raise ValueError("Chương không nằm trong bản share")
+    config = _share_r2_config()
+    client = _share_r2_client(config)
+    share["chapters"] = [item for item in share.get("chapters", []) if str(item.get("name")) != chapter_name]
+    client.put_object(
+        Bucket=config["bucket"], Key=f"shares/{share_id}/manifest.json",
+        Body=json.dumps(_share_manifest(share), ensure_ascii=False).encode("utf-8"),
+        ContentType="application/json; charset=utf-8", CacheControl="private, no-store",
+    )
+    remaining_image_keys = {
+        str(image.get("key"))
+        for item in share["chapters"]
+        for image in item.get("images", [])
+        if image.get("key")
+    }
+    keys = [str(chapter["key"])] + [
+        str(image.get("key")) for image in chapter.get("images", [])
+        if image.get("key") and str(image.get("key")) not in remaining_image_keys
+    ]
+    client.delete_objects(Bucket=config["bucket"], Delete={"Objects": [{"Key": key} for key in keys], "Quiet": True})
+    _save_shares(project_name, shares)
+    return shares_data(project_name)
+
+
+def close_share(project_name: str, share_id: str) -> dict:
+    shares = _load_shares(project_name)
+    share = next((item for item in shares if str(item.get("id")) == share_id), None)
+    if share is None:
+        raise ValueError("Không tìm thấy bản share")
+    config = _share_r2_config()
+    keys = [str(item.get("key")) for item in share.get("chapters", []) if item.get("key")]
+    keys.extend(
+        str(image.get("key"))
+        for item in share.get("chapters", [])
+        for image in item.get("images", [])
+        if image.get("key")
+    )
+    keys.append(f"shares/{share_id}/manifest.json")
+    result = _share_r2_client(config).delete_objects(
+        Bucket=config["bucket"], Delete={"Objects": [{"Key": key} for key in keys], "Quiet": True},
+    )
+    if result.get("Errors"):
+        raise ValueError("R2 không xóa được toàn bộ dữ liệu của bản share")
+    _save_shares(project_name, [item for item in shares if str(item.get("id")) != share_id])
+    return shares_data(project_name)
+
+
+def save_share(project_name: str, payload: dict) -> dict:
+    action = str(payload.get("action", "")).strip()
+    if action == "remove_chapter":
+        return remove_shared_chapter(project_name, str(payload.get("share_id", "")).strip(), str(payload.get("chapter", "")).strip())
+    if action == "close":
+        return close_share(project_name, str(payload.get("share_id", "")).strip())
+    project = safe_project(project_name)
+    translated = project / "translated"
+    chapter_names = payload.get("chapters", [])
+    if not isinstance(chapter_names, list) or not chapter_names:
+        raise ValueError("Hãy chọn ít nhất một chương đã dịch")
+    chapter_names = [str(name) for name in chapter_names]
+    paths = [safe_file(translated, name) for name in chapter_names]
+    if any(not path.is_file() for path in paths):
+        raise ValueError("Có chương chưa có bản dịch để chia sẻ")
+
+    config = _share_r2_config()
+    client = _share_r2_client(config)
+    shares = _load_shares(project_name)
+    share_id = str(payload.get("share_id", "")).strip()
+    share = next((item for item in shares if str(item.get("id")) == share_id), None)
+    now = datetime.now(timezone.utc)
+    if share is None:
+        share_id = secrets.token_hex(8)
+        share = {
+            "id": share_id,
+            "token": secrets.token_urlsafe(32),
+            "title": str(payload.get("title", project_name)).strip() or project_name,
+            "recipient": str(payload.get("recipient", "")).strip(),
+            "created_at": now.isoformat(),
+            "chapters": [],
+        }
+        shares.append(share)
+    else:
+        share["title"] = str(payload.get("title", share.get("title", project_name))).strip() or share.get("title", project_name)
+        share["recipient"] = str(payload.get("recipient", share.get("recipient", ""))).strip()
+    days = max(1, min(int(payload.get("expires_days", 30)), 3650))
+    share["expires_at"] = (now + timedelta(days=days)).isoformat()
+    chapter_map = {str(item.get("name")): item for item in share.get("chapters", []) if isinstance(item, dict)}
+    stale_keys = []
+    for path in paths:
+        content = read_live_utf8(path)
+        key = f"shares/{share_id}/chapters/{path.name}"
+        chapter_html, local_images = _share_chapter_html(project_name, content, share_id)
+        client.put_object(Bucket=config["bucket"], Key=key, Body=chapter_html.encode("utf-8"), ContentType="text/html; charset=utf-8", CacheControl="private, no-store")
+        for image, image_path in local_images:
+            client.put_object(Bucket=config["bucket"], Key=image["key"], Body=image_path.read_bytes(), ContentType=image["content_type"], CacheControl="private, no-store")
+        previous = chapter_map.get(path.name, {})
+        new_image_keys = {image["key"] for image, _path in local_images}
+        stale_keys.extend(
+            str(image.get("key")) for image in previous.get("images", [])
+            if image.get("key") and str(image.get("key")) not in new_image_keys
+        )
+        chapter_map[path.name] = {
+            "name": path.name, "title": chapter_title(path), "key": key,
+            "format": "html", "images": [image for image, _path in local_images],
+            "updated_at": now.isoformat(),
+        }
+    share["chapters"] = sorted(chapter_map.values(), key=lambda item: chapter_key(str(item["name"])))
+    manifest = _share_manifest(share)
+    client.put_object(Bucket=config["bucket"], Key=f"shares/{share_id}/manifest.json", Body=json.dumps(manifest, ensure_ascii=False).encode("utf-8"), ContentType="application/json; charset=utf-8", CacheControl="private, no-store")
+    if stale_keys:
+        client.delete_objects(Bucket=config["bucket"], Delete={"Objects": [{"Key": key} for key in sorted(set(stale_keys))], "Quiet": True})
+    _save_shares(project_name, shares)
+    return shares_data(project_name)
+
+
 def save_characters(project_name: str, payload: dict):
     path = safe_project(project_name) / "characters.md"
     content = str(payload.get("content", "")).replace("\r\n", "\n")
@@ -1082,6 +1513,28 @@ def write_context_safely(path: Path, data: dict):
 
 def save_context(project_name: str, payload: dict):
     path = safe_project(project_name) / "context.yaml"
+    if "glossary_items" in payload:
+        items = payload.get("glossary_items")
+        if not isinstance(items, list):
+            raise ValueError("Dữ liệu glossary không hợp lệ")
+        glossary_lines = []
+        for number, item in enumerate(items, 1):
+            if not isinstance(item, dict):
+                raise ValueError(f"Glossary sai định dạng tại dòng {number}")
+            source = str(item.get("source", "")).strip()
+            target = str(item.get("target", "")).strip()
+            if not source or not target or "=" in source:
+                raise ValueError(f"Glossary sai định dạng tại dòng {number}")
+            glossary_lines.append(f"{source} = {target}")
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else {}
+        data = data or {}
+        if not isinstance(data, dict):
+            raise ValueError("context.yaml hiện tại không hợp lệ")
+        data["glossary"] = "\n".join(glossary_lines)
+        write_context_safely(path, data)
+        result = context_data(project_name)
+        result["backup"] = path.with_name(path.name + ".bak").exists()
+        return result
     if "context_fields" in payload:
         fields = payload.get("context_fields")
         if not isinstance(fields, dict):
@@ -1830,6 +2283,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json_response(publishing_data(project))
             except (ValueError, OSError, yaml.YAMLError) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/shares":
+            try:
+                return self.json_response(shares_data(project))
+            except (ValueError, OSError, yaml.YAMLError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/gemini-api-keys":
             return self.json_response(gemini_api_keys_payload())
         if path == "/api/reviews":
@@ -2094,6 +2552,26 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json_response(write_settings(self.body()))
             except (ValueError, OSError, json.JSONDecodeError) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/share-worker/deploy":
+            if not self.is_loopback():
+                return self.json_response(
+                    {"error": "Chỉ được thiết lập Cloudflare trực tiếp trên máy đang chạy app."},
+                    HTTPStatus.FORBIDDEN,
+                )
+            try:
+                return self.json_response(deploy_share_worker(self.body()))
+            except (ValueError, OSError, json.JSONDecodeError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/publishing-r2/setup":
+            if not self.is_loopback():
+                return self.json_response(
+                    {"error": "Chỉ được thiết lập Cloudflare trực tiếp trên máy đang chạy app."},
+                    HTTPStatus.FORBIDDEN,
+                )
+            try:
+                return self.json_response(setup_publishing_r2(self.body()))
+            except (ValueError, OSError, json.JSONDecodeError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/update":
             try:
                 result = prepare_update()
@@ -2105,6 +2583,11 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self.json_response(save_publishing(project, self.body()))
             except (ValueError, OSError, yaml.YAMLError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/shares":
+            try:
+                return self.json_response(save_share(project, self.body()))
+            except Exception as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/gemini-api-keys":
             try:
@@ -2166,6 +2649,31 @@ class Handler(BaseHTTPRequestHandler):
                     for key, value in config.items()
                 ):
                     raise ValueError("Cấu hình tác vụ không hợp lệ")
+                max_chapters = config.get("max_chapters", "")
+                if max_chapters not in (None, ""):
+                    max_chapters_text = str(max_chapters).strip()
+                    if isinstance(max_chapters, bool) or not re.fullmatch(
+                        r"\d+", max_chapters_text
+                    ):
+                        raise ValueError(
+                            "Số chương muốn chạy phải là số nguyên từ 1 trở lên"
+                        )
+                    max_chapters = int(max_chapters_text)
+                    if max_chapters < 1:
+                        raise ValueError(
+                            "Số chương muốn chạy phải là số nguyên từ 1 trở lên"
+                        )
+                    config["max_chapters"] = max_chapters
+                batch_runs = config.get("batch_runs")
+                if batch_runs is not None:
+                    batch_runs_text = str(batch_runs).strip()
+                    if isinstance(batch_runs, bool) or not re.fullmatch(
+                        r"\d+", batch_runs_text
+                    ):
+                        raise ValueError(
+                            "Số lần chạy batch phải là số nguyên từ 0 trở lên"
+                        )
+                    config["batch_runs"] = int(batch_runs_text)
                 if kind == "manual":
                     target = str(config.get("target_chapter", ""))
                     result = str(config.get("manual_result", ""))

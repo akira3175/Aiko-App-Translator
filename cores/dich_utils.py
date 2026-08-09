@@ -2232,6 +2232,95 @@ def _upload_file_part(client, file_path, display_name, mime_type="text/plain"):
         return None
 
 
+def _character_blocks(markdown):
+    matches = list(re.finditer(r"(?m)^## (?!#)(.+?)\s*$", markdown or ""))
+    blocks = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(markdown)
+        block = markdown[match.start() : end].strip("\n- ")
+        if block:
+            blocks.append((match.group(1).strip(), block))
+    return blocks
+
+
+def _character_aliases(header, block):
+    aliases = [part.strip() for part in re.split(r"\s+/\s+", header) if part.strip()]
+    field_pattern = re.compile(
+        r"(?im)^- \*\*(?:Tên gốc|Ten goc|Biệt danh / Danh hiệu|Biet danh / Danh hieu)\*\*:\s*(.+)$"
+    )
+    for value in field_pattern.findall(block):
+        for part in re.split(r"\s*/\s*|\s*,\s*", value):
+            part = part.strip(" -")
+            if not part:
+                continue
+            aliases.append(part)
+            aliases.extend(item.strip() for item in re.findall(r"\(([^()]+)\)", part))
+            outside = re.sub(r"\([^()]+\)", "", part).strip()
+            if outside:
+                aliases.append(outside)
+    return list(dict.fromkeys(alias for alias in aliases if alias))
+
+
+def _character_alias_score(alias, searchable):
+    normalized = unicodedata.normalize("NFKC", alias).casefold().strip()
+    normalized = re.sub(r"\s+", " ", normalized)
+    if not normalized:
+        return 0
+    if re.search(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7a3]", normalized):
+        return searchable.count(normalized)
+    return len(
+        re.findall(rf"(?<!\w){re.escape(normalized)}(?!\w)", searchable)
+    )
+
+
+def _build_characters_snapshot(characters_file, relevant_text, max_characters=20):
+    """Create a temporary Markdown file containing only relevant character profiles."""
+    if not os.path.exists(characters_file):
+        return None
+    try:
+        with open(characters_file, "r", encoding="utf-8") as file:
+            markdown = file.read()
+    except OSError:
+        return None
+
+    blocks = _character_blocks(markdown)
+    if not blocks or len(blocks) <= max_characters:
+        return None
+
+    searchable = unicodedata.normalize("NFKC", relevant_text or "").casefold()
+    searchable = re.sub(r"\s+", " ", searchable)
+    ranked = []
+    for order, (header, block) in enumerate(blocks):
+        aliases = _character_aliases(header, block)
+        score = sum(
+            min(_character_alias_score(alias, searchable), 5)
+            for alias in aliases
+        )
+        if score:
+            ranked.append((score, -order, header, block))
+
+    if not ranked:
+        return None
+    ranked.sort(reverse=True)
+    selected = ranked[:max_characters]
+    selected.sort(key=lambda item: -item[1])
+    snapshot = "# Hồ Sơ Nhân Vật Liên Quan\n\n" + "\n\n---\n\n".join(
+        item[3] for item in selected
+    )
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix="_characters_snapshot.md",
+        encoding="utf-8",
+        delete=False,
+    )
+    tmp.write(snapshot.rstrip() + "\n")
+    tmp.close()
+    print(
+        f"[UPLOAD] Characters snapshot: {len(selected)}/{len(blocks)} hồ sơ -> {tmp.name}"
+    )
+    return tmp.name
+
+
 def _build_pronouns_snapshot(pronouns_file=PRONOUNS_YAML, n_chapters=50):
     """
     Loc pronouns.yaml: chi giu N chapter_number gan nhat.
@@ -2295,7 +2384,7 @@ def polish_translation(
     Dung gemini-3-flash-preview qua API.
 
     Upload qua Files API:
-      - characters.md          -> ho so nhan vat day du
+      - characters snapshot    -> ho so nhan vat lien quan den chuong
       - pronouns_snapshot.yaml -> fallback khi khong co context xung ho da loc
 
     Tra ve (title, content) da trau chuot.
@@ -2313,9 +2402,19 @@ def polish_translation(
         f"[POLISH] Bien tap chuong {chapter_number} ({chapter_id}) voi {POLISH_MODEL}..."
     )
 
+    tmp_characters = None
     tmp_pronouns = None
     try:
-        tmp_pronouns = None
+        relevant_character_text = "\n".join(
+            [raw_title, raw_content, title_cur, content_cur, pronoun_context]
+        )
+        tmp_characters = _build_characters_snapshot(
+            characters_md_path,
+            relevant_character_text,
+            max_characters=min(
+                int_option("character_snapshot_limit", 20, minimum=1), 50
+            ),
+        )
         if not pronoun_context.strip():
             tmp_pronouns = _build_pronouns_snapshot(pronouns_file, n_chapters=50)
 
@@ -2352,8 +2451,11 @@ Nội dung dịch:
                 global current_key_index
                 if current_upload_key_index != current_key_index:
                     extra_parts = []
+                    characters_upload_path = tmp_characters or characters_md_path
+                    # Giữ tên file mà prompt mặc định đã hướng dẫn model tra cứu.
+                    characters_display_name = "characters.md"
                     chars_part = _upload_file_part(
-                        client, characters_md_path, "characters.md"
+                        client, characters_upload_path, characters_display_name
                     )
                     if chars_part:
                         extra_parts.append(chars_part)
@@ -2371,7 +2473,7 @@ Nội dung dịch:
                     attach_lines = []
                     if chars_part:
                         attach_lines.append(
-                            "- characters.md (file dinh kem): Ho so day du cac nhan vat — dung de tra gioi tinh, tuoi tac, vai tro, biet danh."
+                            f"- {characters_display_name} (file đính kèm): Hồ sơ nhân vật liên quan — dùng để tra giới tính, tuổi tác, vai trò và biệt danh."
                         )
                     if (
                         tmp_pronouns
@@ -2399,7 +2501,7 @@ Nội dung dịch:
 Các quy tắc kỹ thuật bắt buộc dưới đây luôn được ưu tiên:
 {attach_block}
 1. XƯNG HÔ:
-   - Tra characters.md để biết giới tính, tuổi tác, vai trò và biệt danh của nhân vật.
+   - Tra file hồ sơ nhân vật đính kèm để biết giới tính, tuổi tác, vai trò và biệt danh.
    {pronoun_reference}
    - Mục có locked: true là quy tắc người dùng đã xác nhận, không được tự ý thay đổi.
 
@@ -2466,6 +2568,11 @@ Chỉ xuất đúng định dạng sau:
                     time.sleep(15)
 
     finally:
+        if tmp_characters and os.path.exists(tmp_characters):
+            try:
+                os.unlink(tmp_characters)
+            except Exception:
+                pass
         if tmp_pronouns and os.path.exists(tmp_pronouns):
             try:
                 os.unlink(tmp_pronouns)

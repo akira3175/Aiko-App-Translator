@@ -103,12 +103,15 @@ if __name__ == "__main__":
         if not web_mode() or bool_option("open_browser_setup", True):
             setup_gemini_browser()
 
+        batch_runs = int_option("batch_runs", 1, minimum=0)
+        completed_batches = 0
         while True:
             if stop_requested():
                 print("Da dung truoc khi nhan batch tiep theo.")
                 break
             try:
                 run_translation()
+                completed_batches += 1
             except Exception as e:
                 print(f"⚠️ Lỗi khi dịch: {e}")
                 print("⏳ Chờ 10s rồi thử lại...")
@@ -128,10 +131,8 @@ if __name__ == "__main__":
                 print("🎉 Đã dịch hết tất cả các chương!")
                 break
 
-            if web_mode():
-                if bool_option("run_until_complete", False):
-                    continue
-                print("✅ Đã xử lý một batch theo cấu hình web.")
+            if web_mode() and batch_runs > 0 and completed_batches >= batch_runs:
+                print(f"✅ Đã xử lý {completed_batches} batch theo cấu hình web.")
                 break
 
             print("⏳ Đang chuẩn bị dịch chương tiếp theo... (nhấn Enter để dừng)")
