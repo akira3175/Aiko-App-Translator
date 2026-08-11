@@ -33,6 +33,7 @@ import {
   DEFAULT_TRANSLATION_TASK,
   generateContent,
   GeminiRequestError,
+  geminiRetryAction,
   polishPrompt,
   parseTranslationStream,
   parseTranslationResponse,
@@ -119,7 +120,7 @@ export function translationContextYaml(project: Project, rawText: string) {
   return stringify(context, { lineWidth: 0 });
 }
 
-function characterPrompt(batch: Chapter[], existing: string, glossary: Project["glossary"]) {
+function characterPrompt(batch: Chapter[], glossary: Project["glossary"]) {
   const raw = batch.map((item) => `### ${item.title}\n${item.source}`).join("\n\n");
   const glossaryText = glossary?.map((item) => `${item.source} = ${item.target}`).join("\n") || "(Chua co glossary)";
   return `# Vai tro
@@ -142,8 +143,8 @@ ${glossaryText}
 
 ---
 
-# Du lieu nhan vat hien co (de tham khao, tranh mau thuan, chi bo sung them):
-${existing || "(Chua co du lieu nhan vat)"}
+# Du lieu nhan vat hien co:
+Doc tep characters.md dinh kem neu co de tranh mau thuan va chi bo sung thong tin moi.
 
 ---
 
@@ -433,14 +434,14 @@ export function App() {
     try {
       const projectContext = translationContextYaml(project, `${chapter.title}\n${chapter.source}\n${chapters[chapters.findIndex((item) => item.id === chapter.id) + 1]?.source || ""}`);
       const prompt = kind === "polish"
-          ? polishPrompt(chapter.source, chapter.translation, projectContext, project.characters, project.polishPromptRole, project.polishPromptTask)
+          ? polishPrompt(chapter.source, chapter.translation, projectContext, project.polishPromptRole, project.polishPromptTask)
           : kind === "pronouns"
             ? pronounsPrompt(chapter.source, chapter.translation, project.pronouns || "")
             : kind === "review"
               ? reviewPrompt({ chapterId: chapter.localFileName?.replace(/\.md$/i, "") || chapter.id, chapterNumber: chapter.order, rawTitle: chapter.title, source: chapter.source, translatedTitle: chapter.translatedTitle || chapter.title, translation: chapter.translation, context: projectContext })
               : kind === "characters"
-                ? charactersPrompt(chapter.source, project.characters)
-                : contextPrompt(chapter.source, projectContext, project.characters);
+                ? charactersPrompt(chapter.source)
+                : contextPrompt(chapter.source, projectContext);
       const taskKind: AiTaskKind = kind === "characters" || kind === "context" ? "translate" : kind;
       const taskSettings = settings.tasks?.[taskKind] || DEFAULT_TASKS[taskKind];
       let result: string;
@@ -452,6 +453,7 @@ export function App() {
           model: taskSettings.model,
           maxOutputTokens: taskSettings.maxOutputTokens,
           ...prompt,
+          document: project.characters.trim() ? { name: "characters.md", mimeType: "text/markdown", content: project.characters } : undefined,
           systemInstruction: taskSettings.systemInstruction.trim() || prompt.systemInstruction,
           signal: controller.signal,
           onText: (delta) => {
@@ -474,6 +476,7 @@ export function App() {
           model: taskSettings.model,
           maxOutputTokens: taskSettings.maxOutputTokens,
           ...prompt,
+          document: project.characters.trim() ? { name: "characters.md", mimeType: "text/markdown", content: project.characters } : undefined,
           systemInstruction: taskSettings.systemInstruction.trim() || prompt.systemInstruction,
           signal: controller.signal,
         });
@@ -504,34 +507,53 @@ export function App() {
   }
 
   async function generateWithApiKeys(keys: string[], startIndex: number, options: Omit<Parameters<typeof generateContent>[0], "apiKey">) {
-    let lastError: unknown;
-    const attempts = Math.max(3, keys.length);
-    for (let offset = 0; offset < attempts; offset += 1) {
+    let keyIndex = startIndex % keys.length;
+    let retries = 0;
+    while (true) {
       try {
-        return await generateContent({ ...options, apiKey: keys[(startIndex + offset) % keys.length] });
+        return await generateContent({ ...options, apiKey: keys[keyIndex] });
       } catch (reason) {
         if (reason instanceof DOMException && reason.name === "AbortError") throw reason;
         if (!(reason instanceof GeminiRequestError)) throw reason;
-        lastError = reason;
+        const action = geminiRetryAction(reason.status);
+        if (action === "fail") throw reason;
+        retries += 1;
+        if (action === "rotate-key") keyIndex = (keyIndex + 1) % keys.length;
+        const wait = Math.min((action === "rotate-key" ? 10 : 5) * retries, 60);
+        setNotice(action === "rotate-key" ? `Gemini lỗi ${reason.status}; đổi API key và thử lại sau ${wait}s…` : `Gemini lỗi ${reason.status}; thử lại sau ${wait}s…`);
+        await waitForGeminiRetry(wait * 1000, options.signal);
       }
     }
-    throw lastError || new Error("Không có Gemini API key khả dụng.");
   }
 
   async function streamWithApiKeys(keys: string[], startIndex: number, options: Omit<Parameters<typeof streamInteraction>[0], "apiKey">, onAttempt: () => void) {
-    let lastError: unknown;
-    const attempts = Math.max(3, keys.length);
-    for (let offset = 0; offset < attempts; offset += 1) {
+    let keyIndex = startIndex % keys.length;
+    let retries = 0;
+    while (true) {
       try {
         onAttempt();
-        return await streamInteraction({ ...options, apiKey: keys[(startIndex + offset) % keys.length] });
+        return await streamInteraction({ ...options, apiKey: keys[keyIndex] });
       } catch (reason) {
         if (reason instanceof DOMException && reason.name === "AbortError") throw reason;
         if (!(reason instanceof GeminiRequestError)) throw reason;
-        lastError = reason;
+        const action = geminiRetryAction(reason.status);
+        if (action === "fail") throw reason;
+        retries += 1;
+        if (action === "rotate-key") keyIndex = (keyIndex + 1) % keys.length;
+        const wait = Math.min((action === "rotate-key" ? 10 : 5) * retries, 60);
+        setNotice(action === "rotate-key" ? `Gemini lỗi ${reason.status}; đổi API key và thử lại sau ${wait}s…` : `Gemini lỗi ${reason.status}; thử lại sau ${wait}s…`);
+        await waitForGeminiRetry(wait * 1000, options.signal);
       }
     }
-    throw lastError || new Error("Không có Gemini API key khả dụng.");
+  }
+
+  function waitForGeminiRetry(milliseconds: number, signal?: AbortSignal) {
+    return new Promise<void>((resolve, reject) => {
+      if (signal?.aborted) return reject(new DOMException("Đã dừng tác vụ.", "AbortError"));
+      const timeout = window.setTimeout(() => { signal?.removeEventListener("abort", abort); resolve(); }, milliseconds);
+      const abort = () => { window.clearTimeout(timeout); reject(new DOMException("Đã dừng tác vụ.", "AbortError")); };
+      signal?.addEventListener("abort", abort, { once: true });
+    });
   }
 
   function showStreamedChapter(chapterId: string, fields: Partial<Chapter>, stage: "translate" | "polish", line: number | null) {
@@ -559,7 +581,6 @@ export function App() {
       title: chapter.title,
       source: chapter.source,
       context: contextForChapter(chapter, itemIndex),
-      characters: project.characters,
       pronouns: project.pronouns || "",
       previousChapters: previousChapterContext(itemIndex, chapters),
       from: project.sourceLanguage,
@@ -591,7 +612,6 @@ export function App() {
       title: item.title,
       source: item.source,
       context,
-      characters: project.characters,
       pronouns: pronounMemory,
       previousChapters: previousChapterContext(itemIndex, chapterState),
       from: project.sourceLanguage,
@@ -618,6 +638,7 @@ export function App() {
           model: translateSettings.model,
           maxOutputTokens: translateSettings.maxOutputTokens,
           ...prompt,
+          document: project.characters.trim() ? { name: "characters.md", mimeType: "text/markdown", content: project.characters } : undefined,
           systemInstruction: translateSettings.systemInstruction.trim() || prompt.systemInstruction,
           signal,
           onText: (delta) => {
@@ -648,11 +669,11 @@ export function App() {
     let content = translated.content;
     if (taskEnabled("polish")) {
       const polishSettings = settings.tasks?.polish || DEFAULT_TASKS.polish;
-      const polish = polishPrompt(item.source, content, context, project.characters, project.polishPromptRole, project.polishPromptTask);
+      const polish = polishPrompt(item.source, content, context, project.polishPromptRole, project.polishPromptTask);
       const original = content;
       let streamed = "";
       let renderedLines = 0;
-      content = await streamWithApiKeys(keys, keyOffset + 1, { model: polishSettings.model, maxOutputTokens: polishSettings.maxOutputTokens, ...polish, systemInstruction: polishSettings.systemInstruction.trim() || polish.systemInstruction, signal, onText: (delta) => {
+      content = await streamWithApiKeys(keys, keyOffset + 1, { model: polishSettings.model, maxOutputTokens: polishSettings.maxOutputTokens, ...polish, systemInstruction: polishSettings.systemInstruction.trim() || polish.systemInstruction, document: project.characters.trim() ? { name: "characters.md", mimeType: "text/markdown", content: project.characters } : undefined, signal, onText: (delta) => {
         streamed += delta;
         const incoming = streamed.split("\n");
         const ready = Math.max(0, incoming.length - 1);
@@ -750,12 +771,12 @@ export function App() {
         const batch = segment.filter((item) => item.source.trim());
         if (!batch.length) continue;
         setNotice(`Hồ sơ nhân vật: chương ${offset + 1}-${offset + batch.length}/${chapters.length}`);
-        const prompt = characterPrompt(batch, body, project.glossary);
+        const prompt = characterPrompt(batch, project.glossary);
         let block = "";
         let lastError: unknown;
         for (let attempt = 0; attempt < 3 && !block; attempt += 1) {
           try {
-            const response = await generateWithApiKeys(keys, attempt, { model: DEFAULT_TASKS.translate.model, maxOutputTokens: null, systemInstruction: "", prompt: attempt ? `${prompt}\n\nLƯU Ý SỬA OUTPUT: Trả ít nhất một header \`## Tên nhân vật\` giữa \`###CHAR_START###\` và \`###CHAR_END###\`.` : prompt, signal: controller.signal });
+            const response = await generateWithApiKeys(keys, attempt, { model: DEFAULT_TASKS.translate.model, maxOutputTokens: null, systemInstruction: "", prompt: attempt ? `${prompt}\n\nLƯU Ý SỬA OUTPUT: Trả ít nhất một header \`## Tên nhân vật\` giữa \`###CHAR_START###\` và \`###CHAR_END###\`.` : prompt, document: body.trim() ? { name: "characters.md", mimeType: "text/markdown", content: `${CHARACTER_HEADER}${body}` } : undefined, signal: controller.signal });
             block = extractCharacterBlock(response);
             if (!Object.keys(characterBlocks(block)).length) block = "";
           } catch (reason) { lastError = reason; if (reason instanceof DOMException && reason.name === "AbortError") throw reason; }

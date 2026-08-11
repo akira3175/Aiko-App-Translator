@@ -5,6 +5,7 @@ export interface GenerateOptions {
   thinkingLevel?: "LOW" | "MEDIUM" | "HIGH";
   systemInstruction: string;
   prompt: string;
+  document?: { name: string; mimeType: string; content: string };
   signal?: AbortSignal;
 }
 
@@ -25,12 +26,32 @@ export class GeminiRequestError extends Error {
   }
 }
 
+export type GeminiRetryAction = "rotate-key" | "retry-same-key" | "fail";
+
+export function geminiRetryAction(status: number): GeminiRetryAction {
+  if (status === 401 || status === 403 || status === 429) return "rotate-key";
+  if (status === 408 || status >= 500) return "retry-same-key";
+  return "fail";
+}
+
 const SAFETY_OFF = [
   "HARM_CATEGORY_HARASSMENT",
   "HARM_CATEGORY_HATE_SPEECH",
   "HARM_CATEGORY_SEXUALLY_EXPLICIT",
   "HARM_CATEGORY_DANGEROUS_CONTENT",
 ].map((category) => ({ category, threshold: "OFF" }));
+
+function base64Utf8(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  return btoa(binary);
+}
+
+function promptWithDocument(options: GenerateOptions) {
+  if (!options.document?.content.trim()) return options.prompt;
+  return `${options.prompt}\n\nTệp đính kèm \`${options.document.name}\` chứa hồ sơ nhân vật tham chiếu. Hãy đọc tệp khi xử lý yêu cầu.`;
+}
 
 export async function generateContent(options: GenerateOptions): Promise<string> {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(options.model)}:generateContent`;
@@ -42,7 +63,10 @@ export async function generateContent(options: GenerateOptions): Promise<string>
     },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: options.systemInstruction }] },
-      contents: [{ role: "user", parts: [{ text: options.prompt }] }],
+      contents: [{ role: "user", parts: [
+        { text: promptWithDocument(options) },
+        ...(options.document?.content.trim() ? [{ inlineData: { mimeType: options.document.mimeType, data: base64Utf8(options.document.content) } }] : []),
+      ] }],
       generationConfig: {
         ...(options.maxOutputTokens ? { maxOutputTokens: options.maxOutputTokens } : {}),
         thinkingConfig: { thinkingLevel: options.thinkingLevel || "HIGH" },
@@ -72,7 +96,10 @@ export async function streamInteraction(options: StreamOptions): Promise<string>
     },
     body: JSON.stringify({
       model: options.model,
-      input: options.prompt,
+      input: options.document?.content.trim() ? [
+        { type: "text", text: promptWithDocument(options) },
+        { type: "document", data: base64Utf8(options.document.content), mime_type: options.document.mimeType },
+      ] : options.prompt,
       stream: true,
       store: false,
       ...(options.systemInstruction ? { system_instruction: options.systemInstruction } : {}),
@@ -143,7 +170,6 @@ export interface TranslationPromptInput {
   title: string;
   source: string;
   context: string;
-  characters: string;
   pronouns: string;
   previousChapters: string;
   from: string;
@@ -233,17 +259,17 @@ export function containsCjkOrHangul(value: string) {
   return /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(value);
 }
 
-export function charactersPrompt(source: string, existing: string) {
+export function charactersPrompt(source: string) {
   return {
     systemInstruction: "Bạn là biên tập viên phân tích nhân vật tiểu thuyết. Viết tiếng Việt, chỉ trả về Markdown.",
-    prompt: `Cập nhật hồ sơ nhân vật dựa trên chương mới. Giữ thông tin cũ đúng, không bịa khi văn bản không xác nhận. Mỗi nhân vật dùng tiêu đề \"## Tên\" và các mục: Tên gốc, biệt danh, giới tính, vai trò, đặc điểm, quan hệ, xưng hô.\n\n# Hồ sơ hiện có\n${existing || "(Chưa có)"}\n\n# Chương nguồn\n${source}`,
+    prompt: `Cập nhật hồ sơ nhân vật dựa trên chương mới. Giữ thông tin cũ trong tệp characters.md đúng, không bịa khi văn bản không xác nhận. Mỗi nhân vật dùng tiêu đề \"## Tên\" và các mục: Tên gốc, biệt danh, giới tính, vai trò, đặc điểm, quan hệ, xưng hô.\n\n# Chương nguồn\n${source}`,
   };
 }
 
-export function contextPrompt(source: string, existing: string, characters: string) {
+export function contextPrompt(source: string, existing: string) {
   return {
     systemInstruction: "Bạn xây dựng Context V1 cho dịch tiểu thuyết. Chỉ trả về YAML hợp lệ, không dùng code fence.",
-    prompt: `Cập nhật context dịch từ dữ liệu dưới đây. Giữ các khóa: index, style_notes, glossary. Glossary là danh sách chuỗi theo dạng \"Nguyên văn = Tiếng Việt\". Bảo toàn mục cũ còn đúng, thêm tên riêng và thuật ngữ thực sự xuất hiện, không thêm từ quá chung.\n\n# Context hiện có\n${existing || "index: []\nstyle_notes: []\nglossary: []"}\n\n# Hồ sơ nhân vật\n${characters || "(Chưa có)"}\n\n# Chương nguồn\n${source}`,
+    prompt: `Cập nhật context dịch từ dữ liệu dưới đây. Giữ các khóa: index, style_notes, glossary. Glossary là danh sách chuỗi theo dạng \"Nguyên văn = Tiếng Việt\". Bảo toàn mục cũ còn đúng, thêm tên riêng và thuật ngữ thực sự xuất hiện, không thêm từ quá chung. Tham khảo tệp characters.md nếu được đính kèm.\n\n# Context hiện có\n${existing || "index: []\nstyle_notes: []\nglossary: []"}\n\n# Chương nguồn\n${source}`,
   };
 }
 
@@ -270,10 +296,10 @@ export const DEFAULT_POLISH_TASK = `Nhiệm vụ là BIÊN TẬP LẠI bản d�
    - Chỉ sửa xưng hô hoặc văn phong nếu cần, KHÔNG đổi nghĩa.
    - Giữ dạng Title Case (viết hoa chữ cái đầu mỗi từ).`;
 
-export function polishPrompt(source: string, translation: string, context: string, characters: string, role?: string, task?: string) {
+export function polishPrompt(source: string, translation: string, context: string, role?: string, task?: string) {
   return {
     systemInstruction: role?.trim() || DEFAULT_POLISH_ROLE,
-    prompt: `${task?.trim() || DEFAULT_POLISH_TASK}\n\n# Context V1\n${context || "(Chưa có)"}\n\n# Hồ sơ nhân vật\n${characters || "(Chưa có)"}\n\n# Nguyên tác\n${source}\n\n# Bản dịch cần hiệu đính\n${translation}`,
+    prompt: `${task?.trim() || DEFAULT_POLISH_TASK}\n\n# Context V1\n${context || "(Chưa có)"}\n\n# Nguyên tác\n${source}\n\n# Bản dịch cần hiệu đính\n${translation}`,
   };
 }
 
