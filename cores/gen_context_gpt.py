@@ -15,7 +15,9 @@ if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
 from cores.context_workflow import run_context_generation
+from cores.r19_translation import strip_r19_terms
 from cores.runtime_config import int_option
+from cores.translation_prompts import wrap_r19_prompt
 
 if sys.stdout.encoding != "utf-8":
     try:
@@ -45,21 +47,23 @@ BATCH_SIZE = int_option("batch_size", 30, minimum=1)
 # ====== Hàm gọi ChatGPT web tạo glossary ======
 def generate_glossary(chapters, old_glossary):
     """chapters: list of chapter dict (từ load_md_chapter hoặc tương thích)."""
-    content = "\n\n".join(
+    content = strip_r19_terms("\n\n".join(
         [
             f"{c.get('title', '')}\n{c.get('content', '')}"
             for c in chapters
             if c.get("content")
         ]
-    )
+    ))
+    old_glossary = strip_r19_terms(old_glossary)
 
     if not content.strip():
         print("⚠️ Batch này không có content, bỏ qua.")
         return ""
 
-    prompt = f"""
+    prompt = wrap_r19_prompt(f"""
 # 🧙 Vai trò
-Bạn là **công cụ hỗ trợ dịch thuật chuyên cho truyện fantasy Hàn**.
+Bạn là **chuyên gia xây dựng glossary cho bản dịch tiểu thuyết từ mọi ngôn ngữ nguồn sang tiếng Việt**.
+Văn bản có thể là tiếng Hàn, Trung, Nhật, Anh hoặc ngôn ngữ khác; hãy tự nhận diện ngôn ngữ và thể loại từ chính nội dung, không mặc định đó là truyện fantasy.
 
 ---
 
@@ -80,14 +84,16 @@ Hãy **trích xuất và bổ sung BẢNG THUẬT NGỮ (Glossary)** từ văn b
    - Xưng hô
    - Tên riêng
    - Địa danh  
-   trong đoạn **raw Hàn** ở trên.
+   trong **văn bản nguồn** ở trên.
 
 2. **Bỏ qua** những từ:
    - Phổ thông, vật dụng đời thường.
    - Nghề nghiệp chung hoặc từ đã quen thuộc trong tiếng Việt.
 
 3. **Chuyển đổi và dịch:**
-   - Nếu là **tên riêng ngoại lai**, hãy **chuyển về dạng La-tinh gốc** → `卡洛斯 = Carlos`
+   - Giữ nguyên chính xác từ/cụm từ nguồn ở vế trái, không tự dịch ngược sang ngôn ngữ khác.
+   - Với tên ngoại lai được phiên âm qua ngôn ngữ nguồn, khôi phục dạng La-tinh gốc khi có căn cứ chắc chắn → `卡洛斯 = Carlos`.
+   - Với tên bản địa, dùng cách đọc/chuyển tự phù hợp với ngôn ngữ nguồn và thống nhất với glossary cũ; không tự đoán dạng La-tinh khi không chắc chắn.
    - Nếu là **thuật ngữ, danh hiệu, địa danh**, hãy **dịch sang phong cách tiếng Việt hiện đại**.
 
 4. **Quy tắc viết hoa/thường tiếng Việt** (bắt buộc tuân thủ):
@@ -109,10 +115,10 @@ Hãy **trích xuất và bổ sung BẢNG THUẬT NGỮ (Glossary)** từ văn b
 > TUYỆT ĐỐI KHÔNG thêm bất kỳ câu giao tiếp nào (ví dụ: "Dưới đây là...", "Mình sẽ lọc...").
 > KHÔNG dùng công cụ Python (Advanced Data Analysis) để đọc file, hãy đọc trực tiếp và in ra kết quả ngay lập tức trong 1 lần trả lời.
 > Chỉ xuất **thuần văn bản**, mỗi dòng một mục, theo dạng:
-原文 = Dịch
+Nguyên văn = Bản dịch
 
 Bắt đầu glossary bằng dòng `###START###` và kết thúc bằng dòng `###END###`.
-"""
+""")
 
     max_retries = 3
     for attempt in range(max_retries):

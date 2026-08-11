@@ -43,6 +43,7 @@ from cores.dich_utils import (
     switch_api_key,
 )
 from cores.runtime_config import chapter_limit, option, stop_requested, web_mode
+from cores.r19_translation import mask_contexts, prepare_chapters, restore_results, strip_previous_context, translate_fragments
 from cores.translation_prompts import build_single_prompt
 from cores.translation_workflows import run_single_translation
 
@@ -64,13 +65,21 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
     """Dịch một chương qua Gemini API, trả về (title_trans, content_trans)."""
     max_retries = 3
 
+    masked_chapters, r19_entries = prepare_chapters([chapter])
+    prompt_chapter = masked_chapters[0]
     for attempt in range(max_retries):
         pre_chapters = ""
         if os.path.exists(NOVEL_TXT):
             with open(NOVEL_TXT, "r", encoding="utf-8") as f:
                 pre_chapters = f.read().strip()
 
-        prompt = _build_prompt(chapter, context_text, pronoun_context, pre_chapters)
+        masked_context, masked_pronouns = mask_contexts(
+            [context_text, pronoun_context], r19_entries
+        )
+        masked_previous = strip_previous_context(pre_chapters)
+        prompt = _build_prompt(
+            prompt_chapter, masked_context, masked_pronouns, masked_previous
+        )
 
         if attempt > 0:
             print(f"🔄 Thử lại lần {attempt + 1}/{max_retries}...")
@@ -153,6 +162,11 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
                 text,
                 ok=True,
             )
+            if r19_entries:
+                translations = translate_fragments(r19_entries)
+                return restore_results(
+                    [(title_part, content_part)], r19_entries, translations
+                )[0]
             return title_part, content_part
         else:
             print(

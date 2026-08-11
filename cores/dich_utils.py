@@ -13,6 +13,7 @@ import tempfile
 import threading
 import time
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 
 import yaml
 from google import genai
@@ -34,7 +35,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
 from cores.runtime_config import bool_option, int_option, option, web_mode
-from cores.translation_prompts import project_polish_prompt
+from cores.translation_prompts import _r19_placeholder_instruction, project_polish_prompt, wrap_r19_prompt
 
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORTABLE_CHROME = os.path.join(
@@ -113,6 +114,13 @@ WEB_THINKING_LEVEL = str(option("gemini_thinking", "extended"))
 # Model cho pipeline hậu dịch (API)
 POLISH_MODEL = str(option("polish_model", "gemini-3-flash-preview"))
 REVIEW_BG_MODEL = str(option("review_bg_model", "gemini-3.1-flash-lite-preview"))
+DEFAULT_REVIEW_BG_CRITERIA = """1. Thiếu nội dung: chỉ báo khi một ý, hành động, hội thoại hoặc sự kiện trong bản gốc thực sự biến mất khỏi bản dịch; không báo lỗi khi bản dịch diễn đạt cô đọng nhưng vẫn đủ nghĩa.
+2. Dịch sai nội dung: báo khi ý nghĩa thay đổi rõ rệt, nhầm nhân vật, sự kiện hoặc quan hệ nguyên nhân-kết quả.
+3. Xưng hô: kiểm tra giới tính, vai vế, quan hệ và ngữ cảnh giao tiếp của nhân vật.
+4. Phong cách và thuật ngữ: kiểm tra độ tự nhiên của tiếng Việt và tính nhất quán với glossary tham chiếu.
+5. Ngoại ngữ: chỉ báo khi ký tự hoặc câu ngoại ngữ thực sự còn xuất hiện trong bản dịch; không dùng văn bản nguồn làm bằng chứng cho lỗi này.
+6. Chỉ nêu lỗi khi có dẫn chứng cụ thể trong cả bản gốc và bản dịch; không suy đoán hoặc bắt lỗi khác biệt diễn đạt thuần túy."""
+REVIEW_BG_CRITERIA = str(option("review_bg_criteria", DEFAULT_REVIEW_BG_CRITERIA))
 PRONOUN_MODEL = str(option("pronoun_model", "gemini-3.1-flash-lite-preview"))
 REVIEW_YAML = os.path.join(_project_dir, "review.yaml")
 LOG_DIR = os.path.join(_project_dir, "logs")
@@ -121,6 +129,7 @@ LOG_DIR = os.path.join(_project_dir, "logs")
 _review_lock = threading.Lock()
 # Snapshot review mới nhất của từng chương, tránh thread cũ ghi đè kết quả mới.
 _latest_review_tokens = {}
+_review_executor = None
 # Lock cho ghi log từ nhiều thread
 _log_lock = threading.Lock()
 
@@ -2427,8 +2436,10 @@ def polish_translation(
             else "- Tra pronouns_snapshot.yaml để biết cách xưng hô đã dùng ở các chương trước."
         )
 
-        prompt = f"""## Thuật ngữ / Quy tắc dịch tham chiếu:
+        prompt = wrap_r19_prompt(f"""## Thuật ngữ / Quy tắc dịch tham chiếu:
 {context_text}
+
+{_r19_placeholder_instruction()}
 
 ## Văn bản gốc (tham khảo để không sai nghĩa):
 Tiêu đề gốc: {raw_title}
@@ -2442,7 +2453,7 @@ Nội dung gốc:
 Tiêu đề dịch: {title_cur}
 Nội dung dịch:
 {content_cur}
-"""
+""")
 
         while True:
             try:
@@ -2508,6 +2519,7 @@ Các quy tắc kỹ thuật bắt buộc dưới đây luôn được ưu tiên:
 2. BẢO TOÀN NỘI DUNG:
    - Giữ toàn bộ nội dung, dấu ngoặc kép “…” ‘…’, Markdown ảnh và ký hiệu cần thiết.
    - Không thêm giải thích hoặc nội dung mới.
+   {_r19_placeholder_instruction()}
 
 3. ĐỊNH DẠNG ĐẦU RA:
 Chỉ xuất đúng định dạng sau:
@@ -2580,6 +2592,61 @@ Chỉ xuất đúng định dạng sau:
                 pass
 
 
+def build_translation_review_prompt(
+    chapter_id,
+    chapter_number,
+    raw_title,
+    raw_content,
+    title,
+    content,
+    context_text="",
+):
+    """Prompt review dùng chung cho review nền và Review toàn bộ."""
+    return f"""Bạn là reviewer dịch thuật tiểu thuyết từ ngôn ngữ nguồn bất kỳ sang tiếng Việt. Review bản dịch tiếng Việt dưới đây, đối chiếu với bản gốc và trả về JSON.
+
+## Tiêu chí review:
+{REVIEW_BG_CRITERIA}
+
+## Thuật ngữ tham chiếu:
+{context_text}
+
+## Thông tin chương:
+- ID: {chapter_id}
+- Số chương: {chapter_number}
+
+## Bản gốc:
+### Tiêu đề gốc:
+{raw_title}
+
+### Nội dung gốc:
+{raw_content}
+
+## Bản dịch tiếng Việt:
+### Tiêu đề dịch:
+{title}
+
+### Nội dung dịch:
+{content}
+
+## Định dạng JSON:
+{{
+  "chapter_id": "{chapter_id}",
+  "overall_score": <1-10>,
+  "issues": [
+    {{"type": "thiếu nội dung|thêm nội dung|dịch sai|giới tính|xưng hô|thuật ngữ|phong cách|logic|ngoại ngữ",
+      "severity": "nặng|trung bình|nhẹ",
+      "original": "trích đoạn có thật trong bản gốc",
+      "original_vi": "trích đoạn có thật trong bản dịch",
+      "suggestion": "gợi ý sửa"}}
+  ],
+  "gender_ok": true/false,
+  "address_ok": true/false,
+  "summary": "nhận xét tổng quan 1-2 câu"
+}}
+
+Chỉ trả về JSON, không Markdown hoặc giải thích thêm."""
+
+
 def _run_background_review(
     chapter_id,
     chapter_number,
@@ -2588,6 +2655,7 @@ def _run_background_review(
     context_text="",
     raw_content="",
     review_token=None,
+    raw_title="",
 ):
     """
     Bước 4 pipeline (CHẠY NGẦM trong daemon thread):
@@ -2595,46 +2663,27 @@ def _run_background_review(
     Dùng gemini-3.1-flash-lite-preview. Không block main flow.
     So sánh bản dịch với raw gốc để phát hiện thiếu/sai nội dung.
     """
-    raw_section = ""
-    if raw_content:
-        raw_section = f"""## Nội dung gốc (raw tiếng Hàn — dùng để đối chiếu):
-{raw_content}
-"""
-
-    prompt = f"""Bạn là reviewer dịch thuật tiểu thuyết Hàn-Việt. Review bản dịch tiếng Việt dưới đây, **đối chiếu với bản gốc tiếng Hàn**, và trả về JSON:
-
-{{
-  "chapter_id": "{chapter_id}",
-  "overall_score": <1-10>,
-  "issues": [
-    {{"type": "thiếu nội dung|dịch sai|xưng hô|phong cách|thuật ngữ|logic",
-      "severity": "nặng|trung bình|nhẹ",
-      "original_kr": "đoạn gốc tiếng Hàn bị thiếu/dịch sai (nếu có)",
-      "original_vi": "đoạn dịch bị lỗi (nếu có)",
-      "suggestion": "gợi ý sửa"}}
-  ],
-  "summary": "nhận xét tổng quan 1-2 câu"
-}}
-
-## Yêu cầu kiểm tra:
-1. **Thiếu nội dung**: So sánh từng đoạn bản dịch với bản gốc. Nếu có đoạn/câu trong bản gốc mà bản dịch bỏ sót, đánh dấu type = "thiếu nội dung", severity = "nặng".
-2. **Dịch sai nội dung**: Nếu ý nghĩa bản dịch khác hẳn so với bản gốc (nhầm nhân vật, đổi ý, sai sự kiện), đánh dấu type = "dịch sai", severity = "nặng".
-3. **Xưng hô**: Kiểm tra xưng hô có phù hợp ngữ cảnh và mối quan hệ nhân vật không.
-4. **Phong cách & Thuật ngữ**: Kiểm tra theo glossary tham chiếu.
-
-## Thuật ngữ tham chiếu:
-{context_text}
-
-{raw_section}## Tiêu đề dịch:
-{title}
-
-## Nội dung dịch:
-{content}
-
-Chỉ trả về JSON, không giải thích thêm."""
+    prompt = build_translation_review_prompt(
+        chapter_id, chapter_number, raw_title, raw_content, title, content, context_text
+    )
 
     try:
-        text = call_gemini(prompt, model=REVIEW_BG_MODEL, temperature=0.6).strip()
+        while True:
+            try:
+                text = call_gemini(prompt, model=REVIEW_BG_MODEL, temperature=0.6).strip()
+                break
+            except Exception as exc:
+                error = str(exc)
+                if "408" in error or any(code in error for code in ["500", "502", "503", "504"]):
+                    print(f"[REVIEW BG] Lỗi API tạm thời, giữ key và thử lại: {error}")
+                    time.sleep(10)
+                    continue
+                if re.search(r"\b4\d\d\b", error) or any(code in error for code in ["RESOURCE_EXHAUSTED", "PERMISSION_DENIED", "UNAUTHENTICATED"]):
+                    print(f"[REVIEW BG] Lỗi API 4xx, đổi key và thử lại: {error}")
+                    switch_api_key()
+                    time.sleep(15)
+                    continue
+                raise
         log_api_call(
             chapter_id, "review", REVIEW_BG_MODEL, prompt, text, ok=True
         )
@@ -2696,6 +2745,32 @@ Chỉ trả về JSON, không giải thích thêm."""
         print(f"[REVIEW BG] ⚠️ Lỗi review ngầm chương {chapter_id}: {e}")
 
 
+def enqueue_background_review(chapter, chapter_number, context_text=""):
+    """Xếp review vào một worker riêng; các chương được review tuần tự."""
+    global _review_executor
+    if REVIEW_BG_MODEL.strip().lower() in {"", "none"}:
+        print("[PIPELINE] Bỏ qua review nền vì chưa cấu hình model.")
+        return None
+    chapter_id = chapter.get("id", f"chapter_{chapter_number}")
+    review_token = object()
+    with _review_lock:
+        _latest_review_tokens[chapter_id] = review_token
+    if _review_executor is None:
+        _review_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="review-bg")
+    print(f"[PIPELINE] Đã xếp review nền {chapter_id} ({REVIEW_BG_MODEL}).")
+    return _review_executor.submit(
+        _run_background_review,
+        chapter_id,
+        chapter_number,
+        chapter.get("title_translation", ""),
+        chapter.get("translation", ""),
+        context_text,
+        chapter.get("content", ""),
+        review_token,
+        chapter.get("title", ""),
+    )
+
+
 def run_post_translation_pipeline(
     chapter,
     chapter_number,
@@ -2709,7 +2784,7 @@ def run_post_translation_pipeline(
     Bước 1 (tuần tự): polish_translation()     — gemini-3-flash  — biên tập + xưng hô
     Bước 2 (tuần tự): fix_translation()        — gemini-3-flash  — xét sót ngôn ngữ
     Bước 3 (tuần tự): update_pronoun_memory()  — flash-lite      — cập nhật pronouns.yaml
-    Bước 4 (song song): _run_background_review() — flash-lite    — review ngầm → review.yaml
+    Review nền được xếp riêng sau hàm này để mọi engine dùng chung một worker.
 
     Trả về (title, content) sau khi bước 1-3 hoàn tất.
     """
@@ -2747,30 +2822,6 @@ def run_post_translation_pipeline(
     print(f"[PIPELINE] Bước 3 — Cập nhật bộ nhớ xưng hô...")
     update_pronoun_memory(chapter_id, chapter_number, content_fixed, pronouns_file)
 
-    # ── Bước 4: Review ngầm (daemon thread, không block) ──
-    if REVIEW_BG_MODEL.strip().lower() not in {"", "none"}:
-        print(f"[PIPELINE] Bước 4 — Khởi động review ngầm ({REVIEW_BG_MODEL})...")
-        raw_content = chapter.get("content", "")
-        review_token = object()
-        with _review_lock:
-            _latest_review_tokens[chapter_id] = review_token
-        t = threading.Thread(
-            target=_run_background_review,
-            args=(
-                chapter_id,
-                chapter_number,
-                title_fixed,
-                content_fixed,
-                context_text,
-                raw_content,
-                review_token,
-            ),
-            daemon=True,
-        )
-        t.start()
-    else:
-        print("[PIPELINE] Bỏ qua review nền vì chưa cấu hình model.")
-
     print(f"[PIPELINE] ✅ Hoàn tất hậu xử lý chương {chapter_number}")
     return title_fixed, content_fixed
 
@@ -2806,9 +2857,11 @@ def fix_translation(chapter, chapter_number, context_text="", pronoun_context=""
         print(
             f"⚠️ Phát hiện ký tự nước ngoài (lần {attempt + 1}/{FIX_MAX_RETRY}), đang dịch lại..."
         )
-        prompt = f"""Bạn là dịch giả tiểu thuyết.
+        prompt = wrap_r19_prompt(f"""Bạn là dịch giả tiểu thuyết.
 Bản dịch dưới đây vẫn còn sót chữ Hán/Hàn.
 Hãy dịch lại thành bản hoàn chỉnh, giữ nguyên phong cách và nội dung, không được markdown.
+
+{_r19_placeholder_instruction()}
 
 {pronoun_context}
 
@@ -2828,7 +2881,7 @@ Nội dung dịch hiện tại:
 
 ###CONTENT###
 <nội dung dịch hoàn chỉnh>
-"""
+""")
         try:
             chapter_id_fix = chapter.get("id", f"chapter_{chapter_number}")
             text = call_gemini(prompt, model=POLISH_MODEL, temperature=0.3).strip()

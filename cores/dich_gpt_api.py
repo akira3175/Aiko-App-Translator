@@ -24,7 +24,8 @@ from cores.dich_utils import (
 )
 from cores.gpt_api_client import call_gpt_api
 from cores.runtime_config import chapter_limit, option, stop_requested, web_mode
-from cores.translation_prompts import build_single_prompt, project_polish_prompt
+from cores.r19_translation import mask_contexts, prepare_chapters, restore_results, strip_previous_context, translate_fragments
+from cores.translation_prompts import _r19_placeholder_instruction, build_single_prompt, project_polish_prompt, wrap_r19_prompt
 from cores.translation_workflows import run_single_translation
 
 TRANSLATE_MODEL = str(option("gpt_api_translate_model", "gpt-5.6-luna"))
@@ -53,7 +54,12 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
     if os.path.exists(NOVEL_TXT):
         with open(NOVEL_TXT, "r", encoding="utf-8") as file:
             previous = file.read().strip()
-    prompt = build_single_prompt(chapter, context_text, pronoun_context, previous)
+    masked_chapters, r19_entries = prepare_chapters([chapter])
+    context_text, pronoun_context = mask_contexts(
+        [context_text, pronoun_context], r19_entries
+    )
+    previous = strip_previous_context(previous)
+    prompt = build_single_prompt(masked_chapters[0], context_text, pronoun_context, previous)
     print(f"[GPT API] Dịch chương {chapter_number} bằng {TRANSLATE_MODEL}...")
     text = call_gpt_api(
         prompt,
@@ -61,7 +67,11 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
         reasoning_effort=option("gpt_api_translate_effort", "medium"),
         stage="dịch",
     )
-    return _parse_result(text, "dịch")
+    result = _parse_result(text, "dịch")
+    if r19_entries:
+        translations = translate_fragments(r19_entries)
+        result = restore_results([result], r19_entries, translations)[0]
+    return result
 
 
 def polish_chapter(chapter, chapter_number, context_text="", pronoun_context=""):
@@ -69,13 +79,15 @@ def polish_chapter(chapter, chapter_number, context_text="", pronoun_context="")
         print("[GPT API] Bỏ qua hiệu đính vì chưa cấu hình model.")
         return chapter.get("title_translation", ""), chapter.get("translation", "")
     polish_role, polish_task = project_polish_prompt()
-    prompt = f"""# Vai trò hiệu đính
+    prompt = wrap_r19_prompt(f"""# Vai trò hiệu đính
 {polish_role}
 
 # Nhiệm vụ hiệu đính
 {polish_task}
 
 Các quy tắc kỹ thuật bắt buộc: giữ nguyên đầy đủ nội dung, dấu hội thoại, Markdown ảnh và ký hiệu cần thiết. Không giải thích thay đổi. Các mục xưng hô có locked: true phải được ưu tiên.
+
+{_r19_placeholder_instruction()}
 
 ## Thuật ngữ và quy tắc
 {context_text}
@@ -96,7 +108,7 @@ Chỉ trả về:
 <tiêu đề hoàn chỉnh>
 ###CONTENT###
 <nội dung hoàn chỉnh>
-###END###"""
+###END###""")
     print(f"[GPT API] Hiệu đính chương {chapter_number} bằng {POLISH_MODEL}...")
     text = call_gpt_api(
         prompt,

@@ -9,9 +9,20 @@ import re
 import time
 from collections.abc import Callable
 
-from cores.runtime_config import option
+from cores.runtime_config import bool_option, option
+from cores.r19_translation import (
+    mask_contexts,
+    mask_postprocess_contexts,
+    prepare_chapters,
+    prepare_postprocess_chapter,
+    restore_results,
+    strip_r19_terms,
+    strip_previous_context,
+    translate_fragments,
+)
 
 from cores.dich_utils import (
+    enqueue_background_review,
     export_recent_translations_to_txt_md,
     find_glossary_targets,
     format_pronoun_context,
@@ -77,7 +88,12 @@ def translate_batch_with_web(
         with open(novel_text_path, "r", encoding="utf-8") as file:
             previous_chapters = file.read().strip()
 
-    prompt = build_prompt(batch, context_text, pronoun_context, previous_chapters)
+    prompt_batch, r19_entries = prepare_chapters(batch)
+    context_text, pronoun_context = mask_contexts(
+        [context_text, pronoun_context], r19_entries
+    )
+    previous_chapters = strip_previous_context(previous_chapters)
+    prompt = build_prompt(prompt_batch, context_text, pronoun_context, previous_chapters)
     for attempt in range(max_retries):
         if attempt:
             print(f"🔄 Thử lại lần {attempt + 1}/{max_retries}...")
@@ -150,6 +166,9 @@ def translate_batch_with_web(
                 time.sleep(5)
                 continue
             raise ValueError(f"AI trả về placeholder sau {max_retries} lần thử")
+        if r19_entries:
+            translations = translate_fragments(r19_entries)
+            results = restore_results(results, r19_entries, translations)
         return results
 
     raise ValueError("Lỗi dịch hàng loạt")
@@ -163,7 +182,7 @@ def _context_with_previous_titles(
         if current_index - offset < 0:
             break
         previous_id = _chapter_id(raw_files[current_index - offset])
-        title = get_translated_title(previous_id, translated_dir)
+        title = strip_r19_terms(get_translated_title(previous_id, translated_dir))
         if title:
             previous_titles.append(title)
 
@@ -220,23 +239,41 @@ def run_single_translation(
         chapter["title_translation"] = title
         chapter["translation"] = content
 
+        postprocess_entries = []
+        postprocess_translations = {}
+        pipeline_context = context_text
+        pipeline_pronouns = pronoun_context
+        if bool_option("r19_mode", False):
+            chapter, postprocess_entries, postprocess_translations = (
+                prepare_postprocess_chapter(chapter)
+            )
+            pipeline_context, pipeline_pronouns = mask_postprocess_contexts(
+                [context_text, pronoun_context], postprocess_translations
+            )
         if postprocess is None:
             title, content = run_post_translation_pipeline(
                 chapter,
                 chapter_number,
-                context_text,
-                pronoun_context,
+                pipeline_context,
+                pipeline_pronouns,
                 pronouns_file=pronouns_path,
             )
         else:
             title, content = postprocess(
-                chapter, chapter_number, context_text, pronoun_context
+                chapter, chapter_number, pipeline_context, pipeline_pronouns
             )
+        chapter["title_translation"] = title
+        chapter["translation"] = content
+        if postprocess_entries:
+            title, content = restore_results(
+                [(title, content)], postprocess_entries, postprocess_translations
+            )[0]
         chapter["title_translation"] = title
         chapter["translation"] = content
 
         output_path = save_translated_md(raw_path, translated_dir, title, content)
         print(f"✔ Đã lưu: {output_path}")
+        enqueue_background_review(chapter, chapter_number, pipeline_context)
         return 1
 
 
@@ -319,17 +356,35 @@ def run_batch_translation(
                 pronouns_file=chapter_pronouns_path,
                 glossary_names=chapter_glossary_names,
             )
+            postprocess_entries = []
+            postprocess_translations = {}
+            pipeline_context = chapter_context
+            pipeline_pronouns = current_pronouns
+            if bool_option("r19_mode", False):
+                chapter, postprocess_entries, postprocess_translations = (
+                    prepare_postprocess_chapter(chapter)
+                )
+                pipeline_context, pipeline_pronouns = mask_postprocess_contexts(
+                    [chapter_context, current_pronouns], postprocess_translations
+                )
             title, content = run_post_translation_pipeline(
                 chapter,
                 chapter_number,
-                chapter_context,
-                current_pronouns,
+                pipeline_context,
+                pipeline_pronouns,
                 pronouns_file=chapter_pronouns_path,
             )
             chapter["title_translation"] = title
             chapter["translation"] = content
+            if postprocess_entries:
+                title, content = restore_results(
+                    [(title, content)], postprocess_entries, postprocess_translations
+                )[0]
+            chapter["title_translation"] = title
+            chapter["translation"] = content
             output_path = save_translated_md(path, translated_dir, title, content)
             print(f"✅ Đã lưu: {output_path}")
+            enqueue_background_review(chapter, chapter_number, pipeline_context)
 
         print(f"✅ Hoàn tất Batch {len(batch)} chương!")
         return len(batch)

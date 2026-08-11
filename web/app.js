@@ -32,6 +32,7 @@ let manualPromptRequest=0;
 let availableUpdate=null;
 let whatsNewData=null;
 let chapterImportPreview=null;
+let r19Defaults={model:'gemini-3.5-flash-lite',context_chapters:0,prompt_prefix:'Cách để AI dịch đc prompt sau """',words:''};
 const settingsGroups={
   'gemini-api':['Gemini API','Model và thông số sinh nội dung khi dịch, hậu dịch và review qua API.'],
   'gemini-web':['Gemini Web','Gem, model và mức suy nghĩ khi tự động hóa trình duyệt Gemini.'],
@@ -52,7 +53,7 @@ const appThemes=[
   {id:'abyss',name:'Abyss',description:'Xanh vực sâu',color:'#000c18'},
   {id:'kimbie-dark',name:'Kimbie Dark',description:'Nâu hổ phách',color:'#221a0f'},
 ];
-const views = { workspace: ['BÀN DỊCH','Không gian dịch'], chapters: ['THƯ VIỆN','Kho chương'], sharing: ['R2 PRIVATE','Chia sẻ & đọc truyện'], pipeline: ['TỰ ĐỘNG HÓA','Quy trình AI'], terminology: ['BỘ NHỚ','Thuật ngữ'], characters: ['BỘ NHỚ','Hồ sơ nhân vật'], pronouns: ['BỘ NHỚ','Xưng hô'], help: ['TRỢ GIÚP','Hướng dẫn sử dụng'], settings: ['HỆ THỐNG','Cài đặt'] };
+const views = { workspace: ['BÀN DỊCH','Không gian dịch'], chapters: ['THƯ VIỆN','Kho chương'], sharing: ['R2 PRIVATE','Chia sẻ & đọc truyện'], pipeline: ['TỰ ĐỘNG HÓA','Quy trình AI'], terminology: ['BỘ NHỚ','Thuật ngữ'], characters: ['BỘ NHỚ','Hồ sơ nhân vật'], pronouns: ['BỘ NHỚ','Xưng hô'], r19: ['BỘ LỌC TOÀN CỤC','Quản lý Dịch R19'], help: ['TRỢ GIÚP','Hướng dẫn sử dụng'], settings: ['HỆ THỐNG','Cài đặt'] };
 
 function initCodeEditors() {
   editorViews.source=CodeMirror.fromTextArea($('#sourceEditor'),{mode:'markdown',lineNumbers:true,lineWrapping:true,readOnly:true,viewportMargin:20});
@@ -224,7 +225,7 @@ const pipelineItems = [
 const taskSchemas = {
   v1:{title:'Gemini API V1',description:'Chọn số lượng công việc thực hiện trong lần chạy này.',fields:[]},
   'v1-interactions':{title:'V1 · Gemini Interactions Streaming (Beta)',description:'Dịch trực tiếp trong Không gian truyện; khi biên tập chỉ cập nhật dòng thay đổi và đặt con trỏ tại vị trí AI đang sửa. Dùng bộ lọc an toàn mặc định của Google.',fields:[]},
-  review: {title:'Review đối chiếu toàn bộ',description:'So sánh từng chương raw Hàn với bản dịch Việt. Chọn phạm vi và mức song song trước khi gửi API.',fields:[['start','Bắt đầu từ chương','number','1'],['end','Kết thúc tại chương','number',''],['force','Review lại chương đã có','checkbox',false],['batch_size','Số chương mỗi batch','number','10'],['workers','Số luồng song song','number','10'],['sleep','Giây nghỉ giữa batch','number','4']]},
+  review: {title:'Review đối chiếu toàn bộ',description:'So sánh từng chương ở ngôn ngữ nguồn với bản dịch Việt. Chọn phạm vi và mức song song trước khi gửi API.',fields:[['start','Bắt đầu từ chương','number','1'],['end','Kết thúc tại chương','number',''],['force','Review lại chương đã có','checkbox',false],['batch_size','Số chương mỗi batch','number','10'],['workers','Số luồng song song','number','10'],['sleep','Giây nghỉ giữa batch','number','4']]},
   hako:{title:'Đăng chương lên Hako',description:'Chọn chương đầu và chương cuối. App tự xác định volume, Book ID và ảnh cần tải lên.',fields:[['set_as_incomplete','Đánh dấu chương chưa hoàn thành','checkbox',false]]},
   v2:{title:'Gemini Web V2',description:'Cấu hình browser và phạm vi chạy ngay tại đây.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập Gemini','checkbox',true]]},
   v3:{title:'Gemini Web V3',description:'Cấu hình browser, batch và phạm vi chạy.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập Gemini','checkbox',true],['batch_size','Số chương mỗi batch','number','2'],['batch_runs','Số lần chạy batch (0 = đến hết)','number','1']]},
@@ -307,8 +308,10 @@ function renderPythonSettings(items) {
   const settingFields=items.filter(item=>item.group===activeSettingsGroup).map(item=>{
     const control=item.type==='select'
       ? `<select data-python-setting="${escapeHtml(item.key)}">${item.options.map(([value,label])=>`<option value="${escapeHtml(value)}" ${value===item.value?'selected':''}>${escapeHtml(label)}</option>`).join('')}</select>`
+      : item.type==='textarea'
+        ? `<textarea data-python-setting="${escapeHtml(item.key)}" rows="10" spellcheck="false">${escapeHtml(item.value)}</textarea>`
       : `<input data-python-setting="${escapeHtml(item.key)}" type="${item.type}" value="${escapeHtml(item.value)}" ${item.inputmode?`inputmode="${item.inputmode}"`:''} ${item.type==='number'?`min="${item.min}" max="${item.max}"`:''} autocomplete="off">`;
-    return `<label class="python-setting"><span>${escapeHtml(item.label)}${item.overridden?'<em>Đã tùy chỉnh</em>':''}</span>${control}<small>${item.description?escapeHtml(item.description)+' · ':''}Mặc định: ${escapeHtml(item.default||'để trống')}</small></label>`;
+    return `<label class="python-setting ${item.type==='textarea'?'textarea-setting':''}"><span>${escapeHtml(item.label)}${item.overridden?'<em>Đã tùy chỉnh</em>':''}</span>${control}<small>${item.description?escapeHtml(item.description)+' · ':''}${item.type==='textarea'?'Dùng “Khôi phục mặc định” để lấy lại tiêu chí chuẩn.':`Mặc định: ${escapeHtml(item.default||'để trống')}`}</small></label>`;
   }).join('');
   $('#pythonSettingsFields').innerHTML=activeSettingsGroup==='publishing'&&settingFields
     ? `${r2CredentialGuide('publishing')}<details class="publishing-advanced"><summary>Cài đặt nâng cao: tài khoản Hako và kho ảnh</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
@@ -387,7 +390,19 @@ async function savePublishingBooks() {
   finally { button.disabled=false; }
 }
 
-function selectedShareChapters(){return $$('[data-share-chapter]:checked').map(input=>input.value);}
+function selectedShareChapters(){return $$('[data-share-chapter]:checked').flatMap(input=>JSON.parse(input.dataset.shareFiles||'[]'));}
+function groupedShareChapters(items){
+  const groups=new Map();
+  items.filter(item=>item.translated).forEach(item=>{
+    const match=String(item.name||'').match(/^v(\d+)_c(\d+)_s(\d+)\.md$/i);
+    const key=match?`v${Number(match[1])}_c${Number(match[2])}`:`file:${item.name}`;
+    if(!groups.has(key))groups.set(key,{title:item.title||item.id,names:[],order:match?[Number(match[1]),Number(match[2])]:[Number.MAX_SAFE_INTEGER,item.name]});
+    groups.get(key).names.push({name:item.name,segment:match?Number(match[3]):0});
+  });
+  return [...groups.values()]
+    .map(group=>({...group,names:group.names.sort((a,b)=>a.segment-b.segment).map(item=>item.name)}))
+    .sort((a,b)=>a.order[0]-b.order[0]||(typeof a.order[1]==='number'?a.order[1]-b.order[1]:String(a.order[1]).localeCompare(String(b.order[1]))));
+}
 function matchingShareDraft(){
   const recipient=$('#shareRecipient').value.trim().toLocaleLowerCase();
   const title=($('#shareTitle').value.trim()||state.project||'').toLocaleLowerCase();
@@ -406,9 +421,9 @@ function renderSharedChapterCatalog(){
   catalog.innerHTML=projectShares.map(item=>`<section class="shared-catalog-group"><div class="shared-catalog-head"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.recipient||'Không gắn người nhận')} · ${item.chapters?.length||0} chương</small></div><button type="button" data-close-share="${escapeHtml(item.id)}">Đóng share</button></div><div class="shared-catalog-list">${(item.chapters||[]).map(chapter=>`<div class="shared-catalog-row"><span>${escapeHtml(chapter.title||chapter.name)}</span><button type="button" data-remove-shared-chapter="${escapeHtml(chapter.name)}" data-share-id="${escapeHtml(item.id)}">Thu hồi</button></div>`).join('')||'<div class="memory-empty">Bản share chưa có chương.</div>'}</div></section>`).join('')||'<div class="memory-empty">Chưa có chương nào đang được chia sẻ.</div>';
 }
 function renderShares(){
-  const translated=state.chapters.filter(item=>item.translated);
+  const translated=groupedShareChapters(state.chapters);
   $('#shareTitle').placeholder=state.project||'Tên bản đọc';
-  $('#shareChapterList').innerHTML=translated.map(item=>`<label class="share-chapter"><input type="checkbox" data-share-chapter value="${escapeHtml(item.name)}"><span>${escapeHtml(item.title||item.id)}</span></label>`).join('')||'<div class="memory-empty">Chưa có chương đã dịch.</div>';
+  $('#shareChapterList').innerHTML=translated.map(item=>`<label class="share-chapter"><input type="checkbox" data-share-chapter data-share-files="${escapeHtml(JSON.stringify(item.names))}"><span>${escapeHtml(item.title)}${item.names.length>1?` <small>· ${item.names.length} phần</small>`:''}</span></label>`).join('')||'<div class="memory-empty">Chưa có chương đã dịch.</div>';
   $('#shareList').innerHTML=projectShares.map(item=>`<article class="share-item"><div class="share-item-head"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.recipient||'Không gắn người nhận')} · ${item.chapters?.length||0} chương</small></div><small>${escapeHtml(String(item.expires_at||'').slice(0,10))}</small></div><div class="share-item-actions"><button class="secondary" type="button" data-copy-share="${escapeHtml(item.url||'')}" ${item.url?'':'disabled'}>Sao chép link</button><button class="primary" type="button" data-update-share="${escapeHtml(item.id)}">Cập nhật chương đã chọn</button></div></article>`).join('')||'<div class="memory-empty">Chưa tạo bản share nào cho truyện này.</div>';
   renderSharedChapterCatalog();
   updateSharePrimaryAction();
@@ -461,6 +476,116 @@ function syncGeminiApiKeyDraft() {
 async function loadGeminiApiKeys() {
   try { const data=await api('/api/gemini-api-keys'); geminiApiKeys=data.keys; renderGeminiApiKeys(); }
   catch(error) { toast(error.message); }
+}
+
+function ensureR19Config() {
+  if($('#r19Model'))return;
+  const card=document.createElement('section');
+  card.className='r19-config-card';
+  card.innerHTML='<div class="r19-config-actions"><strong>Cấu hình R19</strong><button class="secondary" id="resetR19Defaults" type="button">Khôi phục mặc định</button></div><label><span>Model dịch từ R19 trong khung bên dưới</span><input id="r19Model" type="text" spellcheck="false" placeholder="gemini-3.5-flash-lite"></label><label><span>Số chương ngữ cảnh R19</span><input id="r19ContextChapters" type="number" min="0" max="20" step="1" inputmode="numeric"><small>Chỉ ghi đè cài đặt chung khi R19 bật.</small></label><label class="r19-prompt-field"><span>Dòng mở đầu prompt</span><textarea id="r19PromptPrefix" rows="2" spellcheck="false"></textarea><small>Dòng này được đặt trước prompt dịch; hệ thống tự thêm <code>"""</code> đóng ở cuối.</small></label>';
+  $('.r19-editor-card').before(card);
+  ['#r19Model','#r19ContextChapters','#r19PromptPrefix'].forEach(selector=>$(selector).oninput=updateR19Draft);
+  $('#resetR19Defaults').onclick=resetR19Defaults;
+}
+
+function resetR19Defaults() {
+  $('#r19Model').value=r19Defaults.model;
+  $('#r19ContextChapters').value=r19Defaults.context_chapters;
+  $('#r19PromptPrefix').value=r19Defaults.prompt_prefix;
+  $('#r19Words').value=r19Defaults.words;
+  updateR19Draft();
+  toast('Đã đưa cấu hình R19 về mặc định. Bấm Lưu cấu hình để áp dụng.');
+}
+
+function r19DraftPayload() {
+  return {enabled:$('#r19Enabled').checked,words:$('#r19Words').value,model:$('#r19Model').value,context_chapters:$('#r19ContextChapters').value,prompt_prefix:$('#r19PromptPrefix').value};
+}
+
+function ensureR19StatusBadge() {
+  let badge=$('#r19StatusBadge');
+  if(badge)return badge;
+  badge=document.createElement('span');
+  badge.id='r19StatusBadge'; badge.className='r19-status-badge';
+  badge.textContent='R19'; badge.setAttribute('aria-label','Chế độ R19 đang bật');
+  $('#saveState').after(badge);
+  return badge;
+}
+
+function renderR19(data) {
+  ensureR19Config();
+  r19Defaults={...r19Defaults,...(data.defaults||{})};
+  $('#r19Enabled').checked=Boolean(data.enabled);
+  $('#r19Words').value=String(data.words||'');
+  $('#r19Model').value=String(data.model||'');
+  $('#r19ContextChapters').value=Number(data.context_chapters)||0;
+  $('#r19PromptPrefix').value=String(data.prompt_prefix||'');
+  $('#r19Count').textContent=`${Number(data.count)||0} cụm từ`;
+  $('#r19ModeLabel').textContent=data.enabled?'Đang bật':'Đang tắt';
+  ensureR19StatusBadge().classList.toggle('active',Boolean(data.enabled));
+  $('#r19SaveState').textContent='Đã đồng bộ';
+}
+
+function ensureR19ShortcutHelp() {
+  const section=$('#help-translate');
+  if(!section||$('#r19ShortcutHelp'))return;
+  const note=document.createElement('p');
+  note.id='r19ShortcutHelp'; note.className='help-note help-shortcut-note';
+  note.innerHTML='<strong>Dịch R19:</strong> nhấn <kbd>F9</kbd> hoặc <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>9</kbd> để mở trang quản lý ẩn.';
+  section.querySelector('.help-actions')?.before(note);
+}
+
+async function loadR19() {
+  if(!state.project)return;
+  try { renderR19(await api('/api/r19?project='+encodeURIComponent(state.project))); }
+  catch(error) { $('#r19SaveState').textContent='Không thể tải'; toast(error.message); }
+}
+
+function updateR19Draft() {
+  const enabled=$('#r19Enabled').checked;
+  const terms=$('#r19Words').value.split(/\r?\n/).map(line=>line.split('=',1)[0].trim()).filter(line=>line&&!line.startsWith('#'));
+  $('#r19ModeLabel').textContent=enabled?'Sẽ bật sau khi lưu':'Sẽ tắt sau khi lưu';
+  $('#r19Count').textContent=`${new Set(terms.map(term=>term.toLocaleLowerCase())).size} cụm từ`;
+  $('#r19SaveState').textContent='Có thay đổi chưa lưu';
+}
+
+async function saveR19() {
+  if(!state.project)return toast('Hãy chọn một truyện trước khi bật hoặc tắt R19');
+  const button=$('#saveR19'); button.disabled=true; button.textContent='Đang lưu…';
+  try {
+    const data=await api('/api/r19?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify(r19DraftPayload())});
+    renderR19(data); toast(data.enabled?'Đã bật Dịch R19':'Đã lưu và tắt Dịch R19');
+  } catch(error) { $('#r19SaveState').textContent='Lưu thất bại'; toast(error.message); }
+  finally { button.disabled=false; button.textContent='Lưu cấu hình'; }
+}
+
+function untranslatedR19Words(text) {
+  const seen=new Set();
+  return String(text||'').split(/\r?\n/).map(line=>line.trim()).filter(line=>{
+    if(!line||line.startsWith('#')||line.includes('='))return false;
+    const key=line.toLocaleLowerCase();
+    if(seen.has(key))return false;
+    seen.add(key); return true;
+  });
+}
+
+async function translateR19Words() {
+  if(!state.project)return toast('Hãy chọn một truyện để lưu log request R19');
+  const button=$('#translateR19Words'), saveButton=$('#saveR19');
+  button.disabled=true; saveButton.disabled=true;
+  try {
+    let data=await api('/api/r19?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify(r19DraftPayload())});
+    renderR19(data);
+    const pending=untranslatedR19Words(data.words);
+    if(!pending.length)return toast('Tất cả dòng R19 đã có bản dịch');
+    for(let index=0;index<pending.length;index++){
+      button.textContent=`Đang dịch ${index+1}/${pending.length}…`;
+      $('#r19SaveState').textContent=`Đang dịch: ${pending[index]}`;
+      data=await api('/api/r19/translate-word?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({source:pending[index]})});
+      renderR19(data);
+    }
+    toast(`Đã dịch ${pending.length} dòng R19`);
+  } catch(error) { $('#r19SaveState').textContent='Dừng do lỗi'; toast(error.message); }
+  finally { button.disabled=false; saveButton.disabled=false; button.textContent='Dịch các dòng chưa có'; }
 }
 
 async function saveGeminiApiKeys() {
@@ -528,6 +653,20 @@ async function loadUpdateStatus(check=false) {
   } finally {
     if(check){button.disabled=false;button.textContent='Kiểm tra cập nhật';}
   }
+}
+
+async function autoCheckForUpdate() {
+  const key='aiko-last-update-check';
+  try {
+    const lastCheck=Number(localStorage.getItem(key)||0);
+    if(Date.now()-lastCheck<24*60*60*1000)return;
+    localStorage.setItem(key,String(Date.now()));
+  } catch(error) {}
+  try {
+    const data=await api('/api/update?check=1');
+    renderUpdateStatus(data);
+    if(data.update_available)toast(`Có bản cập nhật ${data.latest_version}`);
+  } catch(error) {}
 }
 
 function renderWhatsNew(entry) {
@@ -651,7 +790,7 @@ async function selectProject(name) {
   renderContext();
   state.currentImages=[]; renderMarkdownEditors();
   $('#projectPopover').classList.remove('open');
-  await Promise.all([loadChapters(), loadReviews(), loadContext(), loadCharacters(), loadPronouns(), loadPublishingBooks(), loadShares()]); toast('Đã mở ' + name);
+  await Promise.all([loadChapters(), loadReviews(), loadContext(), loadCharacters(), loadPronouns(), loadPublishingBooks(), loadShares(), loadR19()]); toast('Đã mở ' + name);
 }
 
 async function loadContext() {
@@ -1864,6 +2003,12 @@ document.addEventListener('keydown',event=>{
     closeSelectionTranslation();
     if($('#whatsNewModal').classList.contains('open'))closeWhatsNew();
   }
+  const typing=event.target instanceof HTMLElement&&(event.target.matches('input,textarea,select')||event.target.isContentEditable);
+  const openR19=(!event.altKey&&!event.ctrlKey&&!event.metaKey&&event.key==='F9')||(event.ctrlKey&&event.altKey&&!event.metaKey&&event.key==='9');
+  if(openR19&&!typing){
+    event.preventDefault(); showView('r19');
+    return;
+  }
   if(!(event.ctrlKey||event.metaKey))return;
   const key=event.key.toLowerCase();
   if(!['f','h'].includes(key))return;
@@ -1880,6 +2025,10 @@ $('#retranslateButton').onclick=()=>{if(!state.current)return toast('Hãy chọn
 $('#cancelRetranslate').onclick=()=>$('#retranslateModal').classList.remove('open');
 $('#confirmRetranslate').onclick=startRetranslate;
 $('#menuButton').onclick=()=>$('#sidebar').classList.toggle('open');
+$('#r19Enabled').onchange=updateR19Draft;
+$('#r19Words').oninput=updateR19Draft;
+$('#saveR19').onclick=saveR19;
+$('#translateR19Words').onclick=translateR19Words;
 $('#focusButton').onclick=()=>{document.body.classList.toggle('focus'); $('#focusButton').textContent=document.body.classList.contains('focus')?'Thoát tập trung':'Chế độ tập trung';requestAnimationFrame(()=>{updateLineNumbers('source');updateLineNumbers('target');});};
 function setWorkspaceMode(mode,remember=true){
   if(!['split','source','target'].includes(mode))mode='split';
@@ -1917,4 +2066,4 @@ setEditorMode('source-text');
 updateLineNumbers('source'); updateLineNumbers('target');
 initCodeEditors();
 setWorkspaceMode(window.matchMedia('(max-width:560px)').matches?(localStorage.getItem('mobileWorkspaceMode')||'target'):'split',false);
-renderThemeOptions(); initPunctuationOptions(); initPipeline(); bootstrapWorkspace(); loadPythonSettings(); loadGeminiApiKeys(); loadUpdateStatus(); loadWhatsNew(); loadLanStatus();
+renderThemeOptions(); initPunctuationOptions(); initPipeline(); ensureR19ShortcutHelp(); bootstrapWorkspace(); loadPythonSettings(); loadGeminiApiKeys(); loadUpdateStatus().then(autoCheckForUpdate); loadWhatsNew(); loadLanStatus();

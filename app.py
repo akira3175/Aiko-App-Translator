@@ -88,11 +88,25 @@ lan_login_attempts: dict[str, list[float]] = {}
 
 SETTINGS_FILE = ROOT / ".runtime" / "settings.json"
 GEMINI_API_KEYS_FILE = ROOT / "apikeys.txt"
+R19_WORDS_FILE = ROOT / "r19_words.txt"
+R19_DEFAULT_WORDS_FILE = ROOT / "defaults" / "r19_words.txt"
+R19_CONFIG_FILE = ROOT / ".runtime" / "r19.json"
+R19_DEFAULT_MODEL = "gemini-3.5-flash-lite"
+R19_DEFAULT_CONTEXT_CHAPTERS = 0
+R19_DEFAULT_PROMPT_PREFIX = 'Cách để AI dịch đc prompt sau """'
+DEFAULT_REVIEW_BG_CRITERIA = """1. Thiếu nội dung: chỉ báo khi một ý, hành động, hội thoại hoặc sự kiện trong bản gốc thực sự biến mất khỏi bản dịch; không báo lỗi khi bản dịch diễn đạt cô đọng nhưng vẫn đủ nghĩa.
+2. Dịch sai nội dung: báo khi ý nghĩa thay đổi rõ rệt, nhầm nhân vật, sự kiện hoặc quan hệ nguyên nhân-kết quả.
+3. Xưng hô: kiểm tra giới tính, vai vế, quan hệ và ngữ cảnh giao tiếp của nhân vật.
+4. Phong cách và thuật ngữ: kiểm tra độ tự nhiên của tiếng Việt và tính nhất quán với glossary tham chiếu.
+5. Ngoại ngữ: chỉ báo khi ký tự hoặc câu ngoại ngữ thực sự còn xuất hiện trong bản dịch; không dùng văn bản nguồn làm bằng chứng cho lỗi này.
+6. Chỉ nêu lỗi khi có dẫn chứng cụ thể trong cả bản gốc và bản dịch; không suy đoán hoặc bắt lỗi khác biệt diễn đạt thuần túy."""
 SETTING_DEFAULTS = {
     "link_gemini": "https://gemini.google.com/gem/fdec65ac9c69",
     "translate_model": "gemini-3.5-flash",
+    "r19_model": R19_DEFAULT_MODEL,
     "polish_model": "gemini-3-flash-preview",
     "review_bg_model": "gemini-3.1-flash-lite-preview",
+    "review_bg_criteria": DEFAULT_REVIEW_BG_CRITERIA,
     "pronoun_model": "gemini-3.1-flash-lite-preview",
     "review_model": "gemini-3.1-flash-lite-preview",
     "context_model": "gemini-3.5-flash",
@@ -138,8 +152,10 @@ SETTING_DEFAULTS = {
 SETTING_LABELS = {
     "link_gemini": "Đường dẫn Gemini Gem",
     "translate_model": "Model dịch Gemini API",
+    "r19_model": "Model Gemini API dịch từ R19",
     "polish_model": "Model hậu dịch",
     "review_bg_model": "Model review chạy nền",
+    "review_bg_criteria": "Tiêu chí review nền",
     "pronoun_model": "Model cập nhật xưng hô",
     "review_model": "Model review toàn bộ",
     "context_model": "Model tạo context",
@@ -193,8 +209,10 @@ SETTING_RANGES = {
 SETTING_META = {
     "link_gemini": {"group": "gemini-web"},
     "translate_model": {"group": "gemini-api", "description": "Model dùng cho bản dịch chính."},
+    "r19_model": {"group": "gemini-api", "description": "Model API riêng dùng để dịch từng từ/cụm R19 chưa có trong cache."},
     "polish_model": {"group": "gemini-api", "description": "Model biên tập sau khi dịch. Để trống hoặc nhập none để bỏ qua."},
     "review_bg_model": {"group": "gemini-api", "description": "Model review nhanh chạy nền. Để trống hoặc nhập none để bỏ qua."},
+    "review_bg_criteria": {"group": "general", "type": "textarea", "description": "Các tiêu chí được chèn trực tiếp vào prompt review từng chương."},
     "pronoun_model": {"group": "gemini-api", "description": "Model trích xuất và cập nhật pronouns.yaml. Để trống hoặc nhập none để bỏ qua."},
     "review_model": {"group": "gemini-api", "description": "Model dùng khi review toàn bộ truyện. Để trống hoặc nhập none để bỏ qua."},
     "context_model": {"group": "gemini-api", "description": "Model Gemini API dùng để tạo glossary trong context.yaml. Để trống hoặc nhập none để bỏ qua."},
@@ -242,11 +260,12 @@ SETTING_META = {
     },
 }
 OPTIONAL_SETTINGS = set(SETTING_DEFAULTS) - {
-    "link_gemini", "translate_model", "gemini_web_model", "gemini_thinking",
+    "link_gemini", "translate_model", "r19_model", "gemini_web_model", "gemini_thinking",
     "link_chatgpt", "chatgpt_model", "chatgpt_thinking", "fix_max_retry",
     "gpt_api_endpoint", "gpt_api_translate_model",
     "gpt_api_translate_effort", "gpt_api_polish_effort",
 }
+HIDDEN_SETTINGS = {"r19_model"}
 
 
 def saved_settings():
@@ -273,6 +292,7 @@ def settings_payload():
                 **SETTING_META.get(key, {"group": "general"}),
             }
             for key, default in SETTING_DEFAULTS.items()
+            if key not in HIDDEN_SETTINGS
         ]
     }
 
@@ -301,7 +321,8 @@ def write_settings(payload: dict):
                 )
         else:
             value = str(value).strip()
-            if (not value and key not in OPTIONAL_SETTINGS) or len(value) > 500:
+            max_length = 5000 if key == "review_bg_criteria" else 500
+            if (not value and key not in OPTIONAL_SETTINGS) or len(value) > max_length:
                 raise ValueError(f"{SETTING_LABELS[key]} không hợp lệ")
             if value and key == "gemini_api_thinking" and value not in {"auto", "off", "minimal", "low", "medium", "high"}:
                 raise ValueError("Cấp độ suy nghĩ Gemini API không hợp lệ")
@@ -667,6 +688,170 @@ def write_gemini_api_keys(payload: dict):
     return {"keys": cleaned, "count": len(cleaned)}
 
 
+def _r19_project_enabled(project_name: str) -> bool:
+    if not project_name:
+        return False
+    path = safe_project(project_name) / ".r19.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return bool(data.get("enabled", False)) if isinstance(data, dict) else False
+
+
+def r19_payload(project_name: str = ""):
+    try:
+        words = R19_WORDS_FILE.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        try:
+            words = R19_DEFAULT_WORDS_FILE.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            words = ""
+    try:
+        config = json.loads(R19_CONFIG_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        config = {}
+    terms = [source for line in words.splitlines() if line.strip() and not line.lstrip().startswith("#") for source in [line.partition("=")[0].strip()] if source]
+    defaults = {
+        "model": R19_DEFAULT_MODEL,
+        "context_chapters": R19_DEFAULT_CONTEXT_CHAPTERS,
+        "prompt_prefix": R19_DEFAULT_PROMPT_PREFIX,
+        "words": R19_DEFAULT_WORDS_FILE.read_text(encoding="utf-8")
+        if R19_DEFAULT_WORDS_FILE.exists()
+        else "",
+    }
+    return {
+        "enabled": _r19_project_enabled(project_name),
+        "words": words,
+        "count": len(dict.fromkeys(term.casefold() for term in terms if term)),
+        "model": str(config.get("model", defaults["model"])),
+        "context_chapters": int(config.get("context_chapters", defaults["context_chapters"])),
+        "prompt_prefix": str(config.get("prompt_prefix", R19_DEFAULT_PROMPT_PREFIX)),
+        "defaults": defaults,
+    }
+
+
+def write_r19(project_name: str, payload: dict):
+    words = str(payload.get("words", "")).replace("\r\n", "\n").replace("\r", "\n")
+    if len(words) > 100_000:
+        raise ValueError("Danh sách R19 vượt quá 100.000 ký tự")
+    terms = [source for line in words.splitlines() if line.strip() and not line.lstrip().startswith("#") for source in [line.partition("=")[0].strip()] if source]
+    if len(terms) > 5000 or any(len(term) > 200 for term in terms):
+        raise ValueError("Danh sách R19 chỉ hỗ trợ tối đa 5.000 dòng, mỗi dòng 200 ký tự")
+    enabled = bool(payload.get("enabled", False))
+    if enabled and not terms:
+        raise ValueError("Hãy thêm ít nhất một cụm từ trước khi bật Dịch R19")
+    model = str(payload.get("model", R19_DEFAULT_MODEL)).strip()
+    prompt_prefix = str(payload.get("prompt_prefix", R19_DEFAULT_PROMPT_PREFIX)).strip()
+    try:
+        context_chapters = int(payload.get("context_chapters", R19_DEFAULT_CONTEXT_CHAPTERS))
+    except (TypeError, ValueError):
+        raise ValueError("Số chương ngữ cảnh R19 phải là số nguyên") from None
+    if not model or len(model) > 200:
+        raise ValueError("Model dịch từ R19 không hợp lệ")
+    if not prompt_prefix or len(prompt_prefix) > 2000:
+        raise ValueError("Dòng mở đầu prompt R19 không hợp lệ")
+    if not 0 <= context_chapters <= 20:
+        raise ValueError("Số chương ngữ cảnh R19 phải từ 0 đến 20")
+    words_temporary = R19_WORDS_FILE.with_suffix(".tmp")
+    words_temporary.write_text(words.rstrip() + "\n" if words.strip() else "", encoding="utf-8")
+    os.replace(words_temporary, R19_WORDS_FILE)
+    R19_CONFIG_FILE.parent.mkdir(exist_ok=True)
+    temporary = R19_CONFIG_FILE.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(
+            {
+                "model": model,
+                "context_chapters": context_chapters,
+                "prompt_prefix": prompt_prefix,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    os.replace(temporary, R19_CONFIG_FILE)
+    project_config = safe_project(project_name) / ".r19.json"
+    project_temporary = project_config.with_suffix(".tmp")
+    project_temporary.write_text(
+        json.dumps({"enabled": enabled}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    os.replace(project_temporary, project_config)
+    return r19_payload(project_name)
+
+
+def r19_enabled(project_name: str):
+    return r19_payload(project_name)["enabled"]
+
+
+def r19_task_options(project_name: str):
+    data = r19_payload(project_name)
+    options = {
+        "r19_mode": data["enabled"],
+        "r19_model": data["model"],
+        "r19_prompt_prefix": data["prompt_prefix"],
+    }
+    if data["enabled"]:
+        options["previous_context_chapters"] = data["context_chapters"]
+    return options
+
+
+def _log_r19_page_call(project_name, source, model, prompt, response, ok):
+    log_dir = safe_project(project_name) / "logs"
+    log_dir.mkdir(exist_ok=True)
+    now = datetime.now()
+    entry = {
+        "ts": now.isoformat(timespec="seconds"),
+        "chapter_id": f"r19:{source}",
+        "step": "r19_word",
+        "model": model,
+        "ok": ok,
+        "prompt_len": len(prompt),
+        "response_len": len(response),
+        "prompt": prompt,
+        "response": response,
+    }
+    with (log_dir / f"{now:%Y-%m-%d}.jsonl").open("a", encoding="utf-8") as file:
+        file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _call_r19_gemini(prompt, model):
+    from cores.dich_utils import call_gemini
+
+    return call_gemini(prompt, model=model, temperature=0.2)
+
+
+def translate_r19_word(project_name: str, payload: dict):
+    source = str(payload.get("source", "")).strip()
+    if not source or len(source) > 200 or "\n" in source or "\r" in source:
+        raise ValueError("Từ/cụm R19 không hợp lệ")
+    safe_project(project_name)
+    from cores import r19_translation
+
+    terms, translations = r19_translation.load_word_mappings()
+    if source.casefold() not in {term.casefold() for term in terms}:
+        raise ValueError("Hãy lưu dòng R19 trước khi dịch")
+    cached = translations.get(source.casefold())
+    if cached:
+        return {**r19_payload(project_name), "source": source, "translation": cached, "cached": True}
+    model = r19_payload(project_name)["model"]
+    with translation_guard:
+        if active_translation():
+            raise ValueError("Hãy chờ tác vụ dịch hiện tại kết thúc")
+        translation = r19_translation.request_word_translation(
+            source,
+            "manager",
+            model,
+            generate=lambda request_prompt: _call_r19_gemini(request_prompt, model),
+            logger=lambda request_prompt, request_response, ok: _log_r19_page_call(
+                project_name, source, model, request_prompt, request_response, ok
+            ),
+        )
+        r19_translation.save_word_translation(source, translation)
+    return {**r19_payload(project_name), "source": source, "translation": translation, "cached": False}
+
+
 def process_is_running(pid: int) -> bool:
     if pid <= 0:
         return False
@@ -930,6 +1115,53 @@ def chapter_title(path: Path) -> str:
 def chapter_key(name: str):
     nums = re.findall(r"\d+", name)
     return tuple(map(int, nums)) if nums else (10**9, name)
+
+
+SHARE_SEGMENT_RE = re.compile(r"^v(\d+)_c(\d+)_s(\d+)\.md$", re.IGNORECASE)
+
+
+def _share_chapter_identity(name: str):
+    match = re.match(r"^v(\d+)_c(\d+)(?:_s\d+)?\.md$", name, re.IGNORECASE)
+    return (int(match.group(1)), int(match.group(2))) if match else None
+
+
+def _share_chapter_groups(paths):
+    groups = {}
+    for path in paths:
+        match = SHARE_SEGMENT_RE.match(path.name)
+        if match:
+            volume, chapter, segment = map(int, match.groups())
+            identity = (volume, chapter)
+            group = groups.setdefault(identity, {"identity": identity, "name": f"v{volume}_c{chapter}.md", "paths": []})
+            group["paths"].append((segment, path))
+        else:
+            identity = ("file", path.name.casefold())
+            group = groups.setdefault(identity, {"identity": None, "name": path.name, "paths": []})
+            group["paths"].append((0, path))
+    result = []
+    for group in groups.values():
+        group["paths"] = [path for _segment, path in sorted(group["paths"], key=lambda item: (item[0], item[1].name.casefold()))]
+        result.append(group)
+    return sorted(result, key=lambda item: chapter_key(item["name"]))
+
+
+def _share_merged_markdown(paths):
+    title = chapter_title(paths[0])
+    bodies = []
+    for path in paths:
+        lines = read_live_utf8(path).splitlines()
+        for index, line in enumerate(lines):
+            if line.strip():
+                if re.match(r"^\s*#{1,6}\s+", line):
+                    del lines[index]
+                break
+        body = "\n".join(lines).strip()
+        if body:
+            bodies.append(body)
+    content = f"# {title}"
+    if bodies:
+        content += "\n\n" + "\n\n".join(bodies)
+    return content, title
 
 
 def read_live_utf8(path: Path) -> str:
@@ -1330,7 +1562,10 @@ def _share_chapter_html(project_name: str, text: str, share_id: str):
                 item = {
                     "name": name,
                     "key": f"shares/{share_id}/images/{name}",
-                    "content_type": mimetypes.guess_type(name)[0] or "application/octet-stream",
+                    "content_type": {
+                        ".webp": "image/webp", ".avif": "image/avif", ".png": "image/png",
+                        ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+                    }.get(path.suffix.lower()) or mimetypes.guess_type(name)[0] or "application/octet-stream",
                 }
                 images.append((item, path))
                 caption = html_lib.escape(local_image.group(1).strip() or Path(name).stem)
@@ -1448,25 +1683,28 @@ def save_share(project_name: str, payload: dict) -> dict:
     share["expires_at"] = (now + timedelta(days=days)).isoformat()
     chapter_map = {str(item.get("name")): item for item in share.get("chapters", []) if isinstance(item, dict)}
     stale_keys = []
-    for path in paths:
-        content = read_live_utf8(path)
-        key = f"shares/{share_id}/chapters/{path.name}"
+    for group in _share_chapter_groups(paths):
+        content, title = _share_merged_markdown(group["paths"])
+        output_name = group["name"]
+        key = f"shares/{share_id}/chapters/{output_name}"
         chapter_html, local_images = _share_chapter_html(project_name, content, share_id)
         client.put_object(Bucket=config["bucket"], Key=key, Body=chapter_html.encode("utf-8"), ContentType="text/html; charset=utf-8", CacheControl="private, no-store")
         for image, image_path in local_images:
             client.put_object(Bucket=config["bucket"], Key=image["key"], Body=image_path.read_bytes(), ContentType=image["content_type"], CacheControl="private, no-store")
-        previous = chapter_map.get(path.name, {})
-        new_image_keys = {image["key"] for image, _path in local_images}
-        stale_keys.extend(
-            str(image.get("key")) for image in previous.get("images", [])
-            if image.get("key") and str(image.get("key")) not in new_image_keys
-        )
-        chapter_map[path.name] = {
-            "name": path.name, "title": chapter_title(path), "key": key,
+        aliases = [name for name in chapter_map if name == output_name or (group["identity"] is not None and _share_chapter_identity(name) == group["identity"])]
+        for alias in aliases:
+            previous = chapter_map.pop(alias)
+            if previous.get("key") and str(previous["key"]) != key:
+                stale_keys.append(str(previous["key"]))
+            stale_keys.extend(str(image.get("key")) for image in previous.get("images", []) if image.get("key"))
+        chapter_map[output_name] = {
+            "name": output_name, "title": title, "key": key,
             "format": "html", "images": [image for image, _path in local_images],
             "updated_at": now.isoformat(),
         }
     share["chapters"] = sorted(chapter_map.values(), key=lambda item: chapter_key(str(item["name"])))
+    active_image_keys = {str(image.get("key")) for item in share["chapters"] for image in item.get("images", []) if image.get("key")}
+    stale_keys = [key for key in stale_keys if key not in active_image_keys]
     manifest = _share_manifest(share)
     client.put_object(Bucket=config["bucket"], Key=f"shares/{share_id}/manifest.json", Body=json.dumps(manifest, ensure_ascii=False).encode("utf-8"), ContentType="application/json; charset=utf-8", CacheControl="private, no-store")
     if stale_keys:
@@ -1977,7 +2215,7 @@ def run_job(
         temporary.write_text(manual_result, encoding="utf-8")
         os.replace(temporary, result_path)
         task_config["manual_result_ready"] = True
-    effective_config = {**saved_settings(), **task_config}
+    effective_config = {**saved_settings(), **task_config, **r19_task_options(project_name)}
     stop_file = task_stop_file(kind)
     stop_file.parent.mkdir(exist_ok=True)
     stop_file.unlink(missing_ok=True)
@@ -2053,6 +2291,7 @@ def retranslate_job(
     backup = target.with_suffix(target.suffix + ".web-backup")
     effective_config = {
         **saved_settings(),
+        **r19_task_options(project_name),
         "run_until_complete": False,
         "skip_login_prompt": True,
         "target_chapter": chapter_name,
@@ -2290,6 +2529,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/gemini-api-keys":
             return self.json_response(gemini_api_keys_payload())
+        if path == "/api/r19":
+            return self.json_response(r19_payload(project))
         if path == "/api/reviews":
             try:
                 project_path = safe_project(project)
@@ -2593,6 +2834,16 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self.json_response(write_gemini_api_keys(self.body()))
             except (ValueError, OSError, json.JSONDecodeError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/r19":
+            try:
+                return self.json_response(write_r19(project, self.body()))
+            except (ValueError, OSError, json.JSONDecodeError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/r19/translate-word":
+            try:
+                return self.json_response(translate_r19_word(project, self.body()))
+            except (ValueError, OSError, json.JSONDecodeError, RuntimeError) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/manual-prompt":
             try:

@@ -2,6 +2,7 @@
 .runtime/
 truyen/
 apikeys.txt
+/r19_words.txt
 .env
 .env.*
 up/config_md.json

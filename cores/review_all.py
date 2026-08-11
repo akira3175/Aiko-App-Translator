@@ -45,6 +45,7 @@ from cores.dich_utils import (
     REVIEW_YAML,
     TRANSLATED_DIR,
     _review_lock,
+    build_translation_review_prompt,
     call_gemini,
     load_context,
     # MD helpers
@@ -128,80 +129,29 @@ def build_review_prompt(
     content,
     context_text="",
 ):
-    """Tạo prompt review chuyên sâu — ưu tiên giới tính & xưng hô."""
-    prompt = f"""Bạn là chuyên gia review dịch thuật tiểu thuyết Hàn-Việt.
-Nhiệm vụ: Đối chiếu sát bản gốc tiếng Hàn với bản dịch tiếng Việt và tìm lỗi. Không được phỏng đoán lỗi nếu bản gốc không chứng minh điều đó.
+    """Tạo cùng prompt đang dùng cho review nền."""
+    return build_translation_review_prompt(
+        chapter_id, chapter_number, raw_title, raw_content, title, content, context_text
+    )
 
-## ƯU TIÊN CAO NHẤT — Phải kiểm tra kỹ:
 
-### 1. LỖI GIỚI TÍNH (severity: "nặng")
-- Dùng sai đại từ giới tính: "anh ấy" cho nữ, "cô ấy" cho nam
-- Dùng sai đại từ ngôi thứ 3 trong dẫn thoại: "hắn" cho nữ, "nàng" cho nam
-- Nhầm lẫn "cậu" (nam) vs "cô" (nữ) trong dẫn truyện ngôi thứ ba
-- Dịch sai giới tính qua cách miêu tả (ví dụ: miêu tả nam như nữ hoặc ngược lại)
-- Nhầm vai trò giới trong hội thoại (ai nói câu gì)
-
-### 2. LỖI XƯNG HÔ (severity: "nặng")
-- Xưng hô không phù hợp mối quan hệ (ví dụ: bạn bè gọi "ngài", đồng nghiệp gọi "con")
-- Thiếu nhất quán xưng hô trong cùng 1 chương (lúc gọi "cậu" lúc gọi "anh" cho cùng 1 người mà không có lý do)
-- Xưng hô sai vai vế (em gái xưng "anh", anh trai xưng "em" khi không có lý do đặc biệt)
-- Lẫn lộn ngôi xưng hô giữa các cặp nhân vật khác nhau
-
-### 3. Lỗi khác (severity: "trung bình" hoặc "nhẹ")
-- Thiếu câu, thiếu đoạn hoặc tự thêm nội dung không có trong bản gốc
-- Dịch sai nghĩa, nhầm chủ thể, nhầm quan hệ hoặc sai sự kiện
-- Thuật ngữ dịch sai/không nhất quán
-- Phong cách dịch cứng nhắc, không tự nhiên
-- Logic truyện bị sai
-- Còn sót ký tự ngoại ngữ
-
-## Thuật ngữ tham chiếu:
-{context_text[:3000]}
-
-## Thông tin chương:
-- ID: {chapter_id}
-- Số chương: {chapter_number}
-
-## Bản gốc tiếng Hàn:
-### Tiêu đề gốc:
-{raw_title}
-
-### Nội dung gốc:
-{raw_content}
-
-## Bản dịch tiếng Việt:
-## Tiêu đề dịch:
-{title}
-
-## Nội dung dịch:
-{content}
-
-## YÊU CẦU OUTPUT:
-Trả về JSON (KHÔNG markdown, KHÔNG giải thích thêm):
-{{
-  "chapter_id": "{chapter_id}",
-  "overall_score": <1-10>,
-  "issues": [
-    {{
-      "type": "thiếu nội dung|thêm nội dung|dịch sai|giới tính|xưng hô|thuật ngữ|phong cách|logic|ngoại ngữ",
-      "severity": "nặng|trung bình|nhẹ",
-      "original_kr": "đoạn tương ứng trong bản gốc tiếng Hàn",
-      "original_vi": "đoạn lỗi trong bản dịch",
-      "suggestion": "gợi ý sửa"
-    }}
-  ],
-  "gender_ok": true/false,
-  "address_ok": true/false,
-  "summary": "nhận xét tổng quan 1-2 câu"
-}}
-
-Lưu ý:
-- Nếu KHÔNG có lỗi giới tính, đặt "gender_ok": true
-- Nếu KHÔNG có lỗi xưng hô, đặt "address_ok": true
-- Nếu CÓ lỗi giới tính hoặc xưng hô, PHẢI liệt kê chi tiết trong issues
-- Chỉ trả về JSON, không giải thích"""
-
-    return prompt
+def prepare_review_item(chapter, fallback_index=0):
+    """Giữ nguyên toàn bộ cặp raw/bản dịch để đối chiếu cùng một phạm vi."""
+    chapter_id = chapter.get("id", f"unknown_{fallback_index}")
+    match = re.search(r"_c(\d+)_", chapter_id)
+    chapter_number = int(match.group(1)) + 1 if match else fallback_index + 1
+    content = chapter.get("translation", "")
+    raw_content = chapter.get("raw_content", "")
+    if not content.strip() or not raw_content.strip():
+        return None
+    return (
+        chapter_id,
+        chapter_number,
+        chapter.get("raw_title", ""),
+        raw_content,
+        chapter.get("title_translation", ""),
+        content,
+    )
 
 
 # ============================================================
@@ -455,30 +405,12 @@ def main():
     review_items = []
     for i, chapter in enumerate(to_review):
         chapter_id = chapter.get("id", f"unknown_{i}")
-        # Chapter number: tích từ sorted index hoặc parse từ id vx_cy_sz
-        m = re.search(r"_c(\d+)_", chapter_id)
-        chapter_number = int(m.group(1)) + 1 if m else i + 1
-        title = chapter.get("title_translation", "")
-        content = chapter.get("translation", "")
-        raw_title = chapter.get("raw_title", "")
-        raw_content = chapter.get("raw_content", "")
-        if not content.strip():
+        if not chapter.get("translation", "").strip():
             continue
-        if not raw_content.strip():
+        if not chapter.get("raw_content", "").strip():
             print(f"  ⚠️ Bỏ qua {chapter_id}: không có nội dung raw để đối chiếu")
             continue
-        content_trimmed = content[:8000] if len(content) > 8000 else content
-        raw_trimmed = raw_content[:8000] if len(raw_content) > 8000 else raw_content
-        review_items.append(
-            (
-                chapter_id,
-                chapter_number,
-                raw_title,
-                raw_trimmed,
-                title,
-                content_trimmed,
-            )
-        )
+        review_items.append(prepare_review_item(chapter, i))
 
     total_items = len(review_items)
     num_batches = (total_items + batch_size - 1) // batch_size

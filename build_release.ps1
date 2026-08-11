@@ -61,7 +61,7 @@ Copy-Item -LiteralPath (Join-Path $projectRoot "README_USER.md") -Destination $s
 Copy-Item -LiteralPath (Join-Path $projectRoot "LICENSE") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "requirements-portable.txt") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "VERSION") -Destination $stageRoot
-foreach ($folder in @("cloudflare", "cores", "split", "web", "up")) {
+foreach ($folder in @("cloudflare", "cores", "defaults", "split", "web", "up")) {
     Copy-Item -LiteralPath (Join-Path $projectRoot $folder) -Destination $stageRoot -Recurse
 }
 "{}" | Set-Content -LiteralPath (Join-Path $stageRoot "up\image_cache.json") -Encoding UTF8

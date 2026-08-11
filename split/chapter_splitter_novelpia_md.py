@@ -146,6 +146,24 @@ def get_epub_toc(z):
     return toc
 
 
+def get_epub_section_titles(z):
+    """Return NCX fragment ids mapped to titles for single-file EPUBs."""
+    titles = {}
+    ncx_files = [n for n in z.namelist() if n.endswith('.ncx')]
+    if not ncx_files:
+        return titles
+    root = ET.fromstring(z.read(ncx_files[0]).decode('utf-8'))
+    ns = {'ncx': 'http://www.daisy.org/z3986/2005/ncx/'}
+    for np in root.findall('.//ncx:navPoint', ns):
+        label = np.find('ncx:navLabel/ncx:text', ns)
+        content_elem = np.find('ncx:content', ns)
+        src = content_elem.get('src', '') if content_elem is not None else ''
+        if '#' not in src or label is None or not label.text:
+            continue
+        titles[src.rsplit('#', 1)[1]] = label.text.strip()
+    return titles
+
+
 def get_epub_spine(z):
     """
     Trả về (opf_base, spine_hrefs, id_to_href_all).
@@ -248,6 +266,81 @@ def parse_epub_chapter(z, opf_base, html_href):
             resolved_elements.append(elem)
 
     return parser.title, resolved_elements
+
+
+def parse_epub_sections(z, opf_base, html_href, section_titles):
+    """Parse EPUBs that store several anchored chapters in one XHTML file."""
+    full_path = opf_base + html_href
+    if full_path not in z.namelist():
+        full_path = html_href
+    if full_path not in z.namelist():
+        return []
+
+    content = z.read(full_path)
+    try:
+        root = ET.fromstring(content.decode('utf-8'))
+    except (UnicodeDecodeError, ET.ParseError):
+        return []
+
+    def local_name(tag):
+        return tag.rsplit('}', 1)[-1].lower()
+
+    sections = [
+        node for node in root.iter()
+        if local_name(node.tag) == 'section' and node.get('id') in section_titles
+    ]
+    if len(sections) < 2:
+        return []
+
+    block_tags = {
+        'address', 'article', 'aside', 'blockquote', 'div', 'figcaption',
+        'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'li',
+        'p', 'pre', 'section', 'td', 'th',
+    }
+    documents = []
+    for section in sections:
+        elements, text_buffer = [], []
+
+        def flush_text():
+            text = ''.join(text_buffer).strip()
+            if text:
+                elements.append({'type': 'text', 'content': text})
+            text_buffer.clear()
+
+        def walk(node):
+            tag = local_name(node.tag)
+            if tag == 'img':
+                flush_text()
+                src = node.get('src', '')
+                if src:
+                    zip_path = resolve_img_path(z, opf_base, html_href, src)
+                    elements.append({'type': 'image', 'zip_path': zip_path, 'src': src})
+                return
+            if tag == 'br':
+                flush_text()
+                return
+            if node.text:
+                text_buffer.append(node.text)
+            for child in node:
+                walk(child)
+                if child.tail:
+                    text_buffer.append(child.tail)
+            if tag in block_tags:
+                flush_text()
+
+        walk(section)
+        flush_text()
+        title = section_titles.get(section.get('id'))
+        header = next(
+            (node for node in section.iter() if local_name(node.tag) in {'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}),
+            None,
+        )
+        if header is not None:
+            header_text = ''.join(header.itertext()).strip()
+            if header_text:
+                title = header_text
+        documents.append((title, elements))
+    return documents
 
 
 # ============================================================
@@ -457,6 +550,7 @@ def split_epub_to_md(epub_path, vol_num, base_dir, project_dir=None, segment_lim
         return 0
 
     toc = get_epub_toc(z)
+    section_titles = get_epub_section_titles(z)
     print(f"[TOC] Tìm thấy {len(toc)} mục lục trong TOC")
 
     opf_base, spine_hrefs, _ = get_epub_spine(z)
@@ -481,29 +575,32 @@ def split_epub_to_md(epub_path, vol_num, base_dir, project_dir=None, segment_lim
     documents = []
     leading_images = []
     for href in html_hrefs:
-        title, elements = parse_epub_chapter(z, opf_base, href)
-        for elem in elements:
-            if elem['type'] == 'text':
-                elem['content'] = re.sub(
-                    r'[\u200B\u200C\u200D\u2060\uFEFF]', '', elem['content']
-                ).strip()
-        elements = [
-            elem for elem in elements
-            if elem['type'] != 'text' or elem['content']
-        ]
+        parsed_documents = parse_epub_sections(
+            z, opf_base, href, section_titles
+        ) or [parse_epub_chapter(z, opf_base, href)]
+        for title, elements in parsed_documents:
+            for elem in elements:
+                if elem['type'] == 'text':
+                    elem['content'] = re.sub(
+                        r'[\u200B\u200C\u200D\u2060\uFEFF]', '', elem['content']
+                    ).strip()
+            elements = [
+                elem for elem in elements
+                if elem['type'] != 'text' or elem['content']
+            ]
 
-        # Bỏ qua nếu không có nội dung
-        text_elements = [e for e in elements if e['type'] == 'text']
-        if not text_elements:
-            if documents:
-                documents[-1][2].extend(elements)
-            else:
-                leading_images.extend(elements)
-            continue
-        if leading_images:
-            elements = leading_images + elements
-            leading_images = []
-        documents.append([href, title, elements])
+            # Bỏ qua nếu không có nội dung
+            text_elements = [e for e in elements if e['type'] == 'text']
+            if not text_elements:
+                if documents:
+                    documents[-1][2].extend(elements)
+                else:
+                    leading_images.extend(elements)
+                continue
+            if leading_images:
+                elements = leading_images + elements
+                leading_images = []
+            documents.append([href, title, elements])
 
     chapter_count = 0
     segment_count = 0

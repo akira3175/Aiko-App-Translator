@@ -1,6 +1,23 @@
 {
   "versions": [
     {
+      "version": "0.11.0",
+      "date": "2026-08-12",
+      "title": "Review chính xác hơn, chia sẻ và nhập truyện linh hoạt hơn",
+      "summary": "Bản cập nhật bổ sung trang quản lý Dịch R19, đồng bộ hệ thống review đa ngôn ngữ và cải thiện quy trình tạo glossary, chia sẻ chương cùng khả năng nhập EPUB.",
+      "highlights": [
+        "Thêm trang quản lý Dịch R19 với danh sách từ dùng chung và số chương ngữ cảnh riêng.",
+        "Review nền chạy bằng worker riêng song song với quá trình dịch, tự đổi API key khi gặp lỗi 4xx và thử lại cùng key khi gặp 408/5xx.",
+        "Đồng bộ Review nền và Review toàn bộ về cùng một prompt, cùng tiêu chí tùy chỉnh và hỗ trợ mọi ngôn ngữ nguồn sang tiếng Việt.",
+        "Review nhận đầy đủ raw và bản dịch cuối cùng sau hiệu đính; sửa lỗi cắt độc lập tự gây báo thiếu nội dung hoặc còn ngoại ngữ sai.",
+        "Cải thiện prompt tạo glossary cho tiếng Hàn, Trung, Nhật, Anh và các ngôn ngữ khác; nhận diện tên riêng và cách chuyển tự phù hợp với từng nguồn.",
+        "Tự gộp các segment s1, s2… thành một chương khi Share, giữ một tiêu đề và dọn dữ liệu segment cũ trên R2.",
+        "Cải thiện giao diện đọc Share với cột nội dung cân đối, điều hướng chương thuận tiện hơn trên desktop và thiết bị di động.",
+        "Hỗ trợ EPUB chứa nhiều chương dạng <section> trong cùng một file XHTML, kết hợp tiêu đề từ NCX mà vẫn giữ cơ chế nhập EPUB cũ làm dự phòng.",
+        "Sửa một số lỗi bố cục biểu mẫu và cải thiện hiển thị các thiết lập dài."
+      ]
+    },
+    {
       "version": "0.10.0",
       "date": "2026-08-06",
       "title": "Chia sẻ truyện riêng tư qua R2, quản lý chương thuận tiện hơn",

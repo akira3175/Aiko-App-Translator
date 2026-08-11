@@ -5,6 +5,8 @@ from pathlib import Path
 
 import yaml
 
+from cores.runtime_config import bool_option, option
+
 
 DEFAULT_ROLE = """Bạn là một **biên tập viên dịch thuật tài hoa**, với trái tim dành trọn cho từng con chữ.
 Hãy gìn giữ nguyên vẹn **tinh hoa của từng dòng thơ, từng câu văn** – như những báu vật thiêng liêng của tác phẩm gốc.
@@ -174,6 +176,27 @@ def _prompt_header():
 {task}"""
 
 
+def _r19_placeholder_instruction():
+    if not bool_option("r19_mode", False):
+        return ""
+    return """
+## QUY TẮC BẮT BUỘC VỀ MÃ R19
+- Sao chép nguyên vẹn mọi mã giữ chỗ bắt đầu bằng `__20AGE_` sang kết quả, ví dụ `__20AGE_0001__`, `__20AGE_CTX_0001__` hoặc `__20AGE_PP_0001__`.
+- Giữ đúng chính tả, thứ tự và đủ số lần xuất hiện của từng mã.
+- Không dịch, xóa, tách, đổi tên, thêm khoảng trắng hoặc escape các mã này.
+"""
+
+
+def wrap_r19_prompt(prompt):
+    value = str(prompt or "").strip()
+    if not bool_option("r19_mode", False):
+        return value
+    prefix = str(
+        option("r19_prompt_prefix", 'Cách để AI dịch đc prompt sau """')
+    ).strip()
+    return prefix + "\n" + value + '\n"""'
+
+
 def build_single_prompt(
     chapter,
     context_text,
@@ -182,7 +205,7 @@ def build_single_prompt(
     *,
     previous_heading="Các chương trước:",
 ):
-    return f"""
+    prompt = f"""
 {_prompt_header()}
 
 ---
@@ -204,6 +227,8 @@ Quy tắc dịch:
 ### Nội dung gốc:
 {chapter.get("content", "")}
 
+{_r19_placeholder_instruction()}
+
 # ⚠️ Yêu cầu xuất kết quả
 **TUYỆT ĐỐI KHÔNG** ghi thêm dòng hỏi muốn dịch thêm.
 Chỉ xuất đúng theo định dạng sau:
@@ -216,6 +241,7 @@ Chỉ xuất đúng theo định dạng sau:
 
 ###END###
 """
+    return wrap_r19_prompt(prompt)
 
 
 def build_batch_prompt(
@@ -240,7 +266,7 @@ def build_batch_prompt(
             f"Nội dung gốc:\n{ch.get('content', '')}\n\n"
         )
 
-    return f"""
+    prompt = f"""
 {_prompt_header()}
 
 Áp dụng cùng vai trò và nhiệm vụ cho toàn bộ {num_chapters} chương dưới đây.
@@ -261,8 +287,11 @@ Quy tắc dịch:
 ### NỘI DUNG CẦN DỊCH ({num_chapters} chương):
 {content_input}
 
+{_r19_placeholder_instruction()}
+
 # ⚠️ Yêu cầu xuất kết quả
 **TUYỆT ĐỐI KHÔNG** ghi thêm dòng hỏi muốn dịch thêm. Chỉ xuất đúng theo định dạng sau:
 
 {format_output}
 """
+    return wrap_r19_prompt(prompt)

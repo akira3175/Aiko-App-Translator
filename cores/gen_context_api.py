@@ -16,6 +16,8 @@ from cores.dich_utils import (
     switch_api_key,
 )
 from cores.runtime_config import int_option, option
+from cores.r19_translation import strip_r19_terms
+from cores.translation_prompts import wrap_r19_prompt
 
 CONTEXT_FILE = CONTEXT_YAML
 BATCH_SIZE = int_option("batch_size", 30, minimum=1)
@@ -24,20 +26,25 @@ MAX_RETRIES = int_option("context_retries", 3, minimum=1)
 
 
 def generate_glossary(chapters, old_glossary):
-    content = "\n\n".join(
+    content = strip_r19_terms("\n\n".join(
         f"{chapter.get('title', '')}\n{chapter.get('content', '')}"
         for chapter in chapters
         if chapter.get("content")
-    )
+    ))
+    old_glossary = strip_r19_terms(old_glossary)
     if not content.strip():
         print("⚠️ Batch này không có nội dung, bỏ qua.")
         return ""
 
-    prompt = f"""Bạn là công cụ xây dựng glossary cho bản dịch tiểu thuyết.
+    prompt = wrap_r19_prompt(f"""Bạn là chuyên gia xây dựng glossary cho bản dịch tiểu thuyết từ mọi ngôn ngữ nguồn sang tiếng Việt.
+Văn bản có thể là tiếng Hàn, Trung, Nhật, Anh hoặc ngôn ngữ khác. Hãy tự nhận diện ngôn ngữ và thể loại từ nội dung, không mặc định đó là truyện fantasy.
 
 Từ nội dung raw dưới đây, trích xuất thuật ngữ, danh hiệu, xưng hô, tên riêng
 và địa danh cần giữ nhất quán. Bỏ qua từ phổ thông và vật dụng đời thường.
-Tên riêng ngoại lai phải chuyển về dạng La-tinh gốc nếu nhận diện được.
+Giữ nguyên chính xác từ/cụm từ nguồn ở vế trái. Với tên ngoại lai được phiên âm
+qua ngôn ngữ nguồn, chỉ khôi phục dạng La-tinh gốc khi có căn cứ chắc chắn.
+Với tên bản địa, dùng cách đọc hoặc chuyển tự phù hợp với ngôn ngữ nguồn,
+ưu tiên thống nhất với glossary cũ và không phỏng đoán khi không chắc chắn.
 Thuật ngữ và danh hiệu dịch sang tiếng Việt hiện đại, đúng ngữ cảnh.
 
 Glossary hiện có:
@@ -50,7 +57,7 @@ Chỉ xuất mỗi dòng theo dạng:
 Nguyên văn = Bản dịch
 
 Bắt đầu bằng ###START### và kết thúc bằng ###END###.
-Không thêm Markdown hoặc lời giải thích."""
+Không thêm Markdown hoặc lời giải thích.""")
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:

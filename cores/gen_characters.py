@@ -37,6 +37,8 @@ from cores.dich_utils import (
     switch_api_key,
 )
 from cores.runtime_config import int_option, option, stop_requested
+from cores.r19_translation import strip_r19_terms
+from cores.translation_prompts import wrap_r19_prompt
 
 # ============================================================
 # CHUONG DAN
@@ -116,7 +118,9 @@ def build_character_prompt(chapters: list, existing_md: str, glossary: str = "")
         if text:
             content_blocks.append(f"### {title}\n{text}")
 
-    full_text = "\n\n".join(content_blocks)
+    full_text = strip_r19_terms("\n\n".join(content_blocks))
+    glossary = strip_r19_terms(glossary)
+    existing_md = strip_r19_terms(existing_md)
 
     prompt = f"""
 # Vai tro
@@ -186,7 +190,7 @@ Doc doan van ban goc ben duoi, sau do **trich xuat / cap nhat** thong tin nhan v
 > O giua: **toan bo** noi dung Markdown theo template tren cho tung nhan vat.
 > KHONG them bat ky giai thich hay text nao ngoai phan giua hai marker.
 """
-    return prompt.strip()
+    return wrap_r19_prompt(prompt)
 
 
 # ============================================================
