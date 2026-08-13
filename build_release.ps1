@@ -65,8 +65,9 @@ foreach ($folder in @("cloudflare", "cores", "defaults", "split", "web", "up")) 
     Copy-Item -LiteralPath (Join-Path $projectRoot $folder) -Destination $stageRoot -Recurse
 }
 "{}" | Set-Content -LiteralPath (Join-Path $stageRoot "up\image_cache.json") -Encoding UTF8
-New-Item -ItemType Directory -Force -Path (Join-Path $stageRoot "truyen"), (Join-Path $stageRoot ".runtime") | Out-Null
-New-Item -ItemType File -Force -Path (Join-Path $stageRoot "apikeys.txt") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $stageRoot "truyen"), (Join-Path $stageRoot ".runtime"), (Join-Path $stageRoot "data") | Out-Null
+New-Item -ItemType File -Force -Path (Join-Path $stageRoot "data\apikeys.txt") | Out-Null
+Copy-Item -LiteralPath (Join-Path $projectRoot "defaults\r19_words.txt") -Destination (Join-Path $stageRoot "data\r19_words.txt")
 
 $stageResolved = (Resolve-Path $stageRoot).Path
 Get-ChildItem -LiteralPath $stageResolved -Directory -Recurse -Filter "__pycache__" | ForEach-Object {
@@ -148,7 +149,7 @@ $manifest = @{
 } | ConvertTo-Json
 $manifest | Set-Content -LiteralPath (Join-Path $stageRoot "release-manifest.json") -Encoding UTF8
 
-& (Join-Path $runtimeRoot "python.exe") -c "import yaml, selenium, pyperclip, playwright, boto3; from google import genai; print('Portable runtime OK')"
+& (Join-Path $runtimeRoot "python.exe") -c "import yaml, selenium, pyperclip, playwright, boto3; from PIL import Image; from google import genai; print('Portable runtime OK')"
 if ($LASTEXITCODE -ne 0) {
     throw "Portable runtime khong import duoc dependency"
 }
@@ -158,8 +159,8 @@ if (-not (Test-Path (Join-Path $chromiumRoot "chrome-win64\chrome.exe"))) {
 if (-not (Test-Path (Join-Path $chromiumRoot "chromedriver-win64\chromedriver.exe"))) {
     throw "Thieu chromedriver.exe"
 }
-if ((Get-Item (Join-Path $stageRoot "apikeys.txt")).Length -ne 0) {
-    throw "apikeys.txt trong goi phai rong"
+if ((Get-Item (Join-Path $stageRoot "data\apikeys.txt")).Length -ne 0) {
+    throw "data\apikeys.txt trong goi phai rong"
 }
 if ((Get-ChildItem -LiteralPath (Join-Path $stageRoot "truyen") -Force | Measure-Object).Count -ne 0) {
     throw "Thu muc truyen trong goi phai rong"
@@ -171,7 +172,15 @@ if ($privateHits) {
     throw "Goi phat hanh con duong dan rieng cua may build"
 }
 
-Compress-Archive -LiteralPath $stageRoot -DestinationPath $zipPath -CompressionLevel Optimal
+Push-Location $releaseRoot
+try {
+    & tar.exe -a -c -f $zipPath ([IO.Path]::GetFileName($stageRoot))
+    if ($LASTEXITCODE -ne 0) {
+        throw "Nen goi phat hanh that bai"
+    }
+} finally {
+    Pop-Location
+}
 $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $hashPath = "$zipPath.sha256"
 "$zipHash  $([IO.Path]::GetFileName($zipPath))" | Set-Content -LiteralPath $hashPath -Encoding ASCII

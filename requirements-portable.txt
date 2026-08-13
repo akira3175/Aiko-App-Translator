@@ -6,3 +6,4 @@ pyperclip==1.11.0
 playwright==1.44.0
 boto3==1.43.29
 playwright-stealth==2.0.2
+Pillow==11.0.0

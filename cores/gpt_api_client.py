@@ -1,5 +1,6 @@
 """Minimal OpenAI Responses API client used by the GPT API translation engine."""
 
+import base64
 import json
 import time
 from urllib.error import HTTPError, URLError
@@ -26,7 +27,7 @@ def _response_text(data):
     return "\n".join(chunks).strip()
 
 
-def call_gpt_api(prompt, *, model, reasoning_effort, stage):
+def call_gpt_api(prompt, *, model, reasoning_effort, stage, document=None, documents=None):
     api_key = str(option("gpt_api_key", "")).strip()
     endpoint = str(
         option("gpt_api_endpoint", "https://api.openai.com/v1/responses")
@@ -43,6 +44,27 @@ def call_gpt_api(prompt, *, model, reasoning_effort, stage):
             "gpt_api_max_output_tokens", 30000, minimum=1000
         ),
     }
+    attached_documents = list(documents or ([] if document is None else [document]))
+    attached_documents = [item for item in attached_documents if str(item.get("content", "")).strip()]
+    if attached_documents:
+        file_parts = []
+        for item in attached_documents:
+            mime_type = str(item.get("mime_type", "text/plain")).strip()
+            encoded = base64.b64encode(str(item["content"]).encode("utf-8")).decode("ascii")
+            file_parts.append({
+                "type": "input_file",
+                "filename": str(item.get("name", "attachment.txt")),
+                "file_data": f"data:{mime_type};base64,{encoded}",
+            })
+        payload["input"] = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": prompt},
+                    *file_parts,
+                ],
+            }
+        ]
     effort = str(reasoning_effort or "").strip().lower()
     if effort:
         payload["reasoning"] = {"effort": effort}

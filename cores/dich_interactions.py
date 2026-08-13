@@ -113,7 +113,8 @@ def _configured_generation(temperature):
 
 
 def call_interactions(
-    prompt, model, temperature=0.5, system_instruction=None, **_kwargs
+    prompt, model, temperature=0.5, system_instruction=None,
+    character_document=None, pronoun_document=None, **_kwargs
 ):
     global _stream_text
     if _stage in {"translation", "polish"}:
@@ -126,6 +127,10 @@ def call_interactions(
         prompt=prompt,
         generation_config=_configured_generation(temperature),
         system_instruction=system_instruction,
+        documents=[item for item in (
+            {"name": "characters.md", "mime_type": "text/markdown", "content": character_document} if character_document else None,
+            {"name": "pronouns_snapshot.yaml", "mime_type": "text/yaml", "content": pronoun_document} if pronoun_document else None,
+        ) if item],
         on_text=_stream_to_workspace,
         stop_requested=stop_requested,
     )

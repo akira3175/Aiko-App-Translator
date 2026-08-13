@@ -14,8 +14,10 @@ import threading
 import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import yaml
+from cores.data_paths import GEMINI_API_KEYS_FILE, ensure_user_data_migrated
 from google import genai
 from google.genai import types
 from selenium import webdriver
@@ -35,7 +37,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
 from cores.runtime_config import bool_option, int_option, option, web_mode
-from cores.translation_prompts import _r19_placeholder_instruction, project_polish_prompt, wrap_r19_prompt
+from cores.translation_prompts import CHARACTER_DOCUMENT_INSTRUCTION, _r19_placeholder_instruction, project_polish_prompt, with_character_document_instruction, wrap_r19_prompt
 
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORTABLE_CHROME = os.path.join(
@@ -140,7 +142,13 @@ _log_lock = threading.Lock()
 
 
 def log_api_call(
-    chapter_id: str, step: str, model: str, prompt: str, response: str, ok: bool = True
+    chapter_id: str,
+    step: str,
+    model: str,
+    prompt: str,
+    response: str,
+    ok: bool = True,
+    attachments=None,
 ):
     """
     Lưu log một lần gọi API vào truyen/logs/YYYY-MM-DD.jsonl.
@@ -161,6 +169,7 @@ def log_api_call(
         "response_len": len(response),
         "prompt": prompt,
         "response": response,
+        "attachments": attachments or [],
     }
     with _log_lock:
         with open(log_path, "a", encoding="utf-8") as f:
@@ -170,20 +179,21 @@ def log_api_call(
 # ==== QUẢN LÝ API KEY ====
 
 
-def load_api_keys(file_path="apikeys.txt"):
+def load_api_keys(file_path=GEMINI_API_KEYS_FILE):
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             keys = [line.strip() for line in f if line.strip()]
         if not keys:
-            print("⚠️ Không có API key nào trong apikeys.txt! Chỉ dùng Gemini Web.")
+            print("⚠️ Không có API key nào trong data/apikeys.txt! Chỉ dùng Gemini Web.")
             return ["dummy_key"]
         return keys
     except FileNotFoundError:
-        print("⚠️ Không tìm thấy apikeys.txt! Chỉ dùng Gemini Web.")
+        print("⚠️ Không tìm thấy data/apikeys.txt! Chỉ dùng Gemini Web.")
         return ["dummy_key"]
 
 
-API_KEYS = load_api_keys("apikeys.txt")
+ensure_user_data_migrated()
+API_KEYS = load_api_keys()
 current_key_index = 0
 last_switch_time = time.time()
 
@@ -216,6 +226,8 @@ def call_gemini(
     system_instruction=None,
     as_chat_parts=False,
     extra_parts=None,
+    character_document=None,
+    pronoun_document=None,
 ):
     """
     Wrapper goi Gemini API.
@@ -229,6 +241,8 @@ def call_gemini(
         as_chat_parts    : Neu True, gui prompt duoi dang role/parts
         extra_parts      : Danh sach types.Part bo sung (file upload,...)
                            -- chi dung khi as_chat_parts=True
+        character_document: Noi dung snapshot nhan vat cho client Interactions.
+        pronoun_document: Noi dung snapshot xung ho cho client Interactions.
 
     Returns:
         str: response.text
@@ -2293,7 +2307,7 @@ def _build_characters_snapshot(characters_file, relevant_text, max_characters=20
         return None
 
     blocks = _character_blocks(markdown)
-    if not blocks or len(blocks) <= max_characters:
+    if not blocks:
         return None
 
     searchable = unicodedata.normalize("NFKC", relevant_text or "").casefold()
@@ -2424,8 +2438,23 @@ def polish_translation(
                 int_option("character_snapshot_limit", 20, minimum=1), 50
             ),
         )
-        if not pronoun_context.strip():
-            tmp_pronouns = _build_pronouns_snapshot(pronouns_file, n_chapters=50)
+        tmp_pronouns = _build_pronouns_snapshot(pronouns_file, n_chapters=50)
+
+        log_attachments = []
+        if tmp_characters:
+            log_attachments.append(
+                {
+                    "name": "characters.md",
+                    "content": Path(tmp_characters).read_text(encoding="utf-8"),
+                }
+            )
+        if tmp_pronouns:
+            log_attachments.append(
+                {
+                    "name": "pronouns_snapshot.yaml",
+                    "content": Path(tmp_pronouns).read_text(encoding="utf-8"),
+                }
+            )
 
         extra_parts = []
         current_upload_key_index = -1
@@ -2454,6 +2483,8 @@ Tiêu đề dịch: {title_cur}
 Nội dung dịch:
 {content_cur}
 """)
+        if tmp_characters:
+            prompt = with_character_document_instruction(prompt)
 
         while True:
             try:
@@ -2484,7 +2515,7 @@ Nội dung dịch:
                     attach_lines = []
                     if chars_part:
                         attach_lines.append(
-                            f"- {characters_display_name} (file đính kèm): Hồ sơ nhân vật liên quan — dùng để tra giới tính, tuổi tác, vai trò và biệt danh."
+                            f"- {characters_display_name} (file đính kèm): Hồ sơ nhân vật liên quan."
                         )
                     if (
                         tmp_pronouns
@@ -2512,7 +2543,7 @@ Nội dung dịch:
 Các quy tắc kỹ thuật bắt buộc dưới đây luôn được ưu tiên:
 {attach_block}
 1. XƯNG HÔ:
-   - Tra file hồ sơ nhân vật đính kèm để biết giới tính, tuổi tác, vai trò và biệt danh.
+   - Đọc và tuân thủ hồ sơ nhân vật được nêu trước phần văn bản gốc trong prompt.
    {pronoun_reference}
    - Mục có locked: true là quy tắc người dùng đã xác nhận, không được tự ý thay đổi.
 
@@ -2537,6 +2568,14 @@ Chỉ xuất đúng định dạng sau:
                     system_instruction=system_instruction,
                     as_chat_parts=True,
                     extra_parts=extra_parts if extra_parts else None,
+                    character_document=next(
+                        (item["content"] for item in log_attachments if item["name"] == "characters.md"),
+                        None,
+                    ),
+                    pronoun_document=next(
+                        (item["content"] for item in log_attachments if item["name"] == "pronouns_snapshot.yaml"),
+                        None,
+                    ),
                 ).strip()
 
                 if "###TITLE###" in text and "###CONTENT###" in text:
@@ -2548,13 +2587,15 @@ Chỉ xuất đúng định dạng sau:
                         f"[POLISH] Da bien tap chuong {chapter_number} ({len(content_out)} ky tu)"
                     )
                     log_api_call(
-                        chapter_id, "polish", POLISH_MODEL, prompt, text, ok=True
+                        chapter_id, "polish", POLISH_MODEL, prompt, text, ok=True,
+                        attachments=log_attachments,
                     )
                     return title_out, content_out
                 else:
                     print("[POLISH] Output sai format -- giu nguyen ban dich cu.")
                     log_api_call(
-                        chapter_id, "polish", POLISH_MODEL, prompt, text, ok=False
+                        chapter_id, "polish", POLISH_MODEL, prompt, text, ok=False,
+                        attachments=log_attachments,
                     )
                     return title_cur, content_cur
 

@@ -5,10 +5,12 @@ import re
 from copy import deepcopy
 from pathlib import Path
 
+from cores.data_paths import R19_WORDS_FILE, ensure_user_data_migrated
+
 from cores.runtime_config import bool_option, option
 
 
-R19_WORDS_FILE = Path(__file__).resolve().parents[1] / "r19_words.txt"
+ensure_user_data_migrated()
 TOKEN_PATTERN = re.compile(r"__20AGE_\d{4}__")
 
 

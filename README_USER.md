@@ -38,7 +38,7 @@ Không chia sẻ thư mục profile này cho người khác.
 
 ## Gemini API
 
-Nếu dùng engine V1, mở `apikeys.txt` và nhập mỗi API key trên một dòng. Không gửi file này cho người khác.
+Nếu dùng engine V1, mở `data/apikeys.txt` và nhập mỗi API key trên một dòng. Không gửi file này cho người khác. Khi cập nhật từ bản cũ, ứng dụng tự chuyển `apikeys.txt` và `r19_words.txt` ở thư mục gốc vào `data/`.
 
 ## Dữ liệu truyện
 

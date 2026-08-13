@@ -1,6 +1,7 @@
 """Minimal Gemini Interactions SSE client used by the Beta translation engine."""
 
 import json
+import base64
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -16,13 +17,28 @@ def stream_interaction(
     prompt,
     generation_config=None,
     system_instruction=None,
+    document=None,
+    documents=None,
     on_text=None,
     stop_requested=lambda: False,
     opener=urlopen,
 ):
+    attached_documents = list(documents or ([] if document is None else [document]))
+    document_parts = [
+        {
+            "type": "document",
+            "data": base64.b64encode(item["content"].encode("utf-8")).decode("ascii"),
+            "mime_type": item["mime_type"],
+        }
+        for item in attached_documents
+        if item and item.get("content", "").strip()
+    ]
     payload = {
         "model": model,
-        "input": prompt,
+        "input": [
+            {"type": "text", "text": prompt},
+            *document_parts,
+        ] if document_parts else prompt,
         "stream": True,
         "store": False,
     }

@@ -1,6 +1,20 @@
 {
   "versions": [
     {
+      "version": "0.12.0",
+      "date": "2026-08-13",
+      "title": "Sidebar tùy biến, nhật ký AI và xuất truyện hoàn chỉnh",
+      "summary": "Bản cập nhật bổ sung khả năng tùy biến giao diện, kiểm tra dữ liệu gửi AI, đối chiếu chương Hako và xuất truyện sang các định dạng phổ biến.",
+      "highlights": [
+        "Thêm menu quản lý sidebar: tìm kiếm, ghim, bỏ ghim và kéo thả sắp xếp.",
+        "Thêm Nhật ký AI để xem prompt, phản hồi, model và tệp đính kèm.",
+        "Gửi snapshot nhân vật và xưng hô vào Gemini/GPT khi dịch và hiệu đính.",
+        "Thêm công cụ đối chiếu, cập nhật chương Hako theo phạm vi.",
+        "Thêm xuất truyện EPUB, DOCX và Markdown từ Kho chương.",
+        "Chuyển API key, từ R19 và tùy chỉnh sidebar vào thư mục data."
+      ]
+    },
+    {
       "version": "0.11.0",
       "date": "2026-08-12",
       "title": "Review chính xác hơn, chia sẻ và nhập truyện linh hoạt hơn",

@@ -28,13 +28,19 @@ if sys.stdout.encoding != "utf-8":
 
 from cores.dich_utils import (
     # Constants
+    CHARACTERS_MD,
     CONTEXT_YAML,
     NOVEL_TXT,
     POLISH_MODEL,
+    PRONOUNS_YAML,
     RAW_DIR,
     TRANSLATED_DIR,
     # API
+    _build_characters_snapshot,
+    _build_pronouns_snapshot,
+    _upload_file_part,
     call_gemini,
+    get_client,
     is_translated,
     # Context
     log_api_call,
@@ -44,7 +50,7 @@ from cores.dich_utils import (
 )
 from cores.runtime_config import chapter_limit, option, stop_requested, web_mode
 from cores.r19_translation import mask_contexts, prepare_chapters, restore_results, strip_previous_context, translate_fragments
-from cores.translation_prompts import build_single_prompt
+from cores.translation_prompts import build_single_prompt, with_character_document_instruction
 from cores.translation_workflows import run_single_translation
 
 # Model dùng cho dịch chính — có thể chỉnh tại đây
@@ -80,6 +86,62 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
         prompt = _build_prompt(
             prompt_chapter, masked_context, masked_pronouns, masked_previous
         )
+        character_parts = []
+        character_document = ""
+        pronoun_document = ""
+        pronoun_parts = []
+        characters_snapshot = _build_characters_snapshot(
+            CHARACTERS_MD,
+            "\n".join(
+                [
+                    str(chapter.get("title", "")),
+                    str(chapter.get("content", "")),
+                    str(pronoun_context or ""),
+                ]
+            ),
+            max_characters=20,
+        )
+        if characters_snapshot:
+            try:
+                with open(characters_snapshot, "r", encoding="utf-8") as file:
+                    character_document = file.read()
+                if not call_gemini.__module__.endswith("dich_interactions"):
+                    character_part = _upload_file_part(
+                        get_client(), characters_snapshot, "characters.md", "text/markdown"
+                    )
+                    if character_part:
+                        character_parts.append(character_part)
+                if character_parts or character_document:
+                    prompt = with_character_document_instruction(prompt)
+            finally:
+                try:
+                    os.unlink(characters_snapshot)
+                except OSError:
+                    pass
+        pronouns_snapshot = _build_pronouns_snapshot(PRONOUNS_YAML, n_chapters=50)
+        if pronouns_snapshot:
+            try:
+                with open(pronouns_snapshot, "r", encoding="utf-8") as file:
+                    pronoun_document = file.read()
+                if not call_gemini.__module__.endswith("dich_interactions"):
+                    pronoun_part = _upload_file_part(
+                        get_client(), pronouns_snapshot, "pronouns_snapshot.yaml", "text/yaml"
+                    )
+                    if pronoun_part:
+                        pronoun_parts.append(pronoun_part)
+            finally:
+                try:
+                    os.unlink(pronouns_snapshot)
+                except OSError:
+                    pass
+        request_attachments = [
+            {"name": name, "content": content}
+            for name, content in (
+                ("characters.md", character_document),
+                ("pronouns_snapshot.yaml", pronoun_document),
+            )
+            if content
+        ]
 
         if attempt > 0:
             print(f"🔄 Thử lại lần {attempt + 1}/{max_retries}...")
@@ -89,7 +151,15 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
         )
 
         try:
-            text = call_gemini(prompt, model=TRANSLATE_MODEL, temperature=0.5)
+            text = call_gemini(
+                prompt,
+                model=TRANSLATE_MODEL,
+                temperature=0.5,
+                as_chat_parts=bool(character_parts or pronoun_parts),
+                extra_parts=(character_parts + pronoun_parts) or None,
+                character_document=character_document or None,
+                pronoun_document=pronoun_document or None,
+            )
         except Exception as e:
             err = str(e)
             if "429" in err or "RESOURCE_EXHAUSTED" in err:
@@ -149,6 +219,7 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
                         prompt,
                         text,
                         ok=False,
+                        attachments=request_attachments,
                     )
                     raise ValueError(
                         f"AI trả về placeholder cho chương {chapter_number} sau {max_retries} lần thử"
@@ -161,6 +232,7 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
                 prompt,
                 text,
                 ok=True,
+                attachments=request_attachments,
             )
             if r19_entries:
                 translations = translate_fragments(r19_entries)
@@ -184,6 +256,7 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
                     prompt,
                     text,
                     ok=False,
+                    attachments=request_attachments,
                 )
                 raise ValueError(
                     f"Không thể dịch chương {chapter_number} sau {max_retries} lần thử"

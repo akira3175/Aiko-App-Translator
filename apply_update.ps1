@@ -13,7 +13,7 @@ $updatesRoot = Join-Path $runtimeRoot "updates"
 $stagingRoot = Join-Path $runtimeRoot "update-staging"
 $backupRoot = Join-Path $runtimeRoot "update-backup"
 $logPath = Join-Path $runtimeRoot "update.log"
-$protected = @(".runtime", "truyen", "apikeys.txt")
+$protected = @(".runtime", "truyen", "data", "apikeys.txt", "r19_words.txt", "r19_word.txt")
 $installedNames = @()
 
 function Assert-ChildPath {

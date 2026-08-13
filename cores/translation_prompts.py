@@ -8,6 +8,18 @@ import yaml
 from cores.runtime_config import bool_option, option
 
 
+CHARACTER_DOCUMENT_INSTRUCTION = """Đọc kỹ file `characters.md` đính kèm trước khi xử lý văn bản. Dùng toàn bộ thông tin trong hồ sơ về giới tính, thân phận, vai trò, tên, bí danh, quan hệ và cách xưng hô. Với nhân vật chuyển sinh, TS hoặc biến đổi giới tính/cơ thể, phải phân biệt trạng thái trước và sau biến đổi, cơ thể hiện tại, nhận thức bản thân, góc nhìn của người khác và thời điểm của cảnh; không giản lược thành một giới tính cố định. Không tự suy đoán khi hồ sơ và nguyên tác chưa đủ căn cứ."""
+
+
+def with_character_document_instruction(prompt):
+    """Place the attachment instruction immediately before chapter source data."""
+    block = f"## Hồ sơ nhân vật đính kèm\n{CHARACTER_DOCUMENT_INSTRUCTION}\n\n"
+    for marker in ("## 📜 Dữ liệu đầu vào", "### Tiêu đề gốc:", "## Văn bản gốc"):
+        if marker in prompt:
+            return prompt.replace(marker, block + marker, 1)
+    return block + prompt
+
+
 DEFAULT_ROLE = """Bạn là một **biên tập viên dịch thuật tài hoa**, với trái tim dành trọn cho từng con chữ.
 Hãy gìn giữ nguyên vẹn **tinh hoa của từng dòng thơ, từng câu văn** – như những báu vật thiêng liêng của tác phẩm gốc.
 Sau đó, bằng bàn tay khéo léo và hơi thở của nghệ sĩ, **hãy mài giũa ngôn từ cho long lanh hơn**, khơi dậy linh hồn sâu lắng,

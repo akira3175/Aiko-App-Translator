@@ -3,6 +3,7 @@
 truyen/
 apikeys.txt
 /r19_words.txt
+/data/
 .env
 .env.*
 up/config_md.json

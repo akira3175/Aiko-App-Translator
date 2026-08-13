@@ -13,24 +13,44 @@ if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from cores.dich_utils import (
+    CHARACTERS_MD,
     CONTEXT_YAML,
     NOVEL_TXT,
     PRONOUNS_YAML,
     RAW_DIR,
     TRANSLATED_DIR,
+    _build_characters_snapshot,
+    _build_pronouns_snapshot,
     is_translated,
     scan_md_dir,
+    log_api_call,
     update_pronoun_memory,
 )
 from cores.gpt_api_client import call_gpt_api
 from cores.runtime_config import chapter_limit, option, stop_requested, web_mode
 from cores.r19_translation import mask_contexts, prepare_chapters, restore_results, strip_previous_context, translate_fragments
-from cores.translation_prompts import _r19_placeholder_instruction, build_single_prompt, project_polish_prompt, wrap_r19_prompt
+from cores.translation_prompts import CHARACTER_DOCUMENT_INSTRUCTION, _r19_placeholder_instruction, build_single_prompt, project_polish_prompt, with_character_document_instruction, wrap_r19_prompt
 from cores.translation_workflows import run_single_translation
 
 TRANSLATE_MODEL = str(option("gpt_api_translate_model", "gpt-5.6-luna"))
 POLISH_MODEL = str(option("gpt_api_polish_model", "gpt-5.6-terra"))
 PRONOUN_MODEL = str(option("gpt_api_pronoun_model", "gpt-5.6-terra"))
+
+
+def _pronoun_snapshot_document():
+    snapshot_path = _build_pronouns_snapshot(PRONOUNS_YAML, n_chapters=50)
+    if not snapshot_path:
+        return None
+    try:
+        with open(snapshot_path, "r", encoding="utf-8") as file:
+            content = file.read().strip()
+        return {
+            "name": "pronouns_snapshot.yaml",
+            "mime_type": "text/yaml",
+            "content": content,
+        } if content else None
+    finally:
+        os.unlink(snapshot_path)
 
 
 def _parse_result(text, stage):
@@ -60,12 +80,47 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
     )
     previous = strip_previous_context(previous)
     prompt = build_single_prompt(masked_chapters[0], context_text, pronoun_context, previous)
+    character_document = None
+    pronoun_document = _pronoun_snapshot_document()
+    snapshot_path = _build_characters_snapshot(
+        CHARACTERS_MD,
+        "\n".join(
+            [
+                str(chapter.get("title", "")),
+                str(chapter.get("content", "")),
+                str(pronoun_context or ""),
+            ]
+        ),
+        max_characters=20,
+    )
+    if snapshot_path:
+        try:
+            with open(snapshot_path, "r", encoding="utf-8") as file:
+                snapshot_content = file.read().strip()
+            if snapshot_content:
+                character_document = {
+                    "name": "characters.md",
+                    "mime_type": "text/markdown",
+                    "content": snapshot_content,
+                }
+                prompt = with_character_document_instruction(prompt)
+        finally:
+            os.unlink(snapshot_path)
     print(f"[GPT API] Dịch chương {chapter_number} bằng {TRANSLATE_MODEL}...")
     text = call_gpt_api(
         prompt,
         model=TRANSLATE_MODEL,
         reasoning_effort=option("gpt_api_translate_effort", "medium"),
         stage="dịch",
+        documents=[item for item in (character_document, pronoun_document) if item],
+    )
+    log_api_call(
+        chapter.get("id", f"chapter_{chapter_number}"),
+        "translate",
+        TRANSLATE_MODEL,
+        prompt,
+        text,
+        attachments=[item for item in (character_document, pronoun_document) if item],
     )
     result = _parse_result(text, "dịch")
     if r19_entries:
@@ -79,6 +134,33 @@ def polish_chapter(chapter, chapter_number, context_text="", pronoun_context="")
         print("[GPT API] Bỏ qua hiệu đính vì chưa cấu hình model.")
         return chapter.get("title_translation", ""), chapter.get("translation", "")
     polish_role, polish_task = project_polish_prompt()
+    character_document = None
+    pronoun_document = _pronoun_snapshot_document()
+    snapshot_path = _build_characters_snapshot(
+        CHARACTERS_MD,
+        "\n".join(
+            [
+                str(chapter.get("title", "")),
+                str(chapter.get("content", "")),
+                str(chapter.get("title_translation", "")),
+                str(chapter.get("translation", "")),
+                str(pronoun_context or ""),
+            ]
+        ),
+        max_characters=20,
+    )
+    if snapshot_path:
+        try:
+            with open(snapshot_path, "r", encoding="utf-8") as file:
+                snapshot_content = file.read().strip()
+            if snapshot_content:
+                character_document = {
+                    "name": "characters.md",
+                    "mime_type": "text/markdown",
+                    "content": snapshot_content,
+                }
+        finally:
+            os.unlink(snapshot_path)
     prompt = wrap_r19_prompt(f"""# Vai trò hiệu đính
 {polish_role}
 
@@ -109,12 +191,23 @@ Chỉ trả về:
 ###CONTENT###
 <nội dung hoàn chỉnh>
 ###END###""")
+    if character_document:
+        prompt = with_character_document_instruction(prompt)
     print(f"[GPT API] Hiệu đính chương {chapter_number} bằng {POLISH_MODEL}...")
     text = call_gpt_api(
         prompt,
         model=POLISH_MODEL,
         reasoning_effort=option("gpt_api_polish_effort", "high"),
         stage="hiệu đính",
+        documents=[item for item in (character_document, pronoun_document) if item],
+    )
+    log_api_call(
+        chapter.get("id", f"chapter_{chapter_number}"),
+        "polish",
+        POLISH_MODEL,
+        prompt,
+        text,
+        attachments=[item for item in (character_document, pronoun_document) if item],
     )
     return _parse_result(text, "hiệu đính")
 

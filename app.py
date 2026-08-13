@@ -4,6 +4,7 @@ import json
 import hashlib
 import html as html_lib
 import difflib
+import io
 import mimetypes
 import os
 import ipaddress
@@ -17,6 +18,7 @@ import threading
 import time
 import traceback
 import unicodedata
+import uuid
 import webbrowser
 import zipfile
 from datetime import datetime, timedelta, timezone
@@ -29,6 +31,14 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 import yaml
+from PIL import Image, ImageOps
+
+from cores.data_paths import (
+    DATA_DIR,
+    GEMINI_API_KEYS_FILE,
+    R19_WORDS_FILE,
+    ensure_user_data_migrated,
+)
 
 try:
     import boto3
@@ -75,6 +85,7 @@ PIPELINES = {
     "glossary": ROOT / "cores" / "insert_glossary.py",
     "split-review": ROOT / "cores" / "split_review.py",
     "hako": ROOT / "up" / "up_md.py",
+    "hako-edit": ROOT / "up" / "edit_hako.py",
 }
 jobs: dict[str, dict] = {}
 job_processes: dict[str, subprocess.Popen] = {}
@@ -87,8 +98,54 @@ lan_sessions: set[str] = set()
 lan_login_attempts: dict[str, list[float]] = {}
 
 SETTINGS_FILE = ROOT / ".runtime" / "settings.json"
-GEMINI_API_KEYS_FILE = ROOT / "apikeys.txt"
-R19_WORDS_FILE = ROOT / "r19_words.txt"
+ensure_user_data_migrated()
+UI_PREFERENCES_FILE = DATA_DIR / "ui_preferences.json"
+DEFAULT_PINNED_SIDEBAR = [
+    "workspace", "chapters", "pipeline", "terminology", "characters", "help",
+]
+SIDEBAR_FEATURES = set(DEFAULT_PINNED_SIDEBAR) | {
+    "sharing", "hakoEdit", "pronouns", "r19", "ai-log", "settings",
+}
+FIXED_SIDEBAR_FEATURES = {"settings"}
+
+
+def ui_preferences_data():
+    try:
+        data = json.loads(UI_PREFERENCES_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    sidebar = data.get("sidebar", {}) if isinstance(data, dict) else {}
+    pinned = sidebar.get("pinned") if isinstance(sidebar, dict) else None
+    if not isinstance(pinned, list):
+        return {"sidebar": {"pinned": list(DEFAULT_PINNED_SIDEBAR)}}
+    cleaned = []
+    for item in pinned:
+        item = str(item)
+        if item in SIDEBAR_FEATURES and item not in FIXED_SIDEBAR_FEATURES and item not in cleaned:
+            cleaned.append(item)
+    return {"sidebar": {"pinned": cleaned}}
+
+
+def write_ui_preferences(payload):
+    sidebar = payload.get("sidebar", {}) if isinstance(payload, dict) else {}
+    pinned = sidebar.get("pinned") if isinstance(sidebar, dict) else None
+    if not isinstance(pinned, list):
+        raise ValueError("Danh sách chức năng đã ghim không hợp lệ")
+    cleaned = []
+    for item in pinned:
+        item = str(item)
+        if item not in SIDEBAR_FEATURES:
+            raise ValueError(f"Chức năng không hợp lệ: {item}")
+        if item not in FIXED_SIDEBAR_FEATURES and item not in cleaned:
+            cleaned.append(item)
+    UI_PREFERENCES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temporary = UI_PREFERENCES_FILE.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps({"sidebar": {"pinned": cleaned}}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    os.replace(temporary, UI_PREFERENCES_FILE)
+    return {"sidebar": {"pinned": cleaned}}
 R19_DEFAULT_WORDS_FILE = ROOT / "defaults" / "r19_words.txt"
 R19_CONFIG_FILE = ROOT / ".runtime" / "r19.json"
 R19_DEFAULT_MODEL = "gemini-3.5-flash-lite"
@@ -816,6 +873,71 @@ def _log_r19_page_call(project_name, source, model, prompt, response, ok):
         file.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
+_LOG_SECRET_PATTERNS = (
+    re.compile(r"(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,\"']+"),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{12,}\b"),
+    re.compile(r"\bAIza[A-Za-z0-9_-]{20,}\b"),
+)
+
+
+def _redact_log_text(value):
+    text = str(value or "")
+    text = _LOG_SECRET_PATTERNS[0].sub(r"\1[REDACTED]", text)
+    for pattern in _LOG_SECRET_PATTERNS[1:]:
+        text = pattern.sub("[REDACTED]", text)
+    return text
+
+
+def ai_logs_data(project_name: str, limit=200):
+    log_dir = safe_project(project_name) / "logs"
+    try:
+        limit = max(1, min(int(limit), 200))
+    except (TypeError, ValueError):
+        limit = 200
+    entries = []
+    if log_dir.is_dir():
+        for path in sorted(log_dir.glob("*.jsonl"), reverse=True):
+            try:
+                lines = path.read_text(encoding="utf-8").splitlines()
+            except OSError:
+                continue
+            for line in reversed(lines):
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(entry, dict):
+                    continue
+                entry["prompt"] = _redact_log_text(entry.get("prompt"))
+                entry["response"] = _redact_log_text(entry.get("response"))
+                attachments = []
+                for attachment in entry.get("attachments", []):
+                    if not isinstance(attachment, dict):
+                        continue
+                    attachments.append(
+                        {
+                            "name": str(attachment.get("name", "Tệp đính kèm")),
+                            "content": _redact_log_text(attachment.get("content")),
+                        }
+                    )
+                entry["attachments"] = attachments
+                entries.append(entry)
+                if len(entries) >= limit:
+                    return {"items": entries, "count": len(entries), "limit": limit}
+    return {"items": entries, "count": len(entries), "limit": limit}
+
+
+def clear_ai_logs(project_name: str):
+    log_dir = safe_project(project_name) / "logs"
+    removed = 0
+    if log_dir.is_dir():
+        for path in log_dir.glob("*.jsonl"):
+            if path.is_file():
+                path.unlink()
+                removed += 1
+    return {"ok": True, "removed": removed}
+
+
 def _call_r19_gemini(prompt, model):
     from cores.dich_utils import call_gemini
 
@@ -953,14 +1075,32 @@ def isolated_process_kwargs():
     return {"start_new_session": True}
 
 
-def google_translate(text: str):
+def lookup_source_language(text: str):
+    if re.search(r"[\uac00-\ud7a3]", text):
+        return "ko"
+    if re.search(r"[\u3040-\u30ff]", text):
+        return "ja"
+    if re.search(r"[\u3400-\u9fff]", text):
+        return "zh-CN"
+    if re.search(r"[A-Za-z]", text):
+        return "en"
+    return "auto"
+
+
+def google_translate_details(text: str):
     text = text.strip()
     if not text:
         raise ValueError("Chưa chọn nội dung cần dịch")
     if len(text) > 5000:
         raise ValueError("Đoạn được chọn quá dài; tối đa 5.000 ký tự")
     body = urlencode(
-        {"client": "gtx", "sl": "auto", "tl": "vi", "dt": "t", "q": text}
+        [
+            ("client", "gtx"),
+            ("sl", lookup_source_language(text)),
+            ("tl", "vi"),
+            ("dt", "t"),
+            ("q", text),
+        ]
     ).encode("utf-8")
     request = Request(
         "https://translate.googleapis.com/translate_a/single",
@@ -977,7 +1117,15 @@ def google_translate(text: str):
     ).strip()
     if not translated:
         raise ValueError("Google Translate không trả về bản dịch")
-    return translated
+    detected = str(data[2] or "") if len(data) > 2 else ""
+    return {
+        "translated": translated,
+        "detected_language": detected,
+    }
+
+
+def google_translate(text: str):
+    return google_translate_details(text)["translated"]
 
 
 def safe_project(name: str) -> Path:
@@ -1115,6 +1263,232 @@ def chapter_title(path: Path) -> str:
 def chapter_key(name: str):
     nums = re.findall(r"\d+", name)
     return tuple(map(int, nums)) if nums else (10**9, name)
+
+
+def _export_body(text: str) -> str:
+    lines = text.replace("\r\n", "\n").split("\n")
+    for index, line in enumerate(lines):
+        if line.strip():
+            if re.match(r"^\s*#{1,6}\s+", line):
+                lines.pop(index)
+            break
+    return "\n".join(lines).strip()
+
+
+def _plain_markdown(text: str) -> str:
+    text = re.sub(r"!\[([^\]]*)\]\([^)]*\)", lambda m: f"[Hình ảnh: {m.group(1) or 'minh họa'}]", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"^\s*#{1,6}\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*>\s?", "", text, flags=re.MULTILINE)
+    return re.sub(r"(?<!\\)[*_~`]", "", text)
+
+
+def _selected_export_chapters(project_name: str, options: dict):
+    items = chapters(project_name)
+    scope = str(options.get("scope", "all"))
+    if scope == "volume":
+        volume = int(options.get("volume", 0))
+        items = [item for item in items if re.match(rf"^v{volume}_", item["name"], re.I)]
+    elif scope == "range":
+        names = [item["name"] for item in items]
+        start, end = str(options.get("from", "")), str(options.get("to", ""))
+        if start not in names or end not in names:
+            raise ValueError("Phạm vi chương không hợp lệ")
+        first, last = names.index(start), names.index(end)
+        if first > last:
+            first, last = last, first
+        items = items[first:last + 1]
+    elif scope != "all":
+        raise ValueError("Phạm vi xuất không hợp lệ")
+    if not items:
+        raise ValueError("Không có chương nào trong phạm vi đã chọn")
+
+    raw_dir, translated_dir = project_folders(project_name)
+    source = str(options.get("source", "translated"))
+    if source not in {"translated", "raw", "bilingual"}:
+        raise ValueError("Nguồn nội dung không hợp lệ")
+    selected = []
+    for item in items:
+        raw_path = safe_file(raw_dir, item["name"])
+        translated_path = safe_file(translated_dir, item["name"])
+        raw_text = read_live_utf8(raw_path) if raw_path.exists() else ""
+        translated_text = read_live_utf8(translated_path) if translated_path.exists() else ""
+        if source == "translated" and not translated_text:
+            continue
+        if source == "raw" and not raw_text:
+            continue
+        selected.append({**item, "raw_text": raw_text, "translated_text": translated_text})
+    if not selected:
+        label = "bản dịch" if source == "translated" else "bản gốc"
+        raise ValueError(f"Không tìm thấy {label} trong phạm vi đã chọn")
+    return selected, source
+
+
+def _export_sections(project_name: str, options: dict):
+    items, source = _selected_export_chapters(project_name, options)
+    sections = []
+    for item in items:
+        title = item["title"] or item["id"]
+        if source == "bilingual":
+            body = "### Bản gốc\n\n" + _export_body(item["raw_text"])
+            body += "\n\n### Bản dịch\n\n" + _export_body(item["translated_text"])
+        else:
+            body = _export_body(item[f"{source}_text"])
+        sections.append({"title": title, "body": body, "name": item["name"], "project": project_name})
+    return sections
+
+
+def _export_blocks(section: dict):
+    project = safe_project(section["project"])
+    image_re = re.compile(r"!\[([^\]]*)\]\((?:\.\./)?image/([\w.-]+)\)")
+    blocks = []
+    cursor = 0
+    for match in image_re.finditer(section["body"]):
+        text = section["body"][cursor:match.start()]
+        for paragraph in re.split(r"\n\s*\n", _plain_markdown(text)):
+            value = " ".join(line.strip() for line in paragraph.splitlines() if line.strip())
+            if value:
+                blocks.append(("text", value))
+        image_path = (project / "image" / match.group(2)).resolve()
+        if image_path.parent == (project / "image").resolve() and image_path.exists():
+            blocks.append(("image", image_path, match.group(1)))
+        cursor = match.end()
+    for paragraph in re.split(r"\n\s*\n", _plain_markdown(section["body"][cursor:])):
+        value = " ".join(line.strip() for line in paragraph.splitlines() if line.strip())
+        if value:
+            blocks.append(("text", value))
+    return blocks
+
+
+def _export_image_asset(path: Path):
+    with Image.open(path) as source:
+        image = ImageOps.exif_transpose(source)
+        width, height = image.size
+        extension = path.suffix.lower()
+        if extension in {".jpg", ".jpeg", ".png"}:
+            return path.read_bytes(), extension, mimetypes.guess_type(path.name)[0], width, height
+        output = io.BytesIO()
+        if "A" in image.getbands():
+            image.save(output, format="PNG")
+            return output.getvalue(), ".png", "image/png", width, height
+        image.convert("RGB").save(output, format="JPEG", quality=92, optimize=True)
+        return output.getvalue(), ".jpg", "image/jpeg", width, height
+
+
+def _docx_paragraph(text: str, style: str | None = None, page_break=False):
+    properties = []
+    if style:
+        properties.append(f'<w:pStyle w:val="{style}"/>')
+    if page_break:
+        properties.append('<w:pageBreakBefore/>')
+    ppr = f"<w:pPr>{''.join(properties)}</w:pPr>" if properties else ""
+    value = html_lib.escape(text)
+    return f'<w:p>{ppr}<w:r><w:t xml:space="preserve">{value}</w:t></w:r></w:p>'
+
+
+def _docx_image_paragraph(relationship_id: str, image_name: str, width: int, height: int, drawing_id: int):
+    name = html_lib.escape(image_name)
+    max_width, max_height = 5257800, 6858000
+    scale = min(max_width / max(width, 1), max_height / max(height, 1))
+    cx, cy = max(1, round(width * scale)), max(1, round(height * scale))
+    return f'''<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="120" w:after="160"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{cx}" cy="{cy}"/><wp:docPr id="{drawing_id}" name="{name}"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="{drawing_id}" name="{name}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="{relationship_id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>'''
+
+
+def _build_docx(project_name: str, sections: list[dict]) -> bytes:
+    paragraphs = [_docx_paragraph(project_name, "Title")]
+    images = []
+    for section in sections:
+        paragraphs.append(_docx_paragraph(section["title"], "Heading1", page_break=True))
+        for block in _export_blocks(section):
+            if block[0] == "text":
+                paragraphs.append(_docx_paragraph(block[1]))
+            else:
+                relationship_id = f"rId{len(images) + 2}"
+                data, extension, mime_type, width, height = _export_image_asset(block[1])
+                target = f"media/image{len(images) + 1}{extension}"
+                images.append((relationship_id, target, data, mime_type))
+                paragraphs.append(_docx_image_paragraph(relationship_id, block[1].name, width, height, len(images)))
+    document = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>' \
+        + "".join(paragraphs) + \
+        '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1134" w:right="1276" w:bottom="1134" w:left="1276"/></w:sectPr></w:body></w:document>'
+    styles = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:eastAsia="Yu Mincho"/><w:sz w:val="22"/><w:lang w:val="vi-VN"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="330" w:lineRule="auto"/><w:jc w:val="both"/></w:pPr></w:pPrDefault></w:docDefaults>
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
+<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="0" w:after="360"/><w:jc w:val="center"/></w:pPr><w:rPr><w:b/><w:sz w:val="44"/><w:szCs w:val="44"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="0" w:after="300"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:color w:val="177E68"/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr></w:style>
+</w:styles>'''
+    image_types = {Path(target).suffix.lower().lstrip(".") for _, target, _, _ in images}
+    mime_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "gif": "image/gif", "webp": "image/webp"}
+    type_defaults = "".join(f'<Default Extension="{ext}" ContentType="{mime_map.get(ext, f"image/{ext}")}"/>' for ext in sorted(image_types))
+    content_types = f'''<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>{type_defaults}<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>'''
+    rels = '''<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'''
+    image_rels = "".join(f'<Relationship Id="{rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="{target}"/>' for rid, target, _data, _mime in images)
+    doc_rels = f'''<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>{image_rels}</Relationships>'''
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", content_types)
+        archive.writestr("_rels/.rels", rels)
+        archive.writestr("word/document.xml", document)
+        archive.writestr("word/styles.xml", styles)
+        archive.writestr("word/_rels/document.xml.rels", doc_rels)
+        for _rid, target, data, _mime in images:
+            archive.writestr(f"word/{target}", data)
+    return output.getvalue()
+
+
+def _build_epub(project_name: str, sections: list[dict]) -> bytes:
+    book_id = str(uuid.uuid4())
+    chapter_files, nav_items, manifest, spine, images = [], [], [], [], {}
+    css = "body{font-family:serif;line-height:1.65;margin:5%;}h1{font-size:1.45em;}h2{font-size:1.1em;}p{text-align:justify;margin:.65em 0;}figure{margin:1em 0;text-align:center;}img{max-width:100%;height:auto;}"
+    for index, section in enumerate(sections, 1):
+        filename = f"chapter-{index}.xhtml"
+        blocks = []
+        for block in _export_blocks(section):
+            if block[0] == "text":
+                blocks.append(f"<p>{html_lib.escape(block[1])}</p>")
+            else:
+                key = str(block[1])
+                if key not in images:
+                    data, extension, mime_type, _width, _height = _export_image_asset(block[1])
+                    images[key] = (f"images/image-{len(images)+1}{extension}", data, mime_type)
+                image_href, _data, _mime = images[key]
+                blocks.append(f'<figure><img src="{html_lib.escape(image_href)}" alt="{html_lib.escape(block[2])}"/></figure>')
+        page = f'''<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" xml:lang="vi"><head><title>{html_lib.escape(section['title'])}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body><h1>{html_lib.escape(section['title'])}</h1>{''.join(blocks)}</body></html>'''
+        chapter_files.append((filename, page))
+        nav_items.append(f'<li><a href="{filename}">{html_lib.escape(section["title"])}</a></li>')
+        manifest.append(f'<item id="c{index}" href="{filename}" media-type="application/xhtml+xml"/>')
+        spine.append(f'<itemref idref="c{index}"/>')
+    nav = f'''<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>Mục lục</title></head><body><nav epub:type="toc"><h1>Mục lục</h1><ol>{''.join(nav_items)}</ol></nav></body></html>'''
+    image_manifest = "".join(f'<item id="img{i}" href="{href}" media-type="{mime_type}"/>' for i, (href, _data, mime_type) in enumerate(images.values(), 1))
+    opf = f'''<?xml version="1.0" encoding="utf-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">urn:uuid:{book_id}</dc:identifier><dc:title>{html_lib.escape(project_name)}</dc:title><dc:language>vi</dc:language><meta property="dcterms:modified">{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="css" href="style.css" media-type="text/css"/>{''.join(manifest)}{image_manifest}</manifest><spine>{''.join(spine)}</spine></package>'''
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr("mimetype", "application/epub+zip", compress_type=zipfile.ZIP_STORED)
+        archive.writestr("META-INF/container.xml", '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>', compress_type=zipfile.ZIP_DEFLATED)
+        archive.writestr("OEBPS/content.opf", opf, compress_type=zipfile.ZIP_DEFLATED)
+        archive.writestr("OEBPS/nav.xhtml", nav, compress_type=zipfile.ZIP_DEFLATED)
+        archive.writestr("OEBPS/style.css", css, compress_type=zipfile.ZIP_DEFLATED)
+        for filename, page in chapter_files:
+            archive.writestr(f"OEBPS/{filename}", page, compress_type=zipfile.ZIP_DEFLATED)
+        for href, data, _mime in images.values():
+            archive.writestr(f"OEBPS/{href}", data, compress_type=zipfile.ZIP_DEFLATED)
+    return output.getvalue()
+
+
+def export_book(project_name: str, options: dict):
+    export_format = str(options.get("format", "epub")).lower()
+    if export_format not in {"epub", "docx", "markdown"}:
+        raise ValueError("Định dạng xuất không được hỗ trợ")
+    sections = _export_sections(project_name, options)
+    safe_name = re.sub(r"[^\w.-]+", "-", project_name, flags=re.UNICODE).strip("-.") or "truyen"
+    if export_format == "markdown":
+        content = f"# {project_name}\n\n" + "\n\n".join(f"## {item['title']}\n\n{item['body']}" for item in sections)
+        return content.encode("utf-8"), "text/markdown; charset=utf-8", f"{safe_name}.md"
+    if export_format == "docx":
+        return _build_docx(project_name, sections), "application/vnd.openxmlformats-officedocument.wordprocessingml.document", f"{safe_name}.docx"
+    return _build_epub(project_name, sections), "application/epub+zip", f"{safe_name}.epub"
 
 
 SHARE_SEGMENT_RE = re.compile(r"^v(\d+)_c(\d+)_s(\d+)\.md$", re.IGNORECASE)
@@ -1470,6 +1844,71 @@ def save_publishing(project_name: str, payload: dict):
         shutil.copy2(path, path.with_name(path.name + ".bak"))
     os.replace(temporary, path)
     return publishing_data(project_name)
+
+
+def hako_public_chapters(public_url: str):
+    public_url = str(public_url or "").strip()
+    parsed = urlparse(public_url)
+    if parsed.scheme != "https" or parsed.hostname not in {"docln.sbs", "ln.hako.vn"}:
+        raise ValueError("Hãy nhập URL trang truyện Hako hợp lệ")
+    if not re.fullmatch(r"/truyen/\d+(?:-[^/?#]+)?/?", parsed.path):
+        raise ValueError("URL phải là trang truyện Hako, không phải URL một chương")
+    canonical_url = f"https://docln.sbs{parsed.path.rstrip('/')}"
+    request = Request(canonical_url, headers={"User-Agent": "Mozilla/5.0 Aiko-App-Translator"})
+    try:
+        source = urlopen(request, timeout=20).read().decode("utf-8", "replace")
+    except (HTTPError, URLError, TimeoutError) as exc:
+        raise ValueError(f"Không tải được danh sách chương Hako: {exc}") from None
+    pattern = re.compile(
+        r'<a\b[^>]*href=["\'](?P<href>[^"\']*/c(?P<id>\d+)-[^"\']*)["\'][^>]*>(?P<title>[\s\S]*?)</a>',
+        re.IGNORECASE,
+    )
+    items, seen = [], set()
+    for match in pattern.finditer(source):
+        chapter_id = match.group("id")
+        if chapter_id in seen:
+            continue
+        title = html_lib.unescape(re.sub(r"<[^>]+>", "", match.group("title")))
+        title = re.sub(r"\s+", " ", title).strip()
+        if not title:
+            continue
+        href = match.group("href")
+        if href.startswith("/"):
+            href = "https://docln.sbs" + href
+        items.append({"chapter_id": chapter_id, "title": title, "url": href})
+        seen.add(chapter_id)
+    if not items:
+        raise ValueError("Không tìm thấy chương nào trên trang Hako này")
+    return {"url": canonical_url, "items": items, "total": len(items)}
+
+
+def validate_hako_edit_targets(value):
+    if not isinstance(value, list) or not value or len(value) > 50:
+        raise ValueError("Danh sách chương Hako cần cập nhật không hợp lệ")
+    normalized, seen = [], set()
+    for index, item in enumerate(value, 1):
+        if not isinstance(item, dict):
+            raise ValueError(f"Mapping Hako dòng {index} không hợp lệ")
+        local_name = str(item.get("local_name", "")).strip()
+        chapter_id = str(item.get("chapter_id", "")).strip()
+        remote_title = str(item.get("remote_title", "")).strip()
+        if not re.fullmatch(r"v\d+_c\d+_s\d+\.md", local_name):
+            raise ValueError(f"Tên chương local dòng {index} không hợp lệ")
+        if not chapter_id.isdigit() or len(chapter_id) > 20:
+            raise ValueError(f"Chapter ID Hako dòng {index} không hợp lệ")
+        if not remote_title or len(remote_title) > 500:
+            raise ValueError(f"Tiêu đề Hako dòng {index} không hợp lệ")
+        if chapter_id in seen:
+            raise ValueError(f"Chapter ID {chapter_id} bị chọn trùng")
+        seen.add(chapter_id)
+        normalized.append(
+            {
+                "local_name": local_name,
+                "chapter_id": chapter_id,
+                "remote_title": remote_title,
+            }
+        )
+    return normalized
 
 
 def _share_store_path(project_name: str) -> Path:
@@ -2412,6 +2851,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def download_response(self, body: bytes, content_type: str, filename: str):
+        encoded_name = quote(filename)
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Disposition", f"attachment; filename*=UTF-8''{encoded_name}")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def body(self):
         length = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(length) or b"{}")
@@ -2500,6 +2949,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.json_response({"items": projects()})
         if path == "/api/settings":
             return self.json_response(settings_payload())
+        if path == "/api/ui-preferences":
+            return self.json_response(ui_preferences_data())
         if path == "/api/update":
             try:
                 return self.json_response(update_payload(query.get("check", ["0"])[0] == "1"))
@@ -2522,6 +2973,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json_response(publishing_data(project))
             except (ValueError, OSError, yaml.YAMLError) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/hako/chapters":
+            try:
+                return self.json_response(
+                    hako_public_chapters(query.get("url", [""])[0])
+                )
+            except ValueError as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/shares":
             try:
                 return self.json_response(shares_data(project))
@@ -2531,6 +2989,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.json_response(gemini_api_keys_payload())
         if path == "/api/r19":
             return self.json_response(r19_payload(project))
+        if path == "/api/ai-logs":
+            try:
+                return self.json_response(
+                    ai_logs_data(project, query.get("limit", ["200"])[0])
+                )
+            except (ValueError, OSError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/reviews":
             try:
                 project_path = safe_project(project)
@@ -2692,6 +3157,22 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path, query = parsed.path, parse_qs(parsed.query)
         project = query.get("project", [""])[0]
+        if path == "/api/ui-preferences":
+            try:
+                return self.json_response(write_ui_preferences(self.body()))
+            except (ValueError, OSError, json.JSONDecodeError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/export-book":
+            try:
+                body, content_type, filename = export_book(project, self.body())
+                return self.download_response(body, content_type, filename)
+            except (ValueError, OSError, json.JSONDecodeError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/ai-logs/clear":
+            try:
+                return self.json_response(clear_ai_logs(project))
+            except (ValueError, OSError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/chapters/import-preview":
             try:
                 source_format = query.get("format", ["epub"])[0].lower()
@@ -2863,7 +3344,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/translate-selection":
             try:
                 text = str(self.body().get("text", ""))
-                return self.json_response({"translated": google_translate(text)})
+                return self.json_response(google_translate_details(text))
             except (ValueError, OSError, json.JSONDecodeError) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path.startswith("/api/run/"):
@@ -2896,10 +3377,18 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self.body()
                 config = payload.get("config", {})
                 if not isinstance(config, dict) or any(
-                    not isinstance(key, str) or isinstance(value, (dict, list))
+                    not isinstance(key, str)
+                    or (
+                        isinstance(value, (dict, list))
+                        and not (kind == "hako-edit" and key == "hako_edit_targets")
+                    )
                     for key, value in config.items()
                 ):
                     raise ValueError("Cấu hình tác vụ không hợp lệ")
+                if kind == "hako-edit":
+                    config["hako_edit_targets"] = validate_hako_edit_targets(
+                        config.get("hako_edit_targets")
+                    )
                 max_chapters = config.get("max_chapters", "")
                 if max_chapters not in (None, ""):
                     max_chapters_text = str(max_chapters).strip()
