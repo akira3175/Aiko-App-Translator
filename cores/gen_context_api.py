@@ -68,7 +68,6 @@ Không thêm Markdown hoặc lời giải thích.""")
             response = call_gemini(
                 prompt,
                 model=CONTEXT_MODEL,
-                temperature=0.2,
                 max_output_tokens=16000,
             ).strip()
             if "###START###" in response and "###END###" in response:

@@ -57,9 +57,6 @@ export interface ProjectAsset {
 export interface AppSettings {
   id: "app";
   model: string;
-  temperature: number;
-  topP: number;
-  topK: number;
   maxOutputTokens: number;
   tasks?: Record<AiTaskKind, AiTaskSettings>;
   rememberApiKey: boolean;

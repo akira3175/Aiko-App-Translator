@@ -66,9 +66,6 @@ const DEFAULT_TASKS: Record<AiTaskKind, AiTaskSettings> = {
 const DEFAULT_SETTINGS: AppSettings = {
   id: "app",
   model: "gemini-2.5-flash",
-  temperature: 0.5,
-  topP: 0.95,
-  topK: 40,
   maxOutputTokens: 65536,
   tasks: DEFAULT_TASKS,
   rememberApiKey: false,

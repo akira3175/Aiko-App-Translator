@@ -69,7 +69,6 @@ def call_char_analysis(prompt: str) -> str:
             result = call_gemini(
                 prompt,
                 model=CHAR_MODEL,
-                temperature=0.4,
             )
             return result.strip() if result else ""
         except Exception as e:

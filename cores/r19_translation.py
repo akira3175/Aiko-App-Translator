@@ -258,7 +258,7 @@ def save_word_translation(source, translation):
 def _gemini_generate(prompt, model):
     from cores.dich_utils import call_gemini
 
-    return call_gemini(prompt, model=model, temperature=0.2)
+    return call_gemini(prompt, model=model)
 
 
 def _log_r19_call(token, model, prompt, response, ok):

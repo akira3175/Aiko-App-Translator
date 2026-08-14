@@ -261,7 +261,6 @@ def switch_api_key():
 def call_gemini(
     prompt,
     model,
-    temperature=0.5,
     max_output_tokens=None,
     system_instruction=None,
     as_chat_parts=False,
@@ -275,7 +274,6 @@ def call_gemini(
     Args:
         prompt           : Noi dung gui di (str)
         model            : Ten model
-        temperature      : Do sang tao (mac dinh 0.5)
         max_output_tokens: Gioi han token output
         system_instruction: System prompt
         as_chat_parts    : Neu True, gui prompt duoi dang role/parts
@@ -309,9 +307,7 @@ def call_gemini(
         ),
     ]
 
-    configured_temperature = option("gemini_api_temperature", "")
     cfg_kwargs = {
-        "temperature": float(configured_temperature) if configured_temperature not in (None, "") else temperature,
         "safety_settings": _safety_off,
     }
     thinking_level = str(option("gemini_api_thinking", "high")).strip().lower()
@@ -319,13 +315,7 @@ def call_gemini(
         cfg_kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
     elif thinking_level != "auto":
         cfg_kwargs["thinking_config"] = types.ThinkingConfig(thinking_level=thinking_level)
-    top_p = option("gemini_api_top_p", "")
-    top_k = option("gemini_api_top_k", "")
     configured_max_tokens = option("gemini_api_max_output_tokens", "")
-    if top_p not in (None, ""):
-        cfg_kwargs["top_p"] = float(top_p)
-    if top_k not in (None, ""):
-        cfg_kwargs["top_k"] = int(top_k)
     if configured_max_tokens not in (None, ""):
         cfg_kwargs["max_output_tokens"] = int(configured_max_tokens)
     elif max_output_tokens:
@@ -2044,7 +2034,7 @@ Lưu ý:
         try:
             if generate is None:
                 raw_result_text = call_gemini(
-                    prompt, model=model, temperature=0.9
+                    prompt, model=model
                 ).strip()
             else:
                 raw_result_text = generate(prompt).strip()
@@ -2604,7 +2594,6 @@ Chỉ xuất đúng định dạng sau:
                 text = call_gemini(
                     prompt,
                     model=POLISH_MODEL,
-                    temperature=0.7,
                     system_instruction=system_instruction,
                     as_chat_parts=True,
                     extra_parts=extra_parts if extra_parts else None,
@@ -2751,7 +2740,7 @@ def _run_background_review(
     try:
         while True:
             try:
-                text = call_gemini(prompt, model=REVIEW_BG_MODEL, temperature=0.6).strip()
+                text = call_gemini(prompt, model=REVIEW_BG_MODEL).strip()
                 break
             except Exception as exc:
                 error = str(exc)
@@ -2965,7 +2954,7 @@ Nội dung dịch hiện tại:
 """)
         try:
             chapter_id_fix = chapter.get("id", f"chapter_{chapter_number}")
-            text = call_gemini(prompt, model=POLISH_MODEL, temperature=0.3).strip()
+            text = call_gemini(prompt, model=POLISH_MODEL).strip()
             if "###TITLE###" in text and "###CONTENT###" in text:
                 parts = text.split("###CONTENT###")
                 chapter["title_translation"] = (

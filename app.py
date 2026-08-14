@@ -169,9 +169,6 @@ SETTING_DEFAULTS = {
     "review_model": "gemini-3.1-flash-lite-preview",
     "context_model": "gemini-3.5-flash",
     "gemini_api_thinking": "high",
-    "gemini_api_temperature": "",
-    "gemini_api_top_p": "",
-    "gemini_api_top_k": "",
     "gemini_api_max_output_tokens": "",
     "gemini_web_model": "pro",
     "gemini_thinking": "extended",
@@ -218,9 +215,6 @@ SETTING_LABELS = {
     "review_model": "Model review toàn bộ",
     "context_model": "Model tạo context",
     "gemini_api_thinking": "Cấp độ suy nghĩ",
-    "gemini_api_temperature": "Temperature",
-    "gemini_api_top_p": "Top P",
-    "gemini_api_top_k": "Top K",
     "gemini_api_max_output_tokens": "Token đầu ra tối đa",
     "gemini_web_model": "Model Gemini Web (free/pro/thinking)",
     "gemini_thinking": "Mức thinking Gemini Web",
@@ -278,9 +272,6 @@ SETTING_META = {
         ["auto", "Tự động theo model"], ["off", "Tắt"], ["minimal", "Minimal"],
         ["low", "Low"], ["medium", "Medium"], ["high", "High"],
     ], "description": "Model không hỗ trợ một mức cụ thể có thể trả lỗi; khi đó chọn Tự động."},
-    "gemini_api_temperature": {"group": "gemini-api", "inputmode": "decimal", "description": "Để trống để mỗi công đoạn dùng giá trị riêng. Khoảng 0–2."},
-    "gemini_api_top_p": {"group": "gemini-api", "inputmode": "decimal", "description": "Để trống để Gemini tự chọn. Khoảng 0–1."},
-    "gemini_api_top_k": {"group": "gemini-api", "inputmode": "numeric", "description": "Để trống để Gemini tự chọn. Số nguyên từ 1."},
     "gemini_api_max_output_tokens": {"group": "gemini-api", "inputmode": "numeric", "description": "Để trống để dùng giới hạn của model."},
     "gemini_web_model": {"group": "gemini-web"},
     "gemini_thinking": {"group": "gemini-web"},
@@ -388,19 +379,14 @@ def write_settings(payload: dict):
                 raise ValueError("Chế độ truy cập LAN không hợp lệ")
             if key == "lan_pin" and value and not re.fullmatch(r"\d{6,12}", value):
                 raise ValueError("Mã PIN LAN phải gồm 6–12 chữ số")
-            if value and key in {"gemini_api_temperature", "gemini_api_top_p", "gemini_api_top_k", "gemini_api_max_output_tokens"}:
+            if value and key == "gemini_api_max_output_tokens":
                 try:
                     number = float(value)
                 except ValueError:
                     raise ValueError(f"{SETTING_LABELS[key]} phải là một số") from None
-                limits = {
-                    "gemini_api_temperature": (0, 2), "gemini_api_top_p": (0, 1),
-                    "gemini_api_top_k": (1, None), "gemini_api_max_output_tokens": (1, None),
-                }
-                minimum, maximum = limits[key]
-                if number < minimum or (maximum is not None and number > maximum):
+                if number < 1:
                     raise ValueError(f"{SETTING_LABELS[key]} nằm ngoài phạm vi cho phép")
-                if key in {"gemini_api_top_k", "gemini_api_max_output_tokens"} and not number.is_integer():
+                if not number.is_integer():
                     raise ValueError(f"{SETTING_LABELS[key]} phải là số nguyên")
         if value != default:
             cleaned[key] = value
@@ -799,7 +785,7 @@ def test_gemini_api_key(payload: dict):
         client.models.generate_content(
             model=model,
             contents="Reply with OK only.",
-            config=types.GenerateContentConfig(temperature=0, max_output_tokens=8),
+            config=types.GenerateContentConfig(max_output_tokens=8),
         )
     except Exception as exc:
         code = getattr(exc, "code", None)
@@ -1012,7 +998,7 @@ def clear_ai_logs(project_name: str):
 def _call_r19_gemini(prompt, model):
     from cores.dich_utils import call_gemini
 
-    return call_gemini(prompt, model=model, temperature=0.2)
+    return call_gemini(prompt, model=model)
 
 
 def translate_r19_word(project_name: str, payload: dict):

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from cores import dich_gpt_api, dich_utils, dich_v1, gpt_api_client
+from cores import dich_gpt_api, dich_interactions, dich_utils, dich_v1, gpt_api_client
 from cores.gemini_interactions import stream_interaction
 
 
@@ -23,6 +23,17 @@ CHARACTERS = """# Hồ Sơ Nhân Vật
 
 
 class TranslationCharacterTests(unittest.TestCase):
+    def test_interactions_keeps_running_after_high_demand_error(self):
+        error = RuntimeError(
+            "gemini-3.7-flash is currently experiencing high demand, "
+            "spikes in demand are usually temporary. Please try again later."
+        )
+        with patch.object(dich_interactions.dich_v1, "run_translation", side_effect=error), \
+                patch.object(dich_interactions, "stop_requested", return_value=False), \
+                patch.object(dich_interactions.time, "sleep") as sleep:
+            self.assertEqual(dich_interactions._run_translation_with_retry(), 0)
+        self.assertEqual(sleep.call_count, 15)
+
     def test_snapshot_contains_only_characters_relevant_to_chapter(self):
         with tempfile.TemporaryDirectory() as directory:
             source = os.path.join(directory, "characters.md")

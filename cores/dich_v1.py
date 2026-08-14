@@ -148,7 +148,6 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
             text = call_gemini(
                 prompt,
                 model=TRANSLATE_MODEL,
-                temperature=0.5,
                 as_chat_parts=bool(reference_parts),
                 extra_parts=reference_parts or None,
                 character_document=character_document or None,

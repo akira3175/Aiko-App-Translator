@@ -165,7 +165,7 @@ def call_review_api(prompt):
     while True:
         attempt += 1
         try:
-            text = call_gemini(prompt, model=REVIEW_MODEL, temperature=0.4).strip()
+            text = call_gemini(prompt, model=REVIEW_MODEL).strip()
             if not text:
                 print(f"  ⚠️ Response rỗng, thử lại (lần {attempt})...")
                 time.sleep(5)

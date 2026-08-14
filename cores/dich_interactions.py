@@ -92,18 +92,14 @@ def _finish_workspace_stream(text):
         _emit("polish_complete", text=markdown)
 
 
-def _configured_generation(temperature):
+def _configured_generation():
     config = {}
-    configured_temperature = option("gemini_api_temperature", "")
-    config["temperature"] = float(configured_temperature) if configured_temperature not in (None, "") else temperature
     thinking = str(option("gemini_api_thinking", "high")).strip().lower()
     if thinking == "off":
         config["thinking_level"] = "minimal"
     elif thinking != "auto":
         config["thinking_level"] = thinking
     for setting, field, converter in (
-        ("gemini_api_top_p", "top_p", float),
-        ("gemini_api_top_k", "top_k", int),
         ("gemini_api_max_output_tokens", "max_output_tokens", int),
     ):
         value = option(setting, "")
@@ -113,7 +109,7 @@ def _configured_generation(temperature):
 
 
 def call_interactions(
-    prompt, model, temperature=0.5, system_instruction=None,
+    prompt, model, system_instruction=None,
     character_document=None, pronoun_document=None, **_kwargs
 ):
     global _stream_text
@@ -125,7 +121,7 @@ def call_interactions(
         api_key=api_key,
         model=model,
         prompt=prompt,
-        generation_config=_configured_generation(temperature),
+        generation_config=_configured_generation(),
         system_instruction=system_instruction,
         documents=[item for item in (
             {"name": "characters.md", "mime_type": "text/markdown", "content": character_document} if character_document else None,
@@ -170,6 +166,19 @@ def polish_interactions(*args, **kwargs):
         _stage = None
 
 
+def _run_translation_with_retry():
+    try:
+        return dich_v1.run_translation() or 0
+    except Exception as exc:
+        print(f"⚠️ Lỗi khi dịch: {exc}")
+        print("⏳ Gemini đang bận hoặc gặp lỗi; chờ 15s rồi thử lại...")
+        for _ in range(15):
+            if stop_requested():
+                return 0
+            time.sleep(1)
+        return 0
+
+
 def main():
     dich_v1.call_gemini = call_interactions
     dich_v1.translate_chapter = translate_interactions
@@ -182,7 +191,7 @@ def main():
     while True:
         if stop_requested():
             break
-        processed += dich_v1.run_translation() or 0
+        processed += _run_translation_with_retry()
         raw_files = dich_utils.scan_md_dir(dich_utils.RAW_DIR)
         if all(
             dich_utils.is_translated(

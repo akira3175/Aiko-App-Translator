@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "0.12.2",
+      "date": "2026-08-14",
+      "title": "V1 Interactions ổn định hơn, cấu hình Gemini gọn hơn",
+      "summary": "Bản cập nhật giúp V1 Interactions tự tiếp tục khi Gemini gặp lỗi tạm thời và đơn giản hóa cấu hình sinh nội dung.",
+      "highlights": [
+        "Giúp V1 Interactions tiếp tục chạy khi Gemini tạm thời quá tải hoặc gặp lỗi, thay vì dừng tác vụ và hiện traceback.",
+        "Loại bỏ Temperature, Top P và Top K khỏi toàn bộ lời gọi Gemini, để model tự sử dụng cấu hình mặc định."
+      ]
+    },
+    {
       "version": "0.12.1",
       "date": "2026-08-14",
       "title": "Quản lý Gemini API key tốt hơn, ổn định dịch V1",
