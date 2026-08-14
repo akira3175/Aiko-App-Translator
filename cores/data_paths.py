@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 GEMINI_API_KEYS_FILE = DATA_DIR / "apikeys.txt"
+GEMINI_API_KEY_STATE_FILE = DATA_DIR / "gemini_api_key_state.json"
 R19_WORDS_FILE = DATA_DIR / "r19_words.txt"
 
 

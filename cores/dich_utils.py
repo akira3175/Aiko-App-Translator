@@ -5,6 +5,7 @@ Hàm dùng chung cho dich_v2.py (dịch đơn) và dich_v3.py (dịch batch).
 Chỉnh sửa tại đây sẽ áp dụng cho CẢ HAI script.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -17,7 +18,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import yaml
-from cores.data_paths import GEMINI_API_KEYS_FILE, ensure_user_data_migrated
+from cores.data_paths import (
+    GEMINI_API_KEYS_FILE,
+    GEMINI_API_KEY_STATE_FILE,
+    ensure_user_data_migrated,
+)
 from google import genai
 from google.genai import types
 from selenium import webdriver
@@ -194,8 +199,41 @@ def load_api_keys(file_path=GEMINI_API_KEYS_FILE):
 
 ensure_user_data_migrated()
 API_KEYS = load_api_keys()
-current_key_index = 0
+
+
+def _key_fingerprint(key):
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+
+
+def _load_key_index(keys):
+    try:
+        fingerprint = json.loads(
+            GEMINI_API_KEY_STATE_FILE.read_text(encoding="utf-8")
+        ).get("current_key_fingerprint", "")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return 0
+    return next(
+        (index for index, key in enumerate(keys) if _key_fingerprint(key) == fingerprint),
+        0,
+    )
+
+
+def _save_key_index():
+    GEMINI_API_KEY_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temporary = GEMINI_API_KEY_STATE_FILE.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(
+            {"current_key_fingerprint": _key_fingerprint(API_KEYS[current_key_index])},
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    os.replace(temporary, GEMINI_API_KEY_STATE_FILE)
+
+
+current_key_index = _load_key_index(API_KEYS)
 last_switch_time = time.time()
+print(f"🔑 Bắt đầu với API key số {current_key_index + 1}/{len(API_KEYS)}")
 
 
 def get_client():
@@ -205,6 +243,7 @@ def get_client():
     if now - last_switch_time >= 3600:
         current_key_index = (current_key_index + 1) % len(API_KEYS)
         last_switch_time = now
+        _save_key_index()
         print(f"🔄 Đã đổi API key sang key số {current_key_index + 1}")
     return genai.Client(api_key=API_KEYS[current_key_index])
 
@@ -215,6 +254,7 @@ def switch_api_key():
     old_index = current_key_index
     current_key_index = (current_key_index + 1) % len(API_KEYS)
     last_switch_time = time.time()
+    _save_key_index()
     print(f"🔄 Lỗi 429! Đổi API key: {old_index + 1} → {current_key_index + 1}")
 
 

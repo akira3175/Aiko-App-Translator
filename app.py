@@ -36,6 +36,7 @@ from PIL import Image, ImageOps
 from cores.data_paths import (
     DATA_DIR,
     GEMINI_API_KEYS_FILE,
+    GEMINI_API_KEY_STATE_FILE,
     R19_WORDS_FILE,
     ensure_user_data_migrated,
 )
@@ -723,7 +724,22 @@ def gemini_api_keys_payload():
         keys = [line.strip() for line in GEMINI_API_KEYS_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
     except FileNotFoundError:
         keys = []
-    return {"keys": keys, "count": len(keys)}
+    active_index = 0
+    try:
+        fingerprint = json.loads(
+            GEMINI_API_KEY_STATE_FILE.read_text(encoding="utf-8")
+        ).get("current_key_fingerprint", "")
+        active_index = next(
+            (
+                index
+                for index, key in enumerate(keys)
+                if hashlib.sha256(key.encode("utf-8")).hexdigest()[:16] == fingerprint
+            ),
+            0,
+        )
+    except (OSError, json.JSONDecodeError, AttributeError):
+        pass
+    return {"keys": keys, "count": len(keys), "active_index": active_index}
 
 
 def write_gemini_api_keys(payload: dict):
@@ -742,7 +758,62 @@ def write_gemini_api_keys(payload: dict):
     temporary = GEMINI_API_KEYS_FILE.with_suffix(".tmp")
     temporary.write_text("\n".join(cleaned) + "\n", encoding="utf-8")
     os.replace(temporary, GEMINI_API_KEYS_FILE)
-    return {"keys": cleaned, "count": len(cleaned)}
+    return {**gemini_api_keys_payload(), "count": len(cleaned)}
+
+
+def set_active_gemini_api_key(payload: dict):
+    keys = gemini_api_keys_payload()["keys"]
+    try:
+        index = int(payload.get("active_index"))
+    except (TypeError, ValueError):
+        raise ValueError("Vị trí API key không hợp lệ") from None
+    if index < 0 or index >= len(keys):
+        raise ValueError("API key đã chọn không tồn tại")
+    temporary = GEMINI_API_KEY_STATE_FILE.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(
+            {
+                "current_key_fingerprint": hashlib.sha256(
+                    keys[index].encode("utf-8")
+                ).hexdigest()[:16]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    os.replace(temporary, GEMINI_API_KEY_STATE_FILE)
+    return {"ok": True, "active_index": index, "count": len(keys)}
+
+
+def test_gemini_api_key(payload: dict):
+    key = str(payload.get("key", "")).strip()
+    if not key or len(key) > 500 or any(char.isspace() for char in key):
+        raise ValueError("Gemini API key không hợp lệ")
+
+    from google import genai
+    from google.genai import types
+
+    model = str(saved_settings().get("translate_model", SETTING_DEFAULTS["translate_model"])).strip()
+    try:
+        client = genai.Client(api_key=key)
+        client.models.generate_content(
+            model=model,
+            contents="Reply with OK only.",
+            config=types.GenerateContentConfig(temperature=0, max_output_tokens=8),
+        )
+    except Exception as exc:
+        code = getattr(exc, "code", None)
+        if code in (400, 401, 403):
+            message = "Key sai, bị chặn hoặc không có quyền"
+        elif code == 429:
+            message = "Hết quota hoặc bị giới hạn tần suất"
+        elif code == 404:
+            message = f"Model {model} không khả dụng"
+        else:
+            code = "NETWORK"
+            message = "Không thể kết nối Gemini"
+        return {"ok": False, "code": str(code), "message": message, "model": model}
+    return {"ok": True, "code": "OK", "message": "Sinh nội dung thành công", "model": model}
 
 
 def _r19_project_enabled(project_name: str) -> bool:
@@ -3315,6 +3386,21 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self.json_response(write_gemini_api_keys(self.body()))
             except (ValueError, OSError, json.JSONDecodeError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/gemini-api-keys/active":
+            if active_translation():
+                return self.json_response(
+                    {"error": "Không thể đổi API key khi đang dịch"},
+                    HTTPStatus.CONFLICT,
+                )
+            try:
+                return self.json_response(set_active_gemini_api_key(self.body()))
+            except (ValueError, OSError, json.JSONDecodeError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/gemini-api-keys/test":
+            try:
+                return self.json_response(test_gemini_api_key(self.body()))
+            except (ValueError, RuntimeError, OSError, json.JSONDecodeError) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/r19":
             try:

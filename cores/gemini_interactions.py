@@ -8,6 +8,22 @@ from urllib.request import Request, urlopen
 
 
 INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
+SUPPORTED_DOCUMENT_MIME_TYPES = {"application/pdf", "text/csv"}
+
+
+def _interaction_reference_part(item):
+    content = item.get("content", "")
+    if not content.strip():
+        return None
+    mime_type = item.get("mime_type", "")
+    if mime_type in SUPPORTED_DOCUMENT_MIME_TYPES:
+        return {
+            "type": "document",
+            "data": base64.b64encode(content.encode("utf-8")).decode("ascii"),
+            "mime_type": mime_type,
+        }
+    name = item.get("name") or "reference"
+    return {"type": "text", "text": f"## Reference file: {name}\n\n{content}"}
 
 
 def stream_interaction(
@@ -25,13 +41,9 @@ def stream_interaction(
 ):
     attached_documents = list(documents or ([] if document is None else [document]))
     document_parts = [
-        {
-            "type": "document",
-            "data": base64.b64encode(item["content"].encode("utf-8")).decode("ascii"),
-            "mime_type": item["mime_type"],
-        }
+        part
         for item in attached_documents
-        if item and item.get("content", "").strip()
+        if item and (part := _interaction_reference_part(item))
     ]
     payload = {
         "model": model,

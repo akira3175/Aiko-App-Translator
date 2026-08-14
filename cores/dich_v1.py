@@ -38,9 +38,7 @@ from cores.dich_utils import (
     # API
     _build_characters_snapshot,
     _build_pronouns_snapshot,
-    _upload_file_part,
     call_gemini,
-    get_client,
     is_translated,
     # Context
     log_api_call,
@@ -86,10 +84,10 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
         prompt = _build_prompt(
             prompt_chapter, masked_context, masked_pronouns, masked_previous
         )
-        character_parts = []
+        reference_parts = []
         character_document = ""
         pronoun_document = ""
-        pronoun_parts = []
+        interactions = call_gemini.__module__.endswith("dich_interactions")
         characters_snapshot = _build_characters_snapshot(
             CHARACTERS_MD,
             "\n".join(
@@ -105,13 +103,11 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
             try:
                 with open(characters_snapshot, "r", encoding="utf-8") as file:
                     character_document = file.read()
-                if not call_gemini.__module__.endswith("dich_interactions"):
-                    character_part = _upload_file_part(
-                        get_client(), characters_snapshot, "characters.md", "text/markdown"
+                if not interactions:
+                    reference_parts.append(
+                        {"text": f"## Reference file: characters.md\n\n{character_document}"}
                     )
-                    if character_part:
-                        character_parts.append(character_part)
-                if character_parts or character_document:
+                if character_document:
                     prompt = with_character_document_instruction(prompt)
             finally:
                 try:
@@ -123,12 +119,10 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
             try:
                 with open(pronouns_snapshot, "r", encoding="utf-8") as file:
                     pronoun_document = file.read()
-                if not call_gemini.__module__.endswith("dich_interactions"):
-                    pronoun_part = _upload_file_part(
-                        get_client(), pronouns_snapshot, "pronouns_snapshot.yaml", "text/yaml"
+                if not interactions:
+                    reference_parts.append(
+                        {"text": f"## Reference file: pronouns_snapshot.yaml\n\n{pronoun_document}"}
                     )
-                    if pronoun_part:
-                        pronoun_parts.append(pronoun_part)
             finally:
                 try:
                     os.unlink(pronouns_snapshot)
@@ -155,8 +149,8 @@ def translate_chapter(chapter, chapter_number, context_text="", pronoun_context=
                 prompt,
                 model=TRANSLATE_MODEL,
                 temperature=0.5,
-                as_chat_parts=bool(character_parts or pronoun_parts),
-                extra_parts=(character_parts + pronoun_parts) or None,
+                as_chat_parts=bool(reference_parts),
+                extra_parts=reference_parts or None,
                 character_document=character_document or None,
                 pronoun_document=pronoun_document or None,
             )

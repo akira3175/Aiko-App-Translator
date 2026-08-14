@@ -51,17 +51,14 @@ class TranslationCharacterTests(unittest.TestCase):
             snapshot.write(CHARACTERS)
             snapshot_path = snapshot.name
         with patch.object(dich_v1, "_build_characters_snapshot", return_value=snapshot_path), \
-                patch.object(dich_v1, "_upload_file_part", return_value={"file": "characters"}) as upload, \
-                patch.object(dich_v1, "get_client", return_value=object()), \
                 patch.object(dich_v1, "call_gemini", return_value=response) as call:
             title, content = dich_v1.translate_chapter(
                 {"id": "v1_c1_s1", "title": "앨리스", "content": "본문"}, 1
             )
         self.assertEqual((title, content), ("Tiêu đề", "Nội dung"))
-        upload.assert_called_once()
         kwargs = call.call_args.kwargs
         self.assertTrue(kwargs["as_chat_parts"])
-        self.assertEqual(kwargs["extra_parts"], [{"file": "characters"}])
+        self.assertEqual(kwargs["extra_parts"][0]["text"], f"## Reference file: characters.md\n\n{CHARACTERS}")
         self.assertTrue(kwargs["character_document"])
         self.assertIn("giới tính", call.call_args.args[0])
         self.assertLess(
@@ -69,7 +66,7 @@ class TranslationCharacterTests(unittest.TestCase):
             call.call_args.args[0].index("Tiêu đề gốc"),
         )
 
-    def test_interactions_sends_snapshot_as_inline_document(self):
+    def test_interactions_sends_markdown_snapshot_as_text(self):
         captured = {}
 
         class Response:
@@ -84,11 +81,34 @@ class TranslationCharacterTests(unittest.TestCase):
 
         stream_interaction(
             api_key="key", model="model", prompt="prompt", opener=opener,
-            document={"content": "# Alice", "mime_type": "text/markdown"},
+            document={"name": "characters.md", "content": "# Alice", "mime_type": "text/markdown"},
+        )
+        self.assertEqual(captured["input"][1]["type"], "text")
+        self.assertEqual(
+            captured["input"][1]["text"], "## Reference file: characters.md\n\n# Alice"
+        )
+
+    def test_interactions_keeps_supported_csv_as_document(self):
+        captured = {}
+
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *_args): return False
+            def __iter__(self):
+                yield b'data: {"event_type":"interaction.completed","interaction":{"status":"completed"}}\n'
+
+        def opener(request, timeout):
+            captured.update(json.loads(request.data.decode("utf-8")))
+            return Response()
+
+        stream_interaction(
+            api_key="key", model="model", prompt="prompt", opener=opener,
+            document={"name": "terms.csv", "content": "a,b", "mime_type": "text/csv"},
         )
         self.assertEqual(captured["input"][1]["type"], "document")
+        self.assertEqual(captured["input"][1]["mime_type"], "text/csv")
         self.assertEqual(
-            base64.b64decode(captured["input"][1]["data"]).decode("utf-8"), "# Alice"
+            base64.b64decode(captured["input"][1]["data"]).decode("utf-8"), "a,b"
         )
 
     def test_gemini_polish_logs_character_snapshot_without_path_error(self):

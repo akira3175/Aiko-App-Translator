@@ -1,6 +1,19 @@
 {
   "versions": [
     {
+      "version": "0.12.1",
+      "date": "2026-08-14",
+      "title": "Quản lý Gemini API key tốt hơn, ổn định dịch V1",
+      "summary": "Bản cập nhật cải thiện khả năng kiểm tra và lựa chọn Gemini API key, ghi nhớ key đang sử dụng, đồng thời sửa lỗi dừng tác vụ và tương thích tài liệu trong V1 Interactions.",
+      "highlights": [
+        "Thêm kiểm tra từng Gemini API key hoặc kiểm tra hàng loạt bằng yêu cầu sinh nội dung thật; hiển thị gọn mã lỗi, model và trạng thái của từng key.",
+        "Cho phép chọn API key bắt đầu; app ghi nhớ key hiện tại bằng fingerprint và tiếp tục từ đúng key khi chạy lại, thay vì luôn quay về key đầu tiên.",
+        "Hiển thị số thứ tự API key đang sử dụng trong phần cài đặt và nhật ký tác vụ.",
+        "Sửa lỗi nút Dừng ngay bị khóa ở lần chạy tiếp theo, khiến người dùng phải F5.",
+        "Sửa lỗi 400 unsupported mime_type của V1 Interactions bằng cách gửi hồ sơ nhân vật và xưng hô dưới dạng văn bản tham chiếu."
+      ]
+    },
+    {
       "version": "0.12.0",
       "date": "2026-08-13",
       "title": "Sidebar tùy biến, nhật ký AI và xuất truyện hoàn chỉnh",

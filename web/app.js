@@ -26,6 +26,7 @@ let novelStreamApplying=false;
 let settingsItems=[];
 let activeSettingsGroup='gemini-api';
 let geminiApiKeys=[];
+let geminiActiveKeyIndex=0;
 let publishingBooks=[];
 let hakoRemoteChapters=[];
 let hakoEditMapping=[];
@@ -546,9 +547,16 @@ async function changeShare(action,shareId,chapter=''){
 }
 
 function renderGeminiApiKeys() {
-  $('#geminiApiKeyCount').textContent=`${geminiApiKeys.length} key`;
-  $('#geminiApiKeyList').innerHTML=geminiApiKeys.map((key,index)=>`<div class="api-key-row"><span>${index+1}</span><input type="password" value="${escapeHtml(key)}" data-gemini-api-key autocomplete="off" spellcheck="false" aria-label="Gemini API key ${index+1}"><button type="button" class="secondary" data-toggle-api-key>Hiện</button><button type="button" class="api-key-remove" data-remove-api-key aria-label="Xóa API key ${index+1}">Xóa</button></div>`).join('')||'<div class="api-key-empty">Chưa có API key. Hãy thêm key để sử dụng Gemini API.</div>';
+  $('#geminiApiKeyCount').textContent=geminiApiKeys.length?`${geminiApiKeys.length} key · hiện tại #${geminiActiveKeyIndex+1}`:'0 key';
+  const startSelect=$('#geminiStartKey');
+  if(startSelect){
+    startSelect.innerHTML=geminiApiKeys.map((_,index)=>`<option value="${index}">Key #${index+1}</option>`).join('');
+    startSelect.value=String(Math.min(geminiActiveKeyIndex,Math.max(0,geminiApiKeys.length-1)));
+    startSelect.disabled=!geminiApiKeys.length;
+  }
+  $('#geminiApiKeyList').innerHTML=geminiApiKeys.map((key,index)=>`<div class="api-key-row"><span>${index+1}</span><input type="password" value="${escapeHtml(key)}" data-gemini-api-key autocomplete="off" spellcheck="false" aria-label="Gemini API key ${index+1}"><button type="button" class="secondary" data-toggle-api-key>Hiện</button><button type="button" class="secondary" data-test-api-key>Kiểm tra</button><button type="button" class="api-key-remove" data-remove-api-key aria-label="Xóa API key ${index+1}">Xóa</button><small class="api-key-test-status" data-api-key-test-status></small></div>`).join('')||'<div class="api-key-empty">Chưa có API key. Hãy thêm key để sử dụng Gemini API.</div>';
   $$('[data-toggle-api-key]').forEach(button=>button.onclick=()=>{ const input=button.parentElement.querySelector('input'); const hidden=input.type==='password'; input.type=hidden?'text':'password'; button.textContent=hidden?'Ẩn':'Hiện'; });
+  $$('[data-test-api-key]').forEach(button=>button.onclick=()=>testGeminiApiKey(button));
   $$('[data-remove-api-key]').forEach((button,index)=>button.onclick=()=>{ syncGeminiApiKeyDraft(); geminiApiKeys.splice(index,1); renderGeminiApiKeys(); });
 }
 
@@ -557,8 +565,20 @@ function syncGeminiApiKeyDraft() {
 }
 
 async function loadGeminiApiKeys() {
-  try { const data=await api('/api/gemini-api-keys'); geminiApiKeys=data.keys; renderGeminiApiKeys(); }
+  try { const data=await api('/api/gemini-api-keys'); geminiApiKeys=data.keys; geminiActiveKeyIndex=Number(data.active_index)||0; renderGeminiApiKeys(); }
   catch(error) { toast(error.message); }
+}
+
+async function selectActiveGeminiApiKey() {
+  const select=$('#geminiStartKey'), previous=geminiActiveKeyIndex;
+  select.disabled=true;
+  try {
+    const data=await api('/api/gemini-api-keys/active',{method:'POST',body:JSON.stringify({active_index:Number(select.value)})});
+    geminiActiveKeyIndex=Number(data.active_index)||0; renderGeminiApiKeys();
+    toast(`Lần chạy sau sẽ bắt đầu từ key #${geminiActiveKeyIndex+1}`);
+  } catch(error) {
+    geminiActiveKeyIndex=previous; renderGeminiApiKeys(); toast(error.message);
+  } finally { select.disabled=!geminiApiKeys.length; }
 }
 
 function ensureR19Config() {
@@ -674,9 +694,40 @@ async function translateR19Words() {
 async function saveGeminiApiKeys() {
   syncGeminiApiKeyDraft();
   const button=$('#saveGeminiApiKeys'); button.disabled=true;
-  try { const data=await api('/api/gemini-api-keys',{method:'POST',body:JSON.stringify({keys:geminiApiKeys})}); geminiApiKeys=data.keys; renderGeminiApiKeys(); toast(`Đã lưu ${data.count} Gemini API key`); }
+  try { const data=await api('/api/gemini-api-keys',{method:'POST',body:JSON.stringify({keys:geminiApiKeys})}); geminiApiKeys=data.keys; geminiActiveKeyIndex=Number(data.active_index)||0; renderGeminiApiKeys(); toast(`Đã lưu ${data.count} Gemini API key`); }
   catch(error) { toast(error.message); }
   finally { button.disabled=false; }
+}
+
+async function testGeminiApiKey(button) {
+  const key=button.parentElement.querySelector('[data-gemini-api-key]').value.trim();
+  const status=button.parentElement.querySelector('[data-api-key-test-status]');
+  if(!key){status.className='api-key-test-status error';status.textContent='LỖI · Key đang trống';return false;}
+  button.disabled=true; button.textContent='Đang kiểm tra…';
+  try {
+    const data=await api('/api/gemini-api-keys/test',{method:'POST',body:JSON.stringify({key})});
+    status.className=`api-key-test-status ${data.ok?'success':'error'}`;
+    status.textContent=`${data.code} · ${data.message} · ${data.model}`;
+    return data.ok;
+  } catch(error) {
+    status.className='api-key-test-status error'; status.textContent=`LỖI · ${error.message}`;
+    return false;
+  }
+  finally { button.disabled=false; button.textContent='Kiểm tra'; }
+}
+
+async function testAllGeminiApiKeys() {
+  const buttons=$$('[data-test-api-key]'), batchButton=$('#testAllGeminiApiKeys');
+  if(!buttons.length)return toast('Chưa có API key để kiểm tra');
+  batchButton.disabled=true; batchButton.textContent=`Đang kiểm tra 0/${buttons.length}…`;
+  let passed=0;
+  try {
+    for(let index=0;index<buttons.length;index++){
+      batchButton.textContent=`Đang kiểm tra ${index+1}/${buttons.length}…`;
+      if(await testGeminiApiKey(buttons[index]))passed++;
+    }
+    toast(`Kiểm tra xong: ${passed} hoạt động, ${buttons.length-passed} lỗi`);
+  } finally { batchButton.disabled=false; batchButton.textContent='Kiểm tra tất cả'; }
 }
 
 async function loadPythonSettings() {
@@ -2067,6 +2118,14 @@ function confirmGlossaryCoverage(kind,config={}) {
   return confirm(`Glossary mới được duyệt đến chương ${glossaryIndex}, nhưng tác vụ có thể dịch ${range}.\n\nNhấn OK để vẫn dịch hoặc Cancel để hủy.`);
 }
 
+function setTaskStopControls(translation,running) {
+  const after=$('#stopAfterCurrent'), immediate=$('#stopImmediately'), current=$('#stopCurrentTask');
+  after.style.display=translation&&running?'':'none';
+  immediate.style.display=translation&&running?'':'none';
+  current.style.display=!translation&&running?'':'none';
+  after.disabled=false; immediate.disabled=false; current.disabled=false;
+}
+
 async function executePipeline(kind,config) {
   activeJobKind=kind;
   novelStreamSequence=0;
@@ -2074,7 +2133,7 @@ async function executePipeline(kind,config) {
   if(pipelineItem)selectPipelineGroup(pipelineItem.group);
   const button = $(`[data-run="${kind}"]`)||(kind==='hako-edit'?$('#runHakoEdit'):null); button.disabled=true; button.textContent='Đang chạy…'; $('#console').classList.add('open'); updateConsoleOutput('Đang khởi động tác vụ…');
   const translation=['v1','v1-interactions','v2','v3','gpt','gpt-api','manual'].includes(kind);
-  $('#stopAfterCurrent').style.display=translation?'':'none'; $('#stopImmediately').style.display=translation?'':'none'; $('#stopCurrentTask').style.display=translation?'none':'';
+  setTaskStopControls(translation,true);
   if (!state.project) { button.disabled=false; button.textContent='Chạy tác vụ'; return toast('Hãy chọn truyện trước'); }
   showView('pipeline');
   try { await api('/api/run/'+kind+'?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({config:{skip_login_prompt:true,...config}})}); if(kind==='v1-interactions')openNovelEventStream(kind); pollJob(kind,button); } catch(error){ button.disabled=false; button.textContent='Chạy lại'; toast(error.message); }
@@ -2364,6 +2423,10 @@ $('#checkUpdate').onclick=()=>availableUpdate?installUpdate():loadUpdateStatus(t
 $('#showWhatsNew').onclick=()=>loadWhatsNew(true);
 $('#closeWhatsNew').onclick=closeWhatsNew;
 $('#addGeminiApiKey').onclick=()=>{ syncGeminiApiKeyDraft(); geminiApiKeys.push(''); renderGeminiApiKeys(); const inputs=$$('[data-gemini-api-key]'); inputs[inputs.length-1]?.focus(); };
+$('#addGeminiApiKey').insertAdjacentHTML('afterend','<label class="api-key-start"><span>Bắt đầu từ</span><select id="geminiStartKey" aria-label="Chọn API key bắt đầu"></select></label>');
+$('#geminiStartKey').onchange=selectActiveGeminiApiKey;
+$('#saveGeminiApiKeys').insertAdjacentHTML('beforebegin','<button class="secondary" id="testAllGeminiApiKeys" type="button">Kiểm tra tất cả</button>');
+$('#testAllGeminiApiKeys').onclick=testAllGeminiApiKeys;
 $('#saveGeminiApiKeys').onclick=saveGeminiApiKeys;
 $('#addPublishingBook').onclick=()=>{syncPublishingBookDraft();const used=publishingBooks.map(book=>Number(book.volume)).filter(Number.isFinite);publishingBooks.push({book_id:'',volume:used.length?Math.max(...used)+1:1});renderPublishingBooks();};
 $('#savePublishingBooks').onclick=savePublishingBooks;

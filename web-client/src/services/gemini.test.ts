@@ -92,7 +92,20 @@ describe("Gemini prompts", () => {
     expect(request.mock.calls[0][1]?.headers).toMatchObject({ Accept: "text/event-stream" });
     const body = JSON.parse(String(request.mock.calls[0][1]?.body));
     expect(body.input[0].text).toContain("characters.md");
-    expect(body.input[1]).toMatchObject({ type: "document", mime_type: "text/markdown" });
+    expect(body.input[1]).toEqual({ type: "text", text: "## Reference file: characters.md\n\n## Nhân vật" });
+    vi.restoreAllMocks();
+  });
+
+  it("keeps supported Interactions CSV references as documents", async () => {
+    const encoder = new TextEncoder();
+    const request = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(new ReadableStream({ start(controller) {
+      controller.enqueue(encoder.encode('data: {"event_type":"step.delta","delta":{"type":"text","text":"OK"}}\n'));
+      controller.enqueue(encoder.encode('data: {"event_type":"interaction.completed","interaction":{"status":"completed"}}\n'));
+      controller.close();
+    } }), { status: 200 }));
+    await streamInteraction({ apiKey: "key", model: "model", systemInstruction: "", prompt: "prompt", document: { name: "terms.csv", mimeType: "text/csv", content: "a,b" }, onText: () => {} });
+    const body = JSON.parse(String(request.mock.calls[0][1]?.body));
+    expect(body.input[1]).toMatchObject({ type: "document", mime_type: "text/csv" });
     vi.restoreAllMocks();
   });
 

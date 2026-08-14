@@ -53,6 +53,15 @@ function promptWithDocument(options: GenerateOptions) {
   return `${options.prompt}\n\nTệp đính kèm \`${options.document.name}\` chứa hồ sơ nhân vật tham chiếu. Hãy đọc tệp khi xử lý yêu cầu.`;
 }
 
+const INTERACTION_DOCUMENT_MIME_TYPES = new Set(["application/pdf", "text/csv"]);
+
+function interactionReferencePart(document: NonNullable<GenerateOptions["document"]>) {
+  if (INTERACTION_DOCUMENT_MIME_TYPES.has(document.mimeType)) {
+    return { type: "document", data: base64Utf8(document.content), mime_type: document.mimeType };
+  }
+  return { type: "text", text: `## Reference file: ${document.name}\n\n${document.content}` };
+}
+
 export async function generateContent(options: GenerateOptions): Promise<string> {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(options.model)}:generateContent`;
   const response = await fetch(endpoint, {
@@ -98,7 +107,7 @@ export async function streamInteraction(options: StreamOptions): Promise<string>
       model: options.model,
       input: options.document?.content.trim() ? [
         { type: "text", text: promptWithDocument(options) },
-        { type: "document", data: base64Utf8(options.document.content), mime_type: options.document.mimeType },
+        interactionReferencePart(options.document),
       ] : options.prompt,
       stream: true,
       store: false,
