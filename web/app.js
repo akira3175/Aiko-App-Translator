@@ -323,6 +323,7 @@ const taskSchemas = {
 };
 const multiChapterTasks=new Set(['v1','v1-interactions','v2','gpt-api']);
 let pendingTask=null;
+let pronounEditIndex=null;
 
 async function api(path, options) {
   const canRetry=!options?.method||options.method==='GET';
@@ -1012,15 +1013,18 @@ function renderPronounDetail() {
   if(!pair){$('#pronounDetail').innerHTML='<div class="pronoun-empty"><strong>Chưa có dữ liệu xưng hô</strong><span>Dữ liệu sẽ xuất hiện sau khi một chương chạy hậu xử lý.</span></div>';return;}
   const latest=pair.latest||{}, history=[...(pair.timeline||[])].reverse();
   $('#pronounDetail').innerHTML=`<div class="pronoun-detail-head"><div><span class="eyebrow">${pair.locked?'QUY TẮC ĐÃ KHÓA':'AI GHI NHẬN'}</span><h3>${escapeHtml(pronounPairLabel(pair))}</h3><p>Cập nhật gần nhất tại chương ${escapeHtml(latest.chapter_number??'—')}</p></div><div class="pronoun-detail-actions"><button class="secondary" id="editPronounPair">Chỉnh sửa</button><button class="secondary pronoun-delete" id="deletePronounPair">Xóa cặp</button></div></div><div class="pronoun-current"><div><span>Tự xưng</span><strong>${escapeHtml(latest.speaker_self||'Chưa rõ')}</strong></div><div><span>Gọi đối phương</span><strong>${escapeHtml(latest.speaker_to_listener||'Chưa rõ')}</strong></div></div><div class="pronoun-context-card"><span>NGỮ CẢNH QUAN HỆ</span><p>${escapeHtml(latest.relationship_status||'Chưa có mô tả quan hệ.')}</p><small>${escapeHtml(latest.emotional_tone||'Chưa ghi nhận giọng điệu.')}</small></div><h4 class="pronoun-history-title">Lịch sử theo chương</h4><div class="pronoun-history">${history.map(item=>`<div class="pronoun-history-item"><b>Chương ${escapeHtml(item.chapter_number??'—')}</b><div><p><strong>${escapeHtml(item.speaker||'?')}</strong> tự xưng “${escapeHtml(item.speaker_self||'?')}”, gọi <strong>${escapeHtml(item.listener||'?')}</strong> là “${escapeHtml(item.speaker_to_listener||'?')}”</p><small>${escapeHtml(item.relationship_status||item.emotional_tone||'Không có ghi chú')}</small></div></div>`).join('')}</div>`;
-  $('#editPronounPair').onclick=openPronounEditor;
+  $('#pronounDetail').querySelectorAll('.pronoun-history-item').forEach((row,index)=>row.querySelector('div').insertAdjacentHTML('beforeend',`<button class="secondary pronoun-history-edit" data-pronoun-history-index="${escapeHtml(history[index].record_index)}">Sửa mốc này</button>`));
+  $('#editPronounPair').onclick=()=>openPronounEditor();
   $('#deletePronounPair').onclick=deletePronounPair;
 }
 
-function openPronounEditor() {
+function openPronounEditor(recordIndex=null) {
   const pair=(state.pronouns.pairs||[]).find(item=>item.key===state.pronounCurrent);
   if(!pair)return;
-  const latest=pair.latest||{};
-  $('#pronounModalTitle').textContent=pronounPairLabel(pair);
+  const latest=recordIndex===null?(pair.latest||{}):(pair.timeline||[]).find(item=>item.record_index===Number(recordIndex));
+  if(!latest)return toast('Không tìm thấy mốc lịch sử xưng hô');
+  pronounEditIndex=latest.record_index;
+  $('#pronounModalTitle').textContent=`${pronounPairLabel(pair)} · Chương ${latest.chapter_number??'—'}`;
   $('#pronounSpeaker').value=latest.speaker||'';
   $('#pronounListener').value=latest.listener||'';
   $('#pronounSelf').value=latest.speaker_self||'';
@@ -1035,7 +1039,7 @@ async function savePronounEdit() {
   if(!state.pronounCurrent)return;
   const button=$('#savePronounEdit');button.disabled=true;button.textContent='Đang lưu…';
   try {
-    state.pronouns=await api('/api/pronouns?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({key:state.pronounCurrent,speaker_self:$('#pronounSelf').value,speaker_to_listener:$('#pronounToListener').value,relationship_status:$('#pronounRelationship').value,emotional_tone:$('#pronounTone').value,locked:$('#pronounLocked').checked})});
+    state.pronouns=await api('/api/pronouns?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({key:state.pronounCurrent,timeline_index:pronounEditIndex,expected_speaker:$('#pronounSpeaker').value,expected_listener:$('#pronounListener').value,speaker_self:$('#pronounSelf').value,speaker_to_listener:$('#pronounToListener').value,relationship_status:$('#pronounRelationship').value,emotional_tone:$('#pronounTone').value,locked:$('#pronounLocked').checked})});
     $('#pronounModal').classList.remove('open');renderPronouns();toast('Đã lưu quy tắc xưng hô · Có bản sao .bak');
   } catch(error){toast(error.message);}
   finally{button.disabled=false;button.textContent='Lưu quy tắc';}
@@ -2236,6 +2240,7 @@ document.addEventListener('click', (event) => {
   const chapter=event.target.closest('[data-chapter]'); if(chapter) openChapter(chapter.dataset.chapter);
   const project=event.target.closest('[data-project]'); if(project) selectProject(project.dataset.project);
   const run=event.target.closest('[data-run]'); if(run) configureTask(run.dataset.run);
+  const historyEdit=event.target.closest('[data-pronoun-history-index]'); if(historyEdit)return openPronounEditor(historyEdit.dataset.pronounHistoryIndex);
   const pronoun=event.target.closest('[data-pronoun-key]'); if(pronoun){state.pronounCurrent=pronoun.dataset.pronounKey;renderPronouns();}
   if(!event.target.closest('.popover,#chapterSelect,#projectSelect'))$$('.popover.open').forEach(item=>item.classList.remove('open'));
 });

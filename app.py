@@ -1739,7 +1739,11 @@ def pronouns_data(project_name: str):
     for key, value in data.items():
         if not isinstance(value, dict):
             continue
-        timeline = [item for item in value.get("timeline", []) if isinstance(item, dict)]
+        timeline = [
+            {**item, "record_index": index}
+            for index, item in enumerate(value.get("timeline", []))
+            if isinstance(item, dict)
+        ]
         timeline.sort(key=lambda item: item.get("chapter_number", 0))
         latest = timeline[-1] if timeline else {}
         previous = timeline[-2] if len(timeline) > 1 else {}
@@ -1787,18 +1791,37 @@ def save_pronouns(project_name: str, payload: dict):
         timeline = pair.get("timeline", [])
         if not isinstance(timeline, list) or not timeline:
             raise ValueError("Cặp xưng hô chưa có lịch sử để chỉnh sửa")
-        latest_entry = max(
-            (
-                (index, item)
-                for index, item in enumerate(timeline)
-                if isinstance(item, dict)
-            ),
-            key=lambda entry: (entry[1].get("chapter_number", 0), entry[0]),
-            default=None,
-        )
+        requested_index = payload.get("timeline_index")
+        if requested_index is None:
+            latest_entry = max(
+                (
+                    (index, item)
+                    for index, item in enumerate(timeline)
+                    if isinstance(item, dict)
+                ),
+                key=lambda entry: (entry[1].get("chapter_number", 0), entry[0]),
+                default=None,
+            )
+        else:
+            if isinstance(requested_index, bool) or not str(requested_index).isdigit():
+                raise ValueError("Mốc lịch sử xưng hô không hợp lệ")
+            index = int(requested_index)
+            latest_entry = (
+                (index, timeline[index])
+                if index < len(timeline) and isinstance(timeline[index], dict)
+                else None
+            )
         if latest_entry is None:
-            raise ValueError("Bản ghi xưng hô gần nhất không hợp lệ")
+            raise ValueError("Không tìm thấy mốc lịch sử xưng hô")
         latest = latest_entry[1]
+        expected_speaker = str(payload.get("expected_speaker", "")).strip()
+        expected_listener = str(payload.get("expected_listener", "")).strip()
+        if (
+            expected_speaker and expected_speaker != str(latest.get("speaker", "")).strip()
+        ) or (
+            expected_listener and expected_listener != str(latest.get("listener", "")).strip()
+        ):
+            raise ValueError("Mốc lịch sử đã thay đổi; hãy tải lại dữ liệu rồi thử lại")
         fields = {
             "speaker_self": str(payload.get("speaker_self", "")).strip(),
             "speaker_to_listener": str(payload.get("speaker_to_listener", "")).strip(),

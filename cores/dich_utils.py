@@ -2257,33 +2257,6 @@ def format_pronoun_context(
 
 # ==== PIPELINE HẬU DỊCH ====
 
-# ── Helpers upload file qua Files API ──
-
-
-def _upload_file_part(client, file_path, display_name, mime_type="text/plain"):
-    """
-    Upload mot file local len Gemini Files API.
-    Tra ve types.Part neu thanh cong, None neu loi / file khong ton tai.
-    """
-    if not os.path.exists(file_path):
-        print(f"[UPLOAD] Khong tim thay file: {file_path}")
-        return None
-    try:
-        print(
-            f"[UPLOAD] Uploading '{display_name}' ({os.path.getsize(file_path):,} bytes)..."
-        )
-        uploaded = client.files.upload(
-            file=file_path,
-            config={"mime_type": mime_type, "display_name": display_name},
-        )
-        print(f"[UPLOAD] Done: {uploaded.uri}")
-        return types.Part(
-            file_data=types.FileData(file_uri=uploaded.uri, mime_type=mime_type)
-        )
-    except Exception as e:
-        print(f"[UPLOAD] Loi upload '{display_name}': {e}")
-        return None
-
 
 def _character_blocks(markdown):
     matches = list(re.finditer(r"(?m)^## (?!#)(.+?)\s*$", markdown or ""))
@@ -2436,7 +2409,7 @@ def polish_translation(
     Buoc 1 pipeline hau dich: Bien tap trau chuot van phong VA chinh xung ho cung luc.
     Dung gemini-3-flash-preview qua API.
 
-    Upload qua Files API:
+    Gui tai lieu tham chieu truc tiep dang text trong request:
       - characters snapshot    -> ho so nhan vat lien quan den chuong
       - pronouns_snapshot.yaml -> fallback khi khong co context xung ho da loc
 
@@ -2518,26 +2491,47 @@ Nội dung dịch:
 
         while True:
             try:
-                # Kiem tra va upload file neu can (khi doi API key hoac lan dau)
-                client = get_client()
+                # Tao lai cac text part khi doi API key hoac o lan goi dau.
                 global current_key_index
                 if current_upload_key_index != current_key_index:
                     extra_parts = []
-                    characters_upload_path = tmp_characters or characters_md_path
-                    # Giữ tên file mà prompt mặc định đã hướng dẫn model tra cứu.
                     characters_display_name = "characters.md"
-                    chars_part = _upload_file_part(
-                        client, characters_upload_path, characters_display_name
+                    character_content = next(
+                        (
+                            item["content"]
+                            for item in log_attachments
+                            if item["name"] == characters_display_name
+                        ),
+                        "",
+                    )
+                    chars_part = (
+                        {
+                            "text": f"## Reference file: {characters_display_name}\n\n{character_content}"
+                        }
+                        if character_content
+                        else None
                     )
                     if chars_part:
                         extra_parts.append(chars_part)
 
-                    if tmp_pronouns:
-                        pron_part = _upload_file_part(
-                            client, tmp_pronouns, "pronouns_snapshot.yaml"
-                        )
-                        if pron_part:
-                            extra_parts.append(pron_part)
+                    pronoun_content = next(
+                        (
+                            item["content"]
+                            for item in log_attachments
+                            if item["name"] == "pronouns_snapshot.yaml"
+                        ),
+                        "",
+                    )
+                    pron_part = (
+                        {
+                            "text": "## Reference file: pronouns_snapshot.yaml\n\n"
+                            + pronoun_content
+                        }
+                        if pronoun_content
+                        else None
+                    )
+                    if pron_part:
+                        extra_parts.append(pron_part)
 
                     current_upload_key_index = current_key_index
 
@@ -2545,15 +2539,11 @@ Nội dung dịch:
                     attach_lines = []
                     if chars_part:
                         attach_lines.append(
-                            f"- {characters_display_name} (file đính kèm): Hồ sơ nhân vật liên quan."
+                            f"- {characters_display_name} (văn bản tham chiếu): Hồ sơ nhân vật liên quan."
                         )
-                    if (
-                        tmp_pronouns
-                        and extra_parts
-                        and len(extra_parts) > (1 if chars_part else 0)
-                    ):
+                    if pron_part:
                         attach_lines.append(
-                            "- pronouns_snapshot.yaml (file dinh kem): Lich su xung ho 50 chuong gan nhat — dung de chinh dai tu xung ho cho dung."
+                            "- pronouns_snapshot.yaml (van ban tham chieu): Lich su xung ho 50 chuong gan nhat — dung de chinh dai tu xung ho cho dung."
                         )
                     attach_block = (
                         "\n## Tai lieu tham chieu dinh kem:\n"
@@ -2636,10 +2626,9 @@ Chỉ xuất đúng định dạng sau:
                     print("[POLISH] Doi key, cho 30s roi thu lai...")
                     time.sleep(30)
                 elif "403" in err or "PERMISSION_DENIED" in err:
-                    # Co the file bi xoa hoac api key hien tai khong the truy cap file do, doi key luon
                     switch_api_key()
                     print(
-                        "[POLISH] Loi quyen truy cap file, doi key, cho 15s roi thu lai..."
+                        "[POLISH] Loi quyen truy cap API, doi key, cho 15s roi thu lai..."
                     )
                     time.sleep(15)
                 elif any(code in err for code in ["500", "502", "503", "504"]):

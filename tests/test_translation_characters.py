@@ -135,9 +135,7 @@ class TranslationCharacterTests(unittest.TestCase):
                 "title_translation": "Cũ",
                 "translation": "Bản dịch cũ",
             }
-            with patch.object(dich_utils, "get_client", return_value=object()), \
-                    patch.object(dich_utils, "_upload_file_part", return_value={"file": "characters"}), \
-                    patch.object(dich_utils, "call_gemini", return_value=response), \
+            with patch.object(dich_utils, "call_gemini", return_value=response) as call, \
                     patch.object(dich_utils, "log_api_call") as log:
                 result = dich_utils.polish_translation(
                     chapter, 1, pronoun_context="Alice: cô", characters_md_path=source
@@ -146,6 +144,12 @@ class TranslationCharacterTests(unittest.TestCase):
         attachments = log.call_args.kwargs["attachments"]
         self.assertEqual(attachments[0]["name"], "characters.md")
         self.assertIn("Alice", attachments[0]["content"])
+        request_parts = call.call_args.kwargs["extra_parts"]
+        self.assertEqual(
+            request_parts[0]["text"],
+            f"## Reference file: characters.md\n\n{attachments[0]['content']}",
+        )
+        self.assertFalse(any("file_data" in part for part in request_parts))
         prompt = log.call_args.args[3]
         self.assertLess(
             prompt.index("Hồ sơ nhân vật đính kèm"),

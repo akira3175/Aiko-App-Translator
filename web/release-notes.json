@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "0.12.3",
+      "date": "2026-08-15",
+      "title": "Chỉnh lịch sử xưng hô, polish ổn định hơn",
+      "summary": "Bản cập nhật cho phép sửa chính xác từng mốc xưng hô và thống nhất cách gửi tài liệu tham chiếu trong bước polish.",
+      "highlights": [
+        "Cho phép chỉnh sửa trực tiếp từng mốc trong lịch sử xưng hô; app cập nhật đúng bản ghi được chọn, không ảnh hưởng các mốc còn lại và tự tạo pronouns.yaml.bak.",
+        "Chuyển tài liệu nhân vật và xưng hô của bước polish sang dạng văn bản tham chiếu, giống lượt dịch V1; áp dụng chung cho V1, V2 và V3, không còn phụ thuộc Gemini Files API."
+      ]
+    },
+    {
       "version": "0.12.2",
       "date": "2026-08-14",
       "title": "V1 Interactions ổn định hơn, cấu hình Gemini gọn hơn",
