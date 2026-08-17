@@ -297,6 +297,7 @@ const pipelineItems = [
   {id:'v2',code:'V2',group:'translation',title:'Gemini Web',desc:'Dịch đơn chương qua hồ sơ trình duyệt Gemini.'},
   {id:'v3',code:'V3',group:'translation',title:'Gemini Web Batch',desc:'Dịch nhiều chương mỗi batch và chạy hậu xử lý.'},
   {id:'gpt',code:'GPT',group:'translation',title:'ChatGPT Web',desc:'Dịch batch qua hồ sơ trình duyệt ChatGPT.'},
+  {id:'gpt-v2',code:'G2',group:'translation',title:'ChatGPT Web V2',desc:'Dịch, hiệu đính, xưng hô và review theo cùng batch.'},
   {id:'gpt-api',code:'GA',group:'translation',title:'GPT API',desc:'Dịch và hiệu đính tuần tự trước khi lưu.'},
   {id:'manual',code:'MN',group:'translation',title:'Dịch thủ công',desc:'Xuất prompt và nhận kết quả AI trực tiếp.'},
   {id:'context-api',code:'CA',group:'memory',title:'Tạo context bằng Gemini API',desc:'Sinh glossary bằng API, không cần mở trình duyệt.'},
@@ -314,6 +315,7 @@ const taskSchemas = {
   v2:{title:'Gemini Web V2',description:'Cấu hình browser và phạm vi chạy ngay tại đây.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập Gemini','checkbox',true]]},
   v3:{title:'Gemini Web V3',description:'Cấu hình browser, batch và phạm vi chạy.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập Gemini','checkbox',true],['batch_size','Số chương mỗi batch','number','2'],['batch_runs','Số lần chạy batch (0 = đến hết)','number','1']]},
   gpt:{title:'ChatGPT Web',description:'Cấu hình browser, batch và phạm vi chạy.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập ChatGPT','checkbox',true],['batch_size','Số chương mỗi batch','number','1'],['batch_runs','Số lần chạy batch (0 = đến hết)','number','1']]},
+  'gpt-v2':{title:'ChatGPT Web V2',description:'Một batch size dùng chung; mỗi công đoạn chạy trong chat mới.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập ChatGPT','checkbox',true],['batch_size','Số chương mỗi batch','number','1'],['batch_runs','Số lần chạy batch (0 = đến hết)','number','1'],['gpt_v2_polish','Hiệu đính','checkbox',true],['gpt_v2_pronouns','Xuất xưng hô','checkbox',true],['gpt_v2_review','Review','checkbox',true]]},
   'gpt-api':{title:'GPT API · Dịch và hiệu đính',description:'Mỗi chương được dịch rồi hiệu đính bằng hai lượt GPT API trước khi lưu.',fields:[]},
   characters:{title:'Tạo hồ sơ nhân vật',description:'Phân tích raw theo phạm vi. Chỉ tăng tiến độ khi AI trả về hồ sơ hợp lệ.',fields:[['character_model','Model Gemini','text','gemini-3.5-flash'],['character_batch_size','Số segment mỗi batch','number','10'],['character_start','Bắt đầu từ segment','number','1'],['character_end','Kết thúc tại segment (để trống = hết)','number',''],['character_retries','Số lần thử API','number','3'],['character_force','Chạy lại phạm vi đã xử lý','checkbox',false]]},
   manual:{title:'Dịch thủ công',description:'Sao chép prompt đầy đủ, gửi cho AI rồi dán kết quả để lưu và hậu xử lý.',fields:[]},
@@ -371,6 +373,10 @@ function r2CredentialGuide(kind){
 
 function renderPythonSettings(items) {
   settingsItems=items;
+  if(!$('#openAppBrowser')){
+    $('#workspaceSettings').insertAdjacentHTML('afterbegin',`<section class="app-browser-card"><div><strong>Chrome của ứng dụng</strong><small>Dùng chung cho ChatGPT, Gemini và duyệt web. Bạn có thể đăng nhập, đăng xuất hoặc đổi tài khoản tùy ý.</small></div><button class="primary" id="openAppBrowser" type="button">Mở Chrome</button></section>`);
+    $('#openAppBrowser').onclick=openAppBrowser;
+  }
   if(!$('#publishingR2Manager')){
     $('#publishingManager').insertAdjacentHTML('afterend',`<div class="cloudflare-deploy-manager" id="publishingR2Manager"><div class="cloudflare-deploy-head"><strong>Tự động thiết lập R2 xuất bản</strong><small>Tạo hoặc cập nhật bucket ảnh public và tự điền toàn bộ cấu hình R2.</small></div><div class="cloudflare-deploy-fields"><label><small>Cloudflare Account ID</small><input id="publishingR2Account" autocomplete="off" placeholder="32 ký tự"></label><label><small>API Token</small><input id="publishingR2Token" type="password" autocomplete="new-password" placeholder="Không lưu token gốc"></label><label><small>Tên bucket ảnh</small><input id="publishingR2Bucket" placeholder="aiko-images"></label></div><details class="cloudflare-token-guide"><summary>Cách lấy Account ID và API Token</summary><ol><li>Mở <a href="https://dash.cloudflare.com/?to=/:account/r2/overview" target="_blank" rel="noopener noreferrer">Cloudflare → R2 Overview</a>. Trong <strong>Account Details</strong>, sao chép <strong>Account ID</strong> vào ô trên.</li><li>Mở <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener noreferrer">Cloudflare → API Tokens</a>, chọn <strong>Create Token</strong> rồi <strong>Create Custom Token</strong>.</li><li>Thêm quyền <strong>Account · Workers R2 Storage · Edit</strong>.</li><li>Ở Account Resources, chọn tài khoản cần dùng; tạo token rồi sao chép vào ô API Token.</li></ol><small>App chỉ dùng token một lần để thiết lập và không lưu token gốc.</small></details><div class="cloudflare-deploy-actions"><small id="publishingR2Status">Bucket này sẽ được bật public qua r2.dev.</small><button class="primary" id="setupPublishingR2" type="button">Tự động thiết lập</button></div></div>`);
     $('#setupPublishingR2').onclick=setupPublishingR2;
@@ -872,6 +878,13 @@ async function resetPythonSettings() {
   try { renderPythonSettings((await api('/api/settings',{method:'POST',body:JSON.stringify({reset:true})})).items); await loadLanStatus(); toast('Đã khôi phục toàn bộ giá trị mặc định'); }
   catch(error) { toast(error.message); }
   finally { button.disabled=false; }
+}
+
+async function openAppBrowser() {
+  const button=$('#openAppBrowser'); button.disabled=true; button.textContent='Đang mở…';
+  try { const result=await api('/api/app-browser/open',{method:'POST',body:'{}'}); toast(result.message); }
+  catch(error) { toast(error.message); }
+  finally { button.disabled=false; button.textContent='Mở Chrome'; }
 }
 
 async function loadChapters() {
@@ -2103,7 +2116,7 @@ function confirmTask() {
 }
 
 function confirmGlossaryCoverage(kind,config={}) {
-  if(!['v1','v1-interactions','v2','v3','gpt','gpt-api','manual','retranslate'].includes(kind))return true;
+  if(!['v1','v1-interactions','v2','v3','gpt','gpt-v2','gpt-api','manual','retranslate'].includes(kind))return true;
   const glossaryIndex=Number(state.context?.index)||0;
   let startIndex=kind==='retranslate'
     ? state.chapters.findIndex(item=>item.name===state.current)
@@ -2111,7 +2124,7 @@ function confirmGlossaryCoverage(kind,config={}) {
   if(startIndex<0)return true;
   let endChapter=startIndex+1;
   if(kind!=='retranslate'){
-    if(['v3','gpt'].includes(kind)){
+    if(['v3','gpt','gpt-v2'].includes(kind)){
       const batchRuns=Number(config.batch_runs);
       endChapter=batchRuns===0?state.chapters.length:Math.min(state.chapters.length,startIndex+Math.max(1,Number(config.batch_size)||1)*Math.max(1,batchRuns||1));
     }
@@ -2136,7 +2149,7 @@ async function executePipeline(kind,config) {
   const pipelineItem=pipelineItems.find(item=>item.id===kind);
   if(pipelineItem)selectPipelineGroup(pipelineItem.group);
   const button = $(`[data-run="${kind}"]`)||(kind==='hako-edit'?$('#runHakoEdit'):null); button.disabled=true; button.textContent='Đang chạy…'; $('#console').classList.add('open'); updateConsoleOutput('Đang khởi động tác vụ…');
-  const translation=['v1','v1-interactions','v2','v3','gpt','gpt-api','manual'].includes(kind);
+  const translation=['v1','v1-interactions','v2','v3','gpt','gpt-v2','gpt-api','manual'].includes(kind);
   setTaskStopControls(translation,true);
   if (!state.project) { button.disabled=false; button.textContent='Chạy tác vụ'; return toast('Hãy chọn truyện trước'); }
   showView('pipeline');

@@ -40,6 +40,7 @@ from cores.data_paths import (
     R19_WORDS_FILE,
     ensure_user_data_migrated,
 )
+from cores.browser_profile import APP_BROWSER_PROFILE_PATH, chrome_binary_path
 
 try:
     import boto3
@@ -76,6 +77,7 @@ PIPELINES = {
     "v2": ROOT / "cores" / "dich_v2.py",
     "v3": ROOT / "cores" / "dich_v3.py",
     "gpt": ROOT / "cores" / "dich_gpt.py",
+    "gpt-v2": ROOT / "cores" / "dich_gpt_v2.py",
     "gpt-api": ROOT / "cores" / "dich_gpt_api.py",
     "manual": ROOT / "cores" / "dich_v2_manual.py",
     "review": ROOT / "cores" / "review_all.py",
@@ -92,7 +94,7 @@ jobs: dict[str, dict] = {}
 job_processes: dict[str, subprocess.Popen] = {}
 job_stream_events: dict[str, list[dict]] = {}
 chapter_import_previews: dict[str, dict] = {}
-TRANSLATION_KINDS = {"v1", "v1-interactions", "v2", "v3", "gpt", "gpt-api", "manual"}
+TRANSLATION_KINDS = {"v1", "v1-interactions", "v2", "v3", "gpt", "gpt-v2", "gpt-api", "manual"}
 TRANSLATION_LOCK = ROOT / ".runtime" / "translation.lock"
 translation_guard = threading.RLock()
 lan_sessions: set[str] = set()
@@ -175,6 +177,14 @@ SETTING_DEFAULTS = {
     "link_chatgpt": "https://chatgpt.com/",
     "chatgpt_model": "gpt-5.6 sol",
     "chatgpt_thinking": "cao",
+    "gpt_v2_translate_model": "gpt-5.6 sol",
+    "gpt_v2_translate_thinking": "cao",
+    "gpt_v2_polish_model": "gpt-5.6 sol",
+    "gpt_v2_polish_thinking": "cao",
+    "gpt_v2_pronouns_model": "gpt-5.6 sol",
+    "gpt_v2_pronouns_thinking": "cao",
+    "gpt_v2_review_model": "gpt-5.6 sol",
+    "gpt_v2_review_thinking": "cao",
     "fix_max_retry": 3,
     "previous_context_chapters": 3,
     "hako_username": "",
@@ -219,8 +229,16 @@ SETTING_LABELS = {
     "gemini_web_model": "Model Gemini Web (free/pro/thinking)",
     "gemini_thinking": "Mức thinking Gemini Web",
     "link_chatgpt": "Đường dẫn cuộc chat ChatGPT",
-    "chatgpt_model": "Model ChatGPT Web",
-    "chatgpt_thinking": "Mức thinking ChatGPT Web",
+    "chatgpt_model": "V1 · Model ChatGPT Web",
+    "chatgpt_thinking": "V1 · Mức thinking ChatGPT Web",
+    "gpt_v2_translate_model": "V2 · Model dịch",
+    "gpt_v2_translate_thinking": "V2 · Thinking dịch",
+    "gpt_v2_polish_model": "V2 · Model hiệu đính",
+    "gpt_v2_polish_thinking": "V2 · Thinking hiệu đính",
+    "gpt_v2_pronouns_model": "V2 · Model xuất xưng hô",
+    "gpt_v2_pronouns_thinking": "V2 · Thinking xuất xưng hô",
+    "gpt_v2_review_model": "V2 · Model review",
+    "gpt_v2_review_thinking": "V2 · Thinking review",
     "fix_max_retry": "Số lần sửa ký tự ngoại ngữ",
     "previous_context_chapters": "Số chương trước làm ngữ cảnh dịch",
     "hako_username": "Tên đăng nhập Hako",
@@ -278,6 +296,14 @@ SETTING_META = {
     "link_chatgpt": {"group": "chatgpt-web"},
     "chatgpt_model": {"group": "chatgpt-web"},
     "chatgpt_thinking": {"group": "chatgpt-web"},
+    "gpt_v2_translate_model": {"group": "chatgpt-web", "description": "Để trống để dùng Model ChatGPT Web chung."},
+    "gpt_v2_translate_thinking": {"group": "chatgpt-web", "description": "Để trống để dùng thinking chung."},
+    "gpt_v2_polish_model": {"group": "chatgpt-web", "description": "Model riêng cho chat hiệu đính."},
+    "gpt_v2_polish_thinking": {"group": "chatgpt-web", "description": "Thinking riêng cho chat hiệu đính."},
+    "gpt_v2_pronouns_model": {"group": "chatgpt-web", "description": "Model riêng cho chat trích xuất xưng hô."},
+    "gpt_v2_pronouns_thinking": {"group": "chatgpt-web", "description": "Thinking riêng cho chat trích xuất xưng hô."},
+    "gpt_v2_review_model": {"group": "chatgpt-web", "description": "Model riêng cho chat review."},
+    "gpt_v2_review_thinking": {"group": "chatgpt-web", "description": "Thinking riêng cho chat review."},
     "fix_max_retry": {"group": "general"},
     "previous_context_chapters": {"group": "general", "description": "Số bản dịch liền trước được đưa vào prompt. Mặc định: 3."},
     "hako_username": {"group": "publishing"}, "hako_password": {"group": "publishing"},
@@ -1130,6 +1156,27 @@ def isolated_process_kwargs():
     if os.name == "nt":
         return {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)}
     return {"start_new_session": True}
+
+
+def open_app_browser():
+    if active_translation() or any(
+        job.get("status") == "running" for job in jobs.values()
+    ):
+        raise ValueError("Hãy chờ hoặc dừng tác vụ đang chạy trước khi mở Chrome của ứng dụng")
+    chrome = chrome_binary_path()
+    if chrome is None:
+        raise ValueError("Không tìm thấy Chrome hoặc Chromium đi kèm ứng dụng")
+    APP_BROWSER_PROFILE_PATH.mkdir(parents=True, exist_ok=True)
+    subprocess.Popen(
+        [
+            str(chrome),
+            f"--user-data-dir={APP_BROWSER_PROFILE_PATH}",
+            "--new-window",
+            "https://www.google.com/",
+        ],
+        cwd=str(ROOT),
+    )
+    return {"ok": True, "message": "Đã mở Chrome của ứng dụng"}
 
 
 def lookup_source_language(text: str):
@@ -2628,6 +2675,22 @@ def confirm_chapter_import(project_name, payload):
         shutil.rmtree(preview["staging"], ignore_errors=True)
 
 
+STREAM_PROGRESS_PREFIXES = ("✍️ Đang nhận:", "📥 Đang nhận:")
+
+
+def merge_process_output(output: str, line: str) -> str:
+    """Replace the latest live counter instead of adding one console line per tick."""
+    current = line.rstrip("\r\n")
+    if current.startswith(STREAM_PROGRESS_PREFIXES):
+        lines = output.rstrip("\r\n").splitlines()
+        if lines and lines[-1].startswith(STREAM_PROGRESS_PREFIXES):
+            lines[-1] = current
+        else:
+            lines.append(current)
+        return ("\n".join(lines) + "\n")[-12000:]
+    return (output + line)[-12000:]
+
+
 def stream_process_output(process: subprocess.Popen, job_key: str) -> str:
     """Publish child-process output to the web console as each line arrives."""
     output = ""
@@ -2660,7 +2723,7 @@ def stream_process_output(process: subprocess.Popen, job_key: str) -> str:
                     continue
                 except (ValueError, TypeError, json.JSONDecodeError):
                     pass
-            output = (output + line)[-12000:]
+            output = merge_process_output(output, line)
             current = jobs.get(job_key)
             if current is not None:
                 current["output"] = output.rstrip()
@@ -3353,6 +3416,16 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self.json_response(write_settings(self.body()))
             except (ValueError, OSError, json.JSONDecodeError) as exc:
+                return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+        if path == "/api/app-browser/open":
+            if not self.is_loopback():
+                return self.json_response(
+                    {"error": "Chỉ có thể mở Chrome trực tiếp trên máy đang chạy app."},
+                    HTTPStatus.FORBIDDEN,
+                )
+            try:
+                return self.json_response(open_app_browser())
+            except (ValueError, OSError) as exc:
                 return self.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/share-worker/deploy":
             if not self.is_loopback():

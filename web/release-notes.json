@@ -1,6 +1,20 @@
 {
   "versions": [
     {
+      "version": "0.13.0",
+      "date": "2026-08-17",
+      "title": "ChatGPT Web V2 và Chrome dùng chung",
+      "summary": "Thêm pipeline ChatGPT Web hoàn chỉnh, cho phép cấu hình riêng từng giai đoạn và cải thiện khả năng điều khiển trình duyệt tự động.",
+      "highlights": [
+        "Thêm ChatGPT Web V2, chạy toàn bộ quy trình dịch, hiệu đính, xuất xưng hô và review trực tiếp trên ChatGPT Web theo batch.",
+        "Cho phép bật/tắt từng bước hậu dịch và chọn model, mức suy luận riêng cho dịch, hiệu đính, xưng hô và review.",
+        "Mỗi giai đoạn sử dụng chat riêng, tự chọn model và mức suy luận qua menu ChatGPT; cải thiện việc chờ prompt, nhận response và kiểm tra kết quả hoàn tất.",
+        "Tự lưu bản dịch sau từng mốc quan trọng, giúp hạn chế mất kết quả khi một bước hậu dịch gặp lỗi.",
+        "Thêm Chrome của ứng dụng dùng chung cho ChatGPT, Gemini và duyệt web thông thường; người dùng có thể chủ động đăng nhập, đăng xuất hoặc đổi tài khoản.",
+        "Cải thiện nhật ký ChatGPT Web: tiến độ nhận response cập nhật trên một dòng và hỗ trợ tốt hơn terminal Windows dùng tiếng Việt."
+      ]
+    },
+    {
       "version": "0.12.3",
       "date": "2026-08-15",
       "title": "Chỉnh lịch sử xưng hô, polish ổn định hơn",

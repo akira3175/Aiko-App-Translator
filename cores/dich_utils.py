@@ -41,6 +41,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
+from cores.browser_profile import APP_BROWSER_PROFILE_PATH
 from cores.runtime_config import bool_option, int_option, option, web_mode
 from cores.translation_prompts import CHARACTER_DOCUMENT_INSTRUCTION, _r19_placeholder_instruction, project_polish_prompt, with_character_document_instruction, wrap_r19_prompt
 
@@ -76,7 +77,7 @@ LINK_CHATGPT = str(option("link_chatgpt", "https://chatgpt.com/"))
 # ============================================================
 # ★ CẤU HÌNH CHROME SELENIUM
 # ============================================================
-SELENIUM_PROFILE_PATH = os.path.join(USER_DATA_ROOT, "profiles", "gemini")
+SELENIUM_PROFILE_PATH = str(APP_BROWSER_PROFILE_PATH)
 
 
 def chrome_service():
@@ -374,7 +375,16 @@ def get_gemini_driver():
     apply_portable_chrome(options)
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
-    _gemini_driver = webdriver.Chrome(service=chrome_service(), options=options)
+    for start_attempt in range(2):
+        try:
+            _gemini_driver = webdriver.Chrome(service=chrome_service(), options=options)
+            break
+        except SessionNotCreatedException:
+            _gemini_driver = None
+            if start_attempt == 0:
+                _close_orphaned_chatgpt_profile_chrome()
+                continue
+            raise
     _gemini_driver.execute_cdp_cmd(
         "Page.addScriptToEvaluateOnNewDocument",
         {
@@ -1040,13 +1050,13 @@ def generate_content_with_selenium(prompt, max_retries=3, web_model=SELECT_MODEL
 # ============================================================
 # ★ CHATGPT SELENIUM DRIVER
 # ============================================================
-CHATGPT_PROFILE_PATH = os.path.join(USER_DATA_ROOT, "profiles", "chatgpt")
+CHATGPT_PROFILE_PATH = str(APP_BROWSER_PROFILE_PATH)
 
 _chatgpt_driver = None
 
 
 def _close_orphaned_chatgpt_profile_chrome():
-    """Close Chrome processes that are still locking the ChatGPT Selenium profile."""
+    """Close Chrome processes that are still locking the shared app profile."""
     if os.name != "nt":
         return
 
@@ -1076,7 +1086,7 @@ Write-Output $targets.Count
         closed_count = int(output[-1]) if output else 0
         if closed_count:
             print(
-                f"Closed {closed_count} old ChatGPT Chrome process(es) using the Selenium profile."
+                f"Closed {closed_count} old app Chrome process(es) using the shared profile."
             )
             time.sleep(2)
     except Exception:
@@ -1174,7 +1184,7 @@ CHATGPT_SELECT_THINKING = str(option("chatgpt_thinking", "cao"))
 CHATGPT_SELECT_MODEL = str(option("chatgpt_model", "gpt-5.6 sol"))
 
 
-def _open_chatgpt_pill_dropdown(driver):
+def _open_chatgpt_pill_dropdown(driver, purpose="thinking"):
     """
     Click vào pill chọn model/thinking trên ChatGPT.
     Trả về (pill_button, current_text) hoặc (None, None).
@@ -1185,25 +1195,230 @@ def _open_chatgpt_pill_dropdown(driver):
         "button.__composer-pill",
         'button[class*="composer-pill"]',
     ]
-    pill_button = None
+    candidates = []
     for selector in pill_selectors:
         try:
             elements = driver.find_elements(By.CSS_SELECTOR, selector)
             for el in elements:
-                if el.is_displayed():
-                    pill_button = el
-                    break
-            if pill_button:
-                break
+                if el.is_displayed() and el not in candidates:
+                    candidates.append(el)
         except:
             continue
 
+    pill_button = None
+    if purpose == "thinking":
+        thinking_words = (
+            "tuc thi", "instant", "nhanh", "fast", "vua", "medium",
+            "cao", "high", "thinking", "reasoning", "suy nghi",
+        )
+        for candidate in candidates:
+            label = _normalized_chatgpt_label(
+                (candidate.text or "")
+                + " "
+                + (candidate.get_attribute("aria-label") or "")
+            )
+            if any(word in label for word in thinking_words):
+                pill_button = candidate
+                break
     if not pill_button:
-        print("⚠️ Không tìm thấy pill chọn model ChatGPT")
+        print("⚠️ Không tìm thấy pill chọn thinking ChatGPT")
         return None, None
 
     current_text = pill_button.text.strip().lower()
     return pill_button, current_text
+
+
+def _normalized_chatgpt_label(value):
+    value = unicodedata.normalize("NFKD", str(value or "")).casefold()
+    value = "".join(character for character in value if not unicodedata.combining(character))
+    return " ".join(value.split())
+
+
+def _visible_chatgpt_menu_items(driver):
+    selectors = (
+        '[role="menuitemradio"]',
+        '[role="menuitem"]',
+        '[role="option"]',
+        '[data-radix-collection-item]',
+    )
+    items = []
+    for selector in selectors:
+        try:
+            for item in driver.find_elements(By.CSS_SELECTOR, selector):
+                if item.is_displayed() and item not in items:
+                    items.append(item)
+        except Exception:
+            continue
+    return items
+
+
+def _chatgpt_item_text(item):
+    return _normalized_chatgpt_label(
+        item.get_attribute("textContent") or getattr(item, "text", "")
+    )
+
+
+_CHATGPT_VISIBLE_CHOICE_SCRIPT = r"""
+const keywords = arguments[0];
+const normalize = (value) => String(value || '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .replace(/\s+/g, ' ').trim();
+const visible = (element) => {
+  const rect = element.getBoundingClientRect();
+  const style = getComputedStyle(element);
+  return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden'
+    && style.display !== 'none';
+};
+const roots = [...document.querySelectorAll(
+  '[role="menu"],[role="listbox"],[data-radix-popper-content-wrapper],[data-radix-menu-content]'
+)].filter(visible);
+const selector = 'button,[role="menuitem"],[role="menuitemradio"],[role="option"],[data-radix-collection-item]';
+const candidates = [];
+for (const root of roots) {
+  for (const element of root.querySelectorAll(selector)) {
+    if (visible(element) && !candidates.includes(element)) candidates.push(element);
+  }
+}
+const scored = candidates.map((element) => {
+  const text = normalize(element.textContent);
+  const lines = String(element.textContent || '').split(/\r?\n/).map(normalize);
+  const exact = keywords.some((word) => text === word || lines.includes(word));
+  const contains = keywords.some((word) => text.includes(word));
+  const rect = element.getBoundingClientRect();
+  return {element, exact, contains, area: rect.width * rect.height};
+}).filter((item) => item.exact || item.contains);
+scored.sort((a, b) => Number(b.exact) - Number(a.exact) || a.area - b.area);
+return scored.length ? scored[0].element : null;
+"""
+
+
+def _find_visible_chatgpt_choice(driver, keywords):
+    normalized = [_normalized_chatgpt_label(keyword) for keyword in keywords]
+    return driver.execute_script(_CHATGPT_VISIBLE_CHOICE_SCRIPT, normalized)
+
+
+def _visible_chatgpt_intelligence_picker(driver):
+    try:
+        for picker in driver.find_elements(
+            By.CSS_SELECTOR, '[data-testid="composer-intelligence-picker-content"]'
+        ):
+            if picker.is_displayed():
+                return picker
+    except Exception:
+        pass
+    return None
+
+
+def _open_chatgpt_intelligence_picker(driver):
+    picker = _visible_chatgpt_intelligence_picker(driver)
+    if picker:
+        for _ in range(2):
+            ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+            time.sleep(0.2)
+            if not _visible_chatgpt_intelligence_picker(driver):
+                break
+    ActionChains(driver).key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys(
+        "m"
+    ).key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
+    try:
+        return WebDriverWait(driver, 10, poll_frequency=0.2).until(
+            lambda current_driver: _visible_chatgpt_intelligence_picker(
+                current_driver
+            )
+            or False
+        )
+    except TimeoutException:
+        return None
+
+
+def _select_chatgpt_advanced_option(driver, row_label, target_keywords):
+    """Select a model/reasoning radio item in the current intelligence picker."""
+    has_new_picker = bool(
+        driver.find_elements(
+            By.CSS_SELECTOR, '[data-testid="composer-intelligence-picker-content"]'
+        )
+    )
+    picker = _open_chatgpt_intelligence_picker(driver)
+    if not picker:
+        return False if has_new_picker else None
+
+    try:
+        advanced = picker.find_element(
+            By.CSS_SELECTOR,
+            '[data-testid="composer-model-picker-slider-advanced-view"]',
+        )
+        if advanced.get_attribute("data-active") != "true":
+            toggle = picker.find_element(
+                By.CSS_SELECTOR,
+                '[role="menuitem"][aria-label*="tùy chọn nâng cao" i]',
+            )
+            driver.execute_script("arguments[0].click();", toggle)
+            advanced = WebDriverWait(driver, 5, poll_frequency=0.2).until(
+                lambda _driver: picker.find_element(
+                    By.CSS_SELECTOR,
+                    '[data-testid="composer-model-picker-slider-advanced-view"]'
+                    '[data-active="true"]',
+                )
+            )
+
+        normalized_row = _normalized_chatgpt_label(row_label)
+        row = None
+        for item in advanced.find_elements(
+            By.CSS_SELECTOR, '[role="menuitem"][aria-haspopup="menu"]'
+        ):
+            labels = item.find_elements(By.CSS_SELECTOR, ".truncate")
+            first_label = labels[0].text if labels else item.text
+            if _normalized_chatgpt_label(first_label) == normalized_row:
+                row = item
+                break
+        if row is None:
+            return False
+
+        row_text = _normalized_chatgpt_label(row.text)
+        normalized_targets = [
+            _normalized_chatgpt_label(keyword) for keyword in target_keywords
+        ]
+        if any(target in row_text for target in normalized_targets):
+            ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+            return True
+
+        driver.execute_script("arguments[0].click();", row)
+        target = WebDriverWait(driver, 5, poll_frequency=0.2).until(
+            lambda current_driver: _find_visible_chatgpt_choice(
+                current_driver, normalized_targets
+            )
+            or False
+        )
+        ActionChains(driver).move_to_element(target).click().perform()
+        time.sleep(0.5)
+        return True
+    except (NoSuchElementException, TimeoutException, StaleElementReferenceException):
+        ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+        return False
+
+
+def _find_chatgpt_model_button(driver):
+    selectors = (
+        'button[data-testid="model-switcher-dropdown-button"]',
+        'button[aria-label*="model" i]',
+        'button[aria-haspopup="menu"]',
+    )
+    for selector in selectors:
+        try:
+            for button in driver.find_elements(By.CSS_SELECTOR, selector):
+                text = _normalized_chatgpt_label(
+                    (button.text or "")
+                    + " "
+                    + (button.get_attribute("aria-label") or "")
+                )
+                if button.is_displayed() and any(
+                    keyword in text
+                    for keyword in ("model", "gpt", "chatgpt", "sol", "thinking", "instant")
+                ):
+                    return button
+        except Exception:
+            continue
+    return None
 
 
 def select_chatgpt_thinking(driver, level=CHATGPT_SELECT_THINKING):
@@ -1220,56 +1435,31 @@ def select_chatgpt_thinking(driver, level=CHATGPT_SELECT_THINKING):
 
     # Danh sách các từ khóa có thể xuất hiện trong DOM (hỗ trợ cả tiếng Anh lẫn tiếng Việt)
     level_keywords = {
-        "tức thì": ["tức thì", "instant", "tuc thi"],
-        "instant": ["tức thì", "instant", "tuc thi"],
-        "vừa": ["vừa", "medium", "vua"],
-        "medium": ["vừa", "medium", "vua"],
+        "tuc thi": ["tuc thi", "instant", "nhanh", "fast"],
+        "instant": ["tuc thi", "instant", "nhanh", "fast"],
+        "vua": ["vua", "medium"],
+        "medium": ["vua", "medium"],
         "cao": ["cao", "high"],
         "high": ["cao", "high"],
     }
 
-    target_kws = level_keywords.get(level.strip().lower(), [level.strip().lower()])
+    normalized_level = _normalized_chatgpt_label(level)
+    target_kws = level_keywords.get(normalized_level, [normalized_level])
 
     try:
         print(f"🧠 Đang chọn cấp độ thinking ChatGPT: {level}...")
 
-        # Mở dropdown
-        pill_button, current_text = _open_chatgpt_pill_dropdown(driver)
-        if not pill_button:
-            return False
-
-        # Nếu pill đã hiển thị đúng level → không cần click
-        if any(kw in current_text for kw in target_kws):
-            print(f"✅ Đã ở cấp độ: {current_text}")
-            return True
-
-        # Click mở dropdown
-        driver.execute_script("arguments[0].click();", pill_button)
-        time.sleep(1.5)
-
-        # Tìm menu items
-        menu_items = driver.find_elements(
-            By.CSS_SELECTOR, '[role="menuitemradio"], [role="menuitem"]'
+        advanced_result = _select_chatgpt_advanced_option(
+            driver, "Mức suy luận", target_kws
         )
-        target_item = None
-        for item in menu_items:
-            textContent = item.get_attribute("textContent")
-            if textContent:
-                text = textContent.strip().lower()
-                if any(kw in text for kw in target_kws):
-                    target_item = item
-                    break
-
-        if target_item:
-            ActionChains(driver).move_to_element(target_item).click().perform()
-            time.sleep(1)
+        if advanced_result:
             print(f"✅ Đã chọn cấp độ thinking: {level}")
             return True
-        else:
-            print(f"⚠️ Không tìm thấy option '{level}' trong menu")
-            # Đóng menu
-            ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+        if advanced_result is False:
+            print("⚠️ Không thể chọn Mức suy luận trong intelligence picker")
             return False
+        print("⚠️ Ctrl+Shift+M không mở được menu Mô hình/Mức suy luận")
+        return False
 
     except Exception as e:
         print(f"⚠️ Lỗi khi chọn thinking level ChatGPT: {e}")
@@ -1283,89 +1473,25 @@ def select_chatgpt_model(driver, model=CHATGPT_SELECT_MODEL):
     if not model:
         return True
 
-    target_model = model.strip().lower()
+    target_model = _normalized_chatgpt_label(model)
+    model_keywords = [target_model]
+    if target_model in {"gpt-5.6 sol", "gpt 5.6 sol", "gpt-5.6"}:
+        model_keywords = ["gpt-5.6 sol", "gpt 5.6 sol", "gpt-5.6", "gpt 5.6", "sol"]
 
     try:
         print(f"📌 Đang chọn model ChatGPT: {model}...")
 
-        # Mở dropdown
-        pill_button, _ = _open_chatgpt_pill_dropdown(driver)
-        if not pill_button:
-            return False
-
-        ActionChains(driver).move_to_element(pill_button).click().perform()
-        time.sleep(1.5)
-
-        # Tìm tất cả items
-        all_items = driver.find_elements(
-            By.CSS_SELECTOR, '[role="menuitem"], [role="menuitemradio"]'
+        advanced_result = _select_chatgpt_advanced_option(
+            driver, "Mô hình", model_keywords
         )
-
-        # Xem có model trực tiếp không
-        for item in all_items:
-            textContent = item.get_attribute("textContent")
-            if textContent and target_model in textContent.strip().lower():
-                ActionChains(driver).move_to_element(item).click().perform()
-                time.sleep(1)
-                print(f"✅ Đã chọn model: {model}")
-                return True
-
-        # Bước 1: Tìm submenu trigger
-        submenu_trigger = None
-        for item in all_items:
-            # Lấy element có popup hoặc không phải thinking level
-            if (
-                item.get_attribute("aria-haspopup")
-                or item.get_attribute("role") == "menuitem"
-            ):
-                textContent = item.get_attribute("textContent")
-                if textContent:
-                    text = textContent.strip().lower()
-                    if text and not any(
-                        kw in text
-                        for kw in ["tức thì", "vừa", "cao", "instant", "medium", "high"]
-                    ):
-                        submenu_trigger = item
-                        break
-
-        if not submenu_trigger:
-            print(f"⚠️ Không tìm thấy submenu trigger hoặc model '{model}'")
-            # Click escape or body to close
-            ActionChains(driver).send_keys(Keys.ESCAPE).perform()
-            return False
-
-        # Click submenu trigger để mở danh sách model
-        driver.execute_script(
-            "arguments[0].scrollIntoView({block: 'center'});", submenu_trigger
-        )
-        time.sleep(0.5)
-        ActionChains(driver).move_to_element(submenu_trigger).click().perform()
-        time.sleep(1.5)
-
-        # Bước 2: Tìm model trong submenu
-        sub_items = driver.find_elements(By.CSS_SELECTOR, '[role="menuitemradio"]')
-        target_item = None
-        for item in sub_items:
-            textContent = item.get_attribute("textContent")
-            if textContent:
-                text = textContent.strip().lower()
-                if target_model in text:
-                    target_item = item
-                    break
-
-        if target_item:
-            driver.execute_script(
-                "arguments[0].scrollIntoView({block: 'center'});", target_item
-            )
-            time.sleep(0.5)
-            ActionChains(driver).move_to_element(target_item).click().perform()
-            time.sleep(1)
+        if advanced_result:
             print(f"✅ Đã chọn model: {model}")
             return True
-        else:
-            print(f"⚠️ Không tìm thấy model '{model}' trong submenu")
-            ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+        if advanced_result is False:
+            print("⚠️ Không thể chọn Mô hình trong intelligence picker")
             return False
+        print("⚠️ Ctrl+Shift+M không mở được menu Mô hình/Mức suy luận")
+        return False
 
     except Exception as e:
         print(f"⚠️ Lỗi khi chọn model ChatGPT: {e}")
@@ -1463,11 +1589,43 @@ def _chatgpt_response_text(response_turn):
     return response_turn.text.strip()
 
 
+_CHATGPT_SEND_SELECTORS = (
+    'button[data-testid="send-button"]',
+    'button[aria-label="Send prompt"]',
+    'button[aria-label="Gửi tin nhắn"]',
+    'button[aria-label="Send message"]',
+    'form button[type="submit"]',
+    "button.bottom-0",
+)
+
+
+def _ready_chatgpt_send_button(driver):
+    """Return Send only after ChatGPT has finished preparing the pasted prompt."""
+    for selector in _CHATGPT_SEND_SELECTORS:
+        try:
+            for element in driver.find_elements(By.CSS_SELECTOR, selector):
+                disabled = element.get_attribute("disabled")
+                aria_disabled = str(element.get_attribute("aria-disabled") or "").lower()
+                if (
+                    element.is_displayed()
+                    and element.is_enabled()
+                    and disabled is None
+                    and aria_disabled != "true"
+                ):
+                    return element
+        except StaleElementReferenceException:
+            continue
+        except Exception:
+            continue
+    return False
+
+
 def generate_content_with_chatgpt(
     prompt,
     max_retries=3,
     chatgpt_model=CHATGPT_SELECT_MODEL,
     chatgpt_thinking=CHATGPT_SELECT_THINKING,
+    chat_url=None,
 ):
     """
     Gửi prompt đến ChatGPT web và lấy response.
@@ -1481,7 +1639,7 @@ def generate_content_with_chatgpt(
             driver = get_chatgpt_driver()
             wait = WebDriverWait(driver, 60)
 
-            driver.get(LINK_CHATGPT)
+            driver.get(chat_url or LINK_CHATGPT)
             time.sleep(3)
 
             # ── Bước 0: Chọn model và thinking level ──
@@ -1549,8 +1707,11 @@ def generate_content_with_chatgpt(
                     prompt,
                 )
 
-            print("⏳ Đang đợi 30s để ChatGPT xử lý file text đính kèm...")
-            time.sleep(30)
+            print("⏳ Đang chờ ChatGPT nạp xong prompt...")
+            send_button = WebDriverWait(driver, 300, poll_frequency=0.25).until(
+                _ready_chatgpt_send_button
+            )
+            print("✅ Prompt đã sẵn sàng, nút Gửi đã được bật.")
 
             # Ghi dấu toàn bộ hội thoại cũ ngay trước lúc gửi. Không được lấy
             # response cuối trang vì nó có thể là bản dịch của lần chạy trước.
@@ -1560,34 +1721,7 @@ def generate_content_with_chatgpt(
             )
 
             # ── Bước 3: Nhấn nút gửi ──
-            send_selectors = [
-                'button[data-testid="send-button"]',
-                'button[aria-label="Send prompt"]',
-                'button[aria-label="Gửi tin nhắn"]',
-                'button[aria-label="Send message"]',
-                'form button[type="submit"]',
-                "button.bottom-0",  # Fallback vị trí
-            ]
-            send_button = None
-            for selector in send_selectors:
-                try:
-                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                    for el in elements:
-                        if el.is_displayed() and el.is_enabled():
-                            send_button = el
-                            break
-                    if send_button:
-                        break
-                except:
-                    continue
-
-            if send_button:
-                driver.execute_script("arguments[0].click();", send_button)
-            else:
-                # Fallback: Ctrl+Enter hoặc Enter
-                ActionChains(driver).key_down(Keys.CONTROL).send_keys(
-                    Keys.RETURN
-                ).key_up(Keys.CONTROL).perform()
+            driver.execute_script("arguments[0].click();", send_button)
 
             print(
                 f"📤 Đã gửi prompt ({len(prompt)} ký tự). Đang chờ ChatGPT response..."

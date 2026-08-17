@@ -243,6 +243,10 @@
 .update-card > div { display: grid; gap: 5px; }
 .update-card strong { font-size: 15px; }
 .update-card small { color: var(--muted); line-height: 1.45; }
+.app-browser-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 2px 18px; border-bottom: 1px solid var(--line); }
+.app-browser-card > div { display: grid; gap: 5px; }
+.app-browser-card strong { font-size: 15px; }
+.app-browser-card small { color: var(--muted); line-height: 1.45; }
 .update-actions { display: flex!important; grid-auto-flow: column; gap: 8px!important; }
 .update-label { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .1em; }
 .whats-new-modal { width: min(680px,calc(100vw - 28px)); overflow: hidden; }
@@ -257,6 +261,8 @@
 .whats-new-empty { padding: 24px; color: var(--muted); text-align: center; }
 @media(max-width:600px) {
   .update-card { align-items: stretch; flex-direction: column; }
+  .app-browser-card { align-items: stretch; flex-direction: column; }
+  .app-browser-card button { width: 100%; }
   .update-actions { grid-auto-flow: row; }
   .update-card button { width: 100%; }
   .whats-new-head { display: grid; }

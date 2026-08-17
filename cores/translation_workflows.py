@@ -283,6 +283,7 @@ def run_batch_translation(
     raw_dir,
     translated_dir,
     context_path,
+    batch_postprocess=None,
 ):
     """Translate and persist the first consecutive untranslated batch."""
     raw_files = scan_md_dir(raw_dir)
@@ -340,6 +341,43 @@ def run_batch_translation(
             chapter["title_translation"] = title
             chapter["translation"] = content
             print(f"✔ Dịch sơ bộ xong: {chapter['id']} — {title}")
+
+        if batch_postprocess is not None:
+            # Checkpoint bản dịch sơ bộ trước khi mở các chat hậu dịch.
+            for chapter, path in zip(batch, batch_paths):
+                save_translated_md(
+                    path,
+                    translated_dir,
+                    chapter["title_translation"],
+                    chapter["translation"],
+                )
+            def checkpoint(processed_results):
+                for checkpoint_chapter, checkpoint_path, result in zip(
+                    batch, batch_paths, processed_results
+                ):
+                    checkpoint_chapter["title_translation"] = result[0]
+                    checkpoint_chapter["translation"] = result[1]
+                    save_translated_md(
+                        checkpoint_path, translated_dir, result[0], result[1]
+                    )
+
+            processed = batch_postprocess(
+                batch,
+                start_chapter_number,
+                context_text,
+                pronoun_context,
+                pronouns_path,
+                checkpoint,
+            )
+            for chapter, path, (title, content) in zip(batch, batch_paths, processed):
+                chapter["title_translation"] = title
+                chapter["translation"] = content
+                output_path = save_translated_md(
+                    path, translated_dir, title, content
+                )
+                print(f"✅ Đã lưu: {output_path}")
+            print(f"✅ Hoàn tất Batch {len(batch)} chương!")
+            return len(batch)
 
         print("\n🔧 Đang chạy pipeline hậu dịch cho từng chương trong batch...")
         for offset, (chapter, path) in enumerate(zip(batch, batch_paths)):
