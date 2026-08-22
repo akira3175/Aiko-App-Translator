@@ -2,6 +2,7 @@ import tempfile
 import unittest
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import app
@@ -37,7 +38,11 @@ class PronounHistoryTests(unittest.TestCase):
                 json.dumps(original, ensure_ascii=False), encoding="utf-8"
             )
 
-            with patch.object(app, "safe_project", return_value=project):
+            with patch.object(
+                app,
+                "library_service",
+                SimpleNamespace(safe_project=lambda _name: project),
+            ):
                 result = app.save_pronouns(
                     "project",
                     {

@@ -17,6 +17,7 @@ from services.library.repository import (
     validate_new_project_name,
     word_count,
 )
+from services.library.service import LibraryService
 
 __all__ = [
     "chapter_images",
@@ -34,4 +35,5 @@ __all__ = [
     "text_metric",
     "validate_new_project_name",
     "word_count",
+    "LibraryService",
 ]

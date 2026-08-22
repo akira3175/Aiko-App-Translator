@@ -21,23 +21,7 @@ from cores.storage.project import (
 )
 from providers.registry import pipeline_config, provider_payload
 from services.exporting import BookExportService
-from services.library import (
-    chapter_images as library_chapter_images,
-    chapter_key as library_chapter_key,
-    chapter_title as library_chapter_title,
-    chapters as library_chapters,
-    cjk_character_ratio as library_cjk_character_ratio,
-    clean_metric_text as library_clean_metric_text,
-    project_folders as library_project_folders,
-    projects as library_projects,
-    read_live_utf8 as library_read_live_utf8,
-    safe_file as library_safe_file,
-    safe_image as library_safe_image,
-    safe_project as library_safe_project,
-    text_metric as library_text_metric,
-    validate_new_project_name as library_validate_new_project_name,
-    word_count as library_word_count,
-)
+from services.library import LibraryService
 from services.importing import (
     cancel as cancel_chapter_import,
     confirm as confirm_staged_chapter_import,
@@ -119,6 +103,7 @@ LIBRARY = ROOT / "truyen"
 PORT = 8765
 SERVER_STATE = {"host": "127.0.0.1"}
 MAX_PROJECT_NAME_LENGTH = 60
+library_service = LibraryService(LIBRARY, MAX_PROJECT_NAME_LENGTH)
 VERSION_FILE = ROOT / "VERSION"
 APP_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip() if VERSION_FILE.exists() else "0.0.0-dev"
 GITHUB_REPOSITORY = "akira3175/Aiko-App-Translator"
@@ -279,11 +264,11 @@ def _redact_log_text(value):
 
 
 def ai_logs_data(project_name: str, limit=200):
-    return ai_log_service.read(safe_project(project_name), limit)
+    return ai_log_service.read(library_service.safe_project(project_name), limit)
 
 
 def clear_ai_logs(project_name: str):
-    return ai_log_service.clear(safe_project(project_name))
+    return ai_log_service.clear(library_service.safe_project(project_name))
 
 
 def _call_r19_gemini(prompt, model):
@@ -294,68 +279,6 @@ def _call_r19_gemini(prompt, model):
 
 def translate_r19_word(project_name: str, payload: dict):
     return r19_service.translate_word(project_name, payload)
-
-
-def safe_project(name: str) -> Path:
-    return library_safe_project(LIBRARY, name)
-
-
-def validate_new_project_name(name: str) -> str:
-    return library_validate_new_project_name(
-        LIBRARY, name, max_length=MAX_PROJECT_NAME_LENGTH
-    )
-
-
-def project_folders(name: str):
-    return library_project_folders(LIBRARY, name)
-
-
-def projects():
-    return library_projects(LIBRARY)
-
-
-def safe_file(folder: Path, name: str) -> Path:
-    return library_safe_file(folder, name)
-
-
-def safe_image(project_name: str, name: str) -> Path:
-    return library_safe_image(LIBRARY, project_name, name)
-
-
-def chapter_images(project_name: str, text: str):
-    return library_chapter_images(LIBRARY, project_name, text)
-
-
-def chapters(project_name: str):
-    return library_chapters(LIBRARY, project_name)
-
-
-def chapter_title(path: Path) -> str:
-    return library_chapter_title(path)
-
-
-def chapter_key(name: str):
-    return library_chapter_key(name)
-
-
-def read_live_utf8(path: Path) -> str:
-    return library_read_live_utf8(path)
-
-
-def clean_metric_text(text: str) -> str:
-    return library_clean_metric_text(text)
-
-
-def cjk_character_ratio(text: str) -> float:
-    return library_cjk_character_ratio(text)
-
-
-def text_metric(path: Path, character_based=None) -> dict:
-    return library_text_metric(path, character_based=character_based)
-
-
-def word_count(path: Path) -> int:
-    return library_word_count(path)
 
 
 def review_data(project_name: str, source: str):
@@ -435,8 +358,8 @@ def save_context(project_name: str, payload: dict):
 def create_chapter_import_preview(
     project_name, source_format, segment_limit, content
 ):
-    project = safe_project(project_name)
-    raw_dir, _translated = project_folders(project_name)
+    project = library_service.safe_project(project_name)
+    raw_dir, _translated = library_service.project_folders(project_name)
     return create_staged_chapter_import(
         project_name,
         project,
@@ -449,8 +372,8 @@ def create_chapter_import_preview(
 
 
 def confirm_chapter_import(project_name, payload):
-    project = safe_project(project_name)
-    raw_dir, _translated = project_folders(project_name)
+    project = library_service.safe_project(project_name)
+    raw_dir, _translated = library_service.project_folders(project_name)
     return confirm_staged_chapter_import(
         project_name, project, raw_dir, payload
     )
@@ -467,7 +390,7 @@ def local_network_ip():
 lan_auth = LanAuth(lan_configuration)
 publishing_service = PublishingService(
     root=ROOT,
-    safe_project=lambda name: safe_project(name),
+    safe_project=lambda name: library_service.safe_project(name),
     configuration=configuration_service,
     provision_share_worker=provision_share_worker,
     provision_publishing_r2=provision_publishing_r2,
@@ -475,14 +398,14 @@ publishing_service = PublishingService(
 )
 sharing_service = SharingService(
     configuration=configuration_service,
-    safe_project=lambda name: safe_project(name),
+    safe_project=lambda name: library_service.safe_project(name),
     boto3_module=boto3,
 )
-pronoun_service = PronounService(lambda name: safe_project(name))
-context_service = ContextService(lambda name: safe_project(name))
-character_service = CharacterService(lambda name: safe_project(name))
-review_service = ReviewService(lambda name: safe_project(name))
-export_service = BookExportService(LIBRARY)
+pronoun_service = PronounService(lambda name: library_service.safe_project(name))
+context_service = ContextService(lambda name: library_service.safe_project(name))
+character_service = CharacterService(lambda name: library_service.safe_project(name))
+review_service = ReviewService(lambda name: library_service.safe_project(name))
+export_service = BookExportService(library_service)
 source_translation_service = SourceTranslationService()
 app_browser_service = AppBrowserService(
     root=ROOT,
@@ -492,7 +415,7 @@ app_browser_service = AppBrowserService(
     chrome_binary=chrome_binary_path,
 )
 r19_service = R19Service(
-    safe_project=lambda name: safe_project(name),
+    safe_project=lambda name: library_service.safe_project(name),
     words_path=lambda: R19_WORDS_FILE,
     config_path=lambda: R19_CONFIG_FILE,
     default_words_path=lambda: R19_DEFAULT_WORDS_FILE,
@@ -517,16 +440,16 @@ lan_routes = LanRoutes(
 project_routes = ProjectRoutes(
     root=ROOT,
     library=LIBRARY,
-    projects=projects,
-    chapters=chapters,
-    project_folders=project_folders,
-    safe_project=safe_project,
-    validate_project_name=validate_new_project_name,
-    safe_file=safe_file,
-    safe_image=safe_image,
-    read_text=read_live_utf8,
-    chapter_images=chapter_images,
-    word_count=word_count,
+    projects=library_service.projects,
+    chapters=library_service.chapters,
+    project_folders=library_service.project_folders,
+    safe_project=library_service.safe_project,
+    validate_project_name=library_service.validate_new_project_name,
+    safe_file=library_service.safe_file,
+    safe_image=library_service.safe_image,
+    read_text=library_service.read_text,
+    chapter_images=library_service.chapter_images,
+    word_count=library_service.word_count,
     export_book=export_service.export,
     import_preview=create_chapter_import_preview,
     import_confirm=confirm_chapter_import,
@@ -551,9 +474,9 @@ job_runner = JobRunner(
     stream_events=job_stream_events,
     saved_settings=saved_settings,
     task_options=r19_task_options,
-    safe_project=safe_project,
-    project_folders=project_folders,
-    safe_file=safe_file,
+    safe_project=library_service.safe_project,
+    project_folders=library_service.project_folders,
+    safe_file=library_service.safe_file,
     canonical_kind=canonical_task_kind,
     translation_stop_file=translation_stop_file,
     update_translation_pid=update_translation_pid,
@@ -569,11 +492,11 @@ job_controller = JobController(
     translation_kinds=TRANSLATION_KINDS,
     canonical_kind=canonical_task_kind,
     active_translation=active_translation,
-    safe_project=safe_project,
+    safe_project=library_service.safe_project,
     validate_hako_targets=validate_hako_edit_targets,
     pipeline_config=pipeline_config,
-    project_folders=project_folders,
-    safe_file=safe_file,
+    project_folders=library_service.project_folders,
+    safe_file=library_service.safe_file,
     claim_translation=claim_translation,
     release_translation=release_translation,
     runner=job_runner,

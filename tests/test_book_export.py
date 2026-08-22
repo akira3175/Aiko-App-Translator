@@ -8,6 +8,7 @@ from xml.etree import ElementTree
 from PIL import Image
 
 from services.exporting import BookExportService
+from services.library import LibraryService
 
 
 class BookExportTests(unittest.TestCase):
@@ -37,7 +38,7 @@ class BookExportTests(unittest.TestCase):
         )
 
     def export(self, root: Path, options: dict):
-        return BookExportService(root).export(self.PROJECT, options)
+        return BookExportService(LibraryService(root)).export(self.PROJECT, options)
 
     def test_markdown_export_respects_volume(self):
         with tempfile.TemporaryDirectory() as directory:

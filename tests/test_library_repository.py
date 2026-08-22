@@ -10,9 +10,19 @@ from services.library.repository import (
     safe_project,
     validate_new_project_name,
 )
+from services.library import LibraryService
 
 
 class LibraryRepositoryTests(unittest.TestCase):
+    def test_service_binds_library_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            library = Path(directory)
+            (library / "Story" / "raw").mkdir(parents=True)
+            service = LibraryService(library)
+
+            self.assertEqual(["Story"], service.projects())
+            self.assertEqual(library / "Story", service.safe_project("Story"))
+
     def test_lists_project_and_builds_chapter_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             library = Path(directory)

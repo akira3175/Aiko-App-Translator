@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import app
@@ -17,7 +18,11 @@ class R19ManagerTests(unittest.TestCase):
             with (
                 patch.object(app, "R19_WORDS_FILE", root / "r19_words.txt"),
                 patch.object(app, "R19_CONFIG_FILE", root / ".runtime" / "r19.json"),
-                patch.object(app, "safe_project", lambda _name: project),
+                patch.object(
+                    app,
+                    "library_service",
+                    SimpleNamespace(safe_project=lambda _name: project),
+                ),
             ):
                 saved = app.write_r19("project", {
                     "enabled": True,
@@ -91,7 +96,11 @@ class R19ManagerTests(unittest.TestCase):
             with (
                 patch.object(app, "R19_WORDS_FILE", root / "r19_words.txt"),
                 patch.object(app, "R19_CONFIG_FILE", root / ".runtime" / "r19.json"),
-                patch.object(app, "safe_project", lambda name: projects[name]),
+                patch.object(
+                    app,
+                    "library_service",
+                    SimpleNamespace(safe_project=lambda name: projects[name]),
+                ),
             ):
                 app.write_r19("a", {"enabled": True, "words": "敏感词 = từ nhạy cảm\n"})
                 self.assertTrue(app.r19_payload("a")["enabled"])
@@ -123,7 +132,11 @@ class R19ManagerTests(unittest.TestCase):
             with (
                 patch.object(app, "R19_WORDS_FILE", words),
                 patch.object(app, "R19_CONFIG_FILE", config),
-                patch.object(app, "safe_project", lambda _name: project),
+                patch.object(
+                    app,
+                    "library_service",
+                    SimpleNamespace(safe_project=lambda _name: project),
+                ),
                 patch.object(app, "active_translation", lambda: None),
                 patch.object(app, "saved_settings", lambda: {"r19_model": "test-model"}),
                 patch.object(app, "_call_r19_gemini", lambda _prompt, _model: '{"translation":"từ nhạy cảm"}'),

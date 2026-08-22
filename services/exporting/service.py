@@ -4,21 +4,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
 
 from services.exporting.book import build_export
-from services.library import (
-    chapters,
-    project_folders,
-    read_live_utf8,
-    safe_file,
-    safe_project,
-)
 
 
 @dataclass(frozen=True)
 class BookExportService:
-    library: Path
+    library: object
 
     def export(self, project_name: str, options: dict):
         export_format = str(options.get("format", "epub")).lower()
@@ -29,7 +21,7 @@ class BookExportService:
 
     def sections(self, project_name: str, options: dict):
         items, source = self._selected_chapters(project_name, options)
-        project_path = safe_project(self.library, project_name)
+        project_path = self.library.safe_project(project_name)
         sections = []
         for item in items:
             title = item["title"] or item["id"]
@@ -49,7 +41,7 @@ class BookExportService:
         return sections
 
     def _selected_chapters(self, project_name: str, options: dict):
-        items = chapters(self.library, project_name)
+        items = self.library.chapters(project_name)
         scope = str(options.get("scope", "all"))
         if scope == "volume":
             volume = int(options.get("volume", 0))
@@ -65,17 +57,19 @@ class BookExportService:
         if not items:
             raise ValueError("Không có chương nào trong phạm vi đã chọn")
 
-        raw_dir, translated_dir = project_folders(self.library, project_name)
+        raw_dir, translated_dir = self.library.project_folders(project_name)
         source = str(options.get("source", "translated"))
         if source not in {"translated", "raw", "bilingual"}:
             raise ValueError("Nguồn nội dung không hợp lệ")
         selected = []
         for item in items:
-            raw_path = safe_file(raw_dir, item["name"])
-            translated_path = safe_file(translated_dir, item["name"])
-            raw_text = read_live_utf8(raw_path) if raw_path.exists() else ""
+            raw_path = self.library.safe_file(raw_dir, item["name"])
+            translated_path = self.library.safe_file(translated_dir, item["name"])
+            raw_text = self.library.read_text(raw_path) if raw_path.exists() else ""
             translated_text = (
-                read_live_utf8(translated_path) if translated_path.exists() else ""
+                self.library.read_text(translated_path)
+                if translated_path.exists()
+                else ""
             )
             if source == "translated" and not translated_text:
                 continue

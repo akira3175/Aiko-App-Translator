@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import app
+from services.library import LibraryService
 
 
 class AiLogTests(unittest.TestCase):
@@ -49,7 +50,7 @@ class AiLogTests(unittest.TestCase):
             (logs / "2026-08-13.jsonl").write_text(
                 "\n".join(json.dumps(item) for item in entries), encoding="utf-8"
             )
-            with patch.object(app, "LIBRARY", library):
+            with patch.object(app, "library_service", LibraryService(library)):
                 result = app.ai_logs_data("Demo")
             self.assertEqual(result["items"][0]["chapter_id"], "v1_c2_s1")
             self.assertNotIn("secret-value", result["items"][0]["prompt"])
@@ -66,7 +67,7 @@ class AiLogTests(unittest.TestCase):
             (logs / "one.jsonl").write_text("{}\n", encoding="utf-8")
             keep = logs / "keep.txt"
             keep.write_text("keep", encoding="utf-8")
-            with patch.object(app, "LIBRARY", library):
+            with patch.object(app, "library_service", LibraryService(library)):
                 result = app.clear_ai_logs("Demo")
             self.assertEqual(result["removed"], 1)
             self.assertTrue(keep.exists())
