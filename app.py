@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 from datetime import timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -47,6 +46,7 @@ from services.importing import (
 from services import ai_logs as ai_log_service
 from services import api_keys as api_key_service
 from services.settings import ConfigurationService
+from services.app_browser import AppBrowserService
 from services.source_translation import SourceTranslationService
 from services.publishing import PublishingService
 from services.context import ContextService
@@ -296,27 +296,6 @@ def translate_r19_word(project_name: str, payload: dict):
     return r19_service.translate_word(project_name, payload)
 
 
-def open_app_browser():
-    if active_translation() or any(
-        job.get("status") == "running" for job in jobs.values()
-    ):
-        raise ValueError("Hãy chờ hoặc dừng tác vụ đang chạy trước khi mở Chrome của ứng dụng")
-    chrome = chrome_binary_path()
-    if chrome is None:
-        raise ValueError("Không tìm thấy Chrome hoặc Chromium đi kèm ứng dụng")
-    APP_BROWSER_PROFILE_PATH.mkdir(parents=True, exist_ok=True)
-    subprocess.Popen(
-        [
-            str(chrome),
-            f"--user-data-dir={APP_BROWSER_PROFILE_PATH}",
-            "--new-window",
-            "https://www.google.com/",
-        ],
-        cwd=str(ROOT),
-    )
-    return {"ok": True, "message": "Đã mở Chrome của ứng dụng"}
-
-
 def safe_project(name: str) -> Path:
     return library_safe_project(LIBRARY, name)
 
@@ -505,6 +484,13 @@ character_service = CharacterService(lambda name: safe_project(name))
 review_service = ReviewService(lambda name: safe_project(name))
 export_service = BookExportService(LIBRARY)
 source_translation_service = SourceTranslationService()
+app_browser_service = AppBrowserService(
+    root=ROOT,
+    profile_path=APP_BROWSER_PROFILE_PATH,
+    jobs=jobs,
+    active_translation=active_translation,
+    chrome_binary=chrome_binary_path,
+)
 r19_service = R19Service(
     safe_project=lambda name: safe_project(name),
     words_path=lambda: R19_WORDS_FILE,
@@ -554,7 +540,7 @@ settings_routes = SettingsRoutes(
     prepare_update=prepare_update,
     ai_logs=ai_logs_data,
     clear_ai_logs=clear_ai_logs,
-    open_app_browser=open_app_browser,
+    open_app_browser=app_browser_service.open,
     active_translation=active_translation,
 )
 job_runner = JobRunner(
