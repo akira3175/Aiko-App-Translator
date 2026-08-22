@@ -1,8 +1,8 @@
 import json
 import unittest
-from unittest.mock import patch
+from urllib.parse import parse_qs
 
-import app
+from services.source_translation import SourceTranslationService
 
 
 class _Response:
@@ -21,27 +21,50 @@ class _Response:
 
 class SelectionLookupTests(unittest.TestCase):
     def test_lookup_language_prefers_script_specific_languages(self):
-        self.assertEqual(app.lookup_source_language("hello"), "en")
-        self.assertEqual(app.lookup_source_language("猫"), "zh-CN")
-        self.assertEqual(app.lookup_source_language("食べる"), "ja")
-        self.assertEqual(app.lookup_source_language("사랑"), "ko")
+        lookup = SourceTranslationService.source_language
+
+        self.assertEqual(lookup("hello"), "en")
+        self.assertEqual(lookup("猫"), "zh-CN")
+        self.assertEqual(lookup("食べる"), "ja")
+        self.assertEqual(lookup("사랑"), "ko")
+        self.assertEqual(lookup("123"), "auto")
 
     def test_translate_details_returns_translation_and_language(self):
         payload = [
-            [["chạy", "run", None, None, 10], [None, None, None, "rən"]],
+            [["chạy", "run", None, None, 10], [None, None, None, "rʌn"]],
             [["verb", ["chạy", "vận hành"]], ["noun", ["lượt chạy"]]],
             "en",
         ]
-        with patch.object(app, "urlopen", return_value=_Response(payload)):
-            result = app.google_translate_details("run")
-        self.assertEqual(result["translated"], "chạy")
-        self.assertEqual(result["detected_language"], "en")
-        self.assertNotIn("pronunciation", result)
-        self.assertNotIn("dictionary", result)
+        calls = []
+
+        def opener(request, timeout):
+            calls.append((request, timeout))
+            return _Response(payload)
+
+        result = SourceTranslationService(opener).translate_details(" run ")
+
+        self.assertEqual(result, {"translated": "chạy", "detected_language": "en"})
+        query = parse_qs(calls[0][0].data.decode("utf-8"))
+        self.assertEqual(["run"], query["q"])
+        self.assertEqual(["en"], query["sl"])
+        self.assertEqual(15, calls[0][1])
 
     def test_translate_details_limits_long_selection(self):
         with self.assertRaisesRegex(ValueError, "5.000"):
-            app.google_translate_details("a" * 5001)
+            SourceTranslationService().translate_details("a" * 5001)
+
+    def test_translate_details_rejects_empty_provider_result(self):
+        service = SourceTranslationService(lambda *_args, **_kwargs: _Response([]))
+
+        with self.assertRaisesRegex(ValueError, "không trả về"):
+            service.translate_details("run")
+
+    def test_translate_details_propagates_network_timeout(self):
+        def timeout(*_args, **_kwargs):
+            raise TimeoutError("timed out")
+
+        with self.assertRaisesRegex(TimeoutError, "timed out"):
+            SourceTranslationService(timeout).translate_details("run")
 
 
 if __name__ == "__main__":

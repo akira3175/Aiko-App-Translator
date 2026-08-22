@@ -5,9 +5,8 @@ import re
 import subprocess
 from datetime import timezone
 from pathlib import Path
-from urllib.parse import urlencode
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import urlopen
 
 from cores.storage.data_paths import (
     DATA_DIR,
@@ -48,6 +47,7 @@ from services.importing import (
 from services import ai_logs as ai_log_service
 from services import api_keys as api_key_service
 from services.settings import ConfigurationService
+from services.source_translation import SourceTranslationService
 from services.publishing import PublishingService
 from services.context import ContextService
 from services.characters import CharacterService
@@ -317,59 +317,6 @@ def open_app_browser():
     return {"ok": True, "message": "Đã mở Chrome của ứng dụng"}
 
 
-def lookup_source_language(text: str):
-    if re.search(r"[\uac00-\ud7a3]", text):
-        return "ko"
-    if re.search(r"[\u3040-\u30ff]", text):
-        return "ja"
-    if re.search(r"[\u3400-\u9fff]", text):
-        return "zh-CN"
-    if re.search(r"[A-Za-z]", text):
-        return "en"
-    return "auto"
-
-
-def google_translate_details(text: str):
-    text = text.strip()
-    if not text:
-        raise ValueError("Chưa chọn nội dung cần dịch")
-    if len(text) > 5000:
-        raise ValueError("Đoạn được chọn quá dài; tối đa 5.000 ký tự")
-    body = urlencode(
-        [
-            ("client", "gtx"),
-            ("sl", lookup_source_language(text)),
-            ("tl", "vi"),
-            ("dt", "t"),
-            ("q", text),
-        ]
-    ).encode("utf-8")
-    request = Request(
-        "https://translate.googleapis.com/translate_a/single",
-        data=body,
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "Mozilla/5.0",
-        },
-    )
-    with urlopen(request, timeout=15) as response:
-        data = json.loads(response.read().decode("utf-8"))
-    translated = "".join(
-        part[0] for part in (data[0] if data else []) if part and part[0]
-    ).strip()
-    if not translated:
-        raise ValueError("Google Translate không trả về bản dịch")
-    detected = str(data[2] or "") if len(data) > 2 else ""
-    return {
-        "translated": translated,
-        "detected_language": detected,
-    }
-
-
-def google_translate(text: str):
-    return google_translate_details(text)["translated"]
-
-
 def safe_project(name: str) -> Path:
     return library_safe_project(LIBRARY, name)
 
@@ -557,6 +504,7 @@ context_service = ContextService(lambda name: safe_project(name))
 character_service = CharacterService(lambda name: safe_project(name))
 review_service = ReviewService(lambda name: safe_project(name))
 export_service = BookExportService(LIBRARY)
+source_translation_service = SourceTranslationService()
 r19_service = R19Service(
     safe_project=lambda name: safe_project(name),
     words_path=lambda: R19_WORDS_FILE,
@@ -658,7 +606,7 @@ content_routes = ContentRoutes(
     characters=character_service,
     pronouns=pronoun_service,
     prepare_manual_prompt=job_runner.prepare_manual_prompt,
-    translate_selection=google_translate_details,
+    translate_selection=source_translation_service.translate_details,
 )
 route_dispatcher = RouteDispatcher(
     [
