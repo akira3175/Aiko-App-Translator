@@ -2,6 +2,7 @@
 
 import json
 import re
+from dataclasses import dataclass
 from datetime import datetime
 
 
@@ -84,3 +85,22 @@ def clear(project_path):
                 path.unlink()
                 removed += 1
     return {"ok": True, "removed": removed}
+
+
+@dataclass(frozen=True)
+class AiLogService:
+    library: object
+
+    @staticmethod
+    def redact(value):
+        return redact(value)
+
+    @staticmethod
+    def append_r19(project_path, source, model, prompt, response, ok):
+        return append_r19(project_path, source, model, prompt, response, ok)
+
+    def read(self, project_name, limit=200):
+        return read(self.library.safe_project(project_name), limit)
+
+    def clear(self, project_name):
+        return clear(self.library.safe_project(project_name))

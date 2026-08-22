@@ -23,7 +23,7 @@ from providers.registry import pipeline_config, provider_payload
 from services.exporting import BookExportService
 from services.library import LibraryService
 from services.importing import ChapterImportService
-from services import ai_logs as ai_log_service
+from services.ai_logs import AiLogService
 from services import api_keys as api_key_service
 from services.settings import ConfigurationService
 from services.app_browser import AppBrowserService
@@ -100,6 +100,7 @@ PORT = 8765
 SERVER_STATE = {"host": "127.0.0.1"}
 MAX_PROJECT_NAME_LENGTH = 60
 library_service = LibraryService(LIBRARY, MAX_PROJECT_NAME_LENGTH)
+ai_log_service = AiLogService(library_service)
 VERSION_FILE = ROOT / "VERSION"
 APP_VERSION = VERSION_FILE.read_text(encoding="utf-8").strip() if VERSION_FILE.exists() else "0.0.0-dev"
 GITHUB_REPOSITORY = "akira3175/Aiko-App-Translator"
@@ -255,18 +256,6 @@ def r19_task_options(project_name: str):
     return r19_service.task_options(project_name)
 
 
-def _redact_log_text(value):
-    return ai_log_service.redact(value)
-
-
-def ai_logs_data(project_name: str, limit=200):
-    return ai_log_service.read(library_service.safe_project(project_name), limit)
-
-
-def clear_ai_logs(project_name: str):
-    return ai_log_service.clear(library_service.safe_project(project_name))
-
-
 def _call_r19_gemini(prompt, model):
     from cores.gemini import call_gemini
 
@@ -398,11 +387,7 @@ r19_service = R19Service(
     active_translation=lambda: active_translation(),
     translation_guard=translation_guard,
     generate=lambda prompt, model: _call_r19_gemini(prompt, model),
-    log_call=lambda project_path, source, model, prompt, response, ok: (
-        ai_log_service.append_r19(
-            project_path, source, model, prompt, response, ok
-        )
-    ),
+    log_call=ai_log_service.append_r19,
 )
 
 lan_routes = LanRoutes(
@@ -434,8 +419,8 @@ settings_routes = SettingsRoutes(
     providers_payload=provider_payload,
     update_payload=update_payload,
     prepare_update=prepare_update,
-    ai_logs=ai_logs_data,
-    clear_ai_logs=clear_ai_logs,
+    ai_logs=ai_log_service.read,
+    clear_ai_logs=ai_log_service.clear,
     open_app_browser=app_browser_service.open,
     active_translation=active_translation,
 )
