@@ -25,6 +25,20 @@ class _Process:
         return self.return_code
 
 
+class _Runner:
+    def __init__(self, root):
+        self.root = root
+
+    def run(self, *_args):
+        return None
+
+    def retranslate(self, *_args):
+        return None
+
+    def task_stop_file(self, kind):
+        return self.root / f"{kind}.stop"
+
+
 class JobControllerTests(unittest.TestCase):
     def setUp(self):
         _Thread.created.clear()
@@ -60,10 +74,8 @@ class JobControllerTests(unittest.TestCase):
             "safe_file": lambda folder, name: folder / name,
             "claim_translation": lambda _kind, _project: "claim-1",
             "release_translation": lambda _claim: None,
-            "run_job": lambda *_args: None,
-            "retranslate_job": lambda *_args: None,
+            "runner": _Runner(self.root),
             "translation_stop_file": lambda claim: self.root / f"{claim}.stop",
-            "task_stop_file": lambda kind: self.root / f"{kind}.stop",
             "terminate_process_tree": self.terminated.append,
             "thread_factory": _Thread,
         }

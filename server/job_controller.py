@@ -27,10 +27,8 @@ class JobController:
     safe_file: object
     claim_translation: object
     release_translation: object
-    run_job: object
-    retranslate_job: object
+    runner: object
     translation_stop_file: object
-    task_stop_file: object
     terminate_process_tree: object
     thread_factory: object = threading.Thread
 
@@ -106,7 +104,7 @@ class JobController:
                 raise JobRequestError(str(exc), HTTPStatus.CONFLICT) from None
         try:
             self.thread_factory(
-                target=self.run_job,
+                target=self.runner.run,
                 args=(kind, project, config, claim),
                 daemon=True,
             ).start()
@@ -159,7 +157,7 @@ class JobController:
         process = self.processes.get(kind)
         if not job or job.get("status") != "running" or process is None:
             raise JobRequestError("Không có tác vụ này đang chạy")
-        self.task_stop_file(kind).touch()
+        self.runner.task_stop_file(kind).touch()
         job["cancel_mode"] = "immediate"
         job["output"] = "Đang dừng tác vụ…"
         if process.poll() is None:
@@ -186,7 +184,7 @@ class JobController:
         claim = self.claim_translation(engine, project)
         try:
             self.thread_factory(
-                target=self.retranslate_job,
+                target=self.runner.retranslate,
                 args=(engine, project, chapter, claim),
                 daemon=True,
             ).start()

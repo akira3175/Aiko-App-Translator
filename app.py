@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
-import sys
 from datetime import timezone
 from pathlib import Path
 from urllib.parse import urlencode
@@ -98,6 +96,7 @@ from server.jobs import (
 from server.routes.projects import ProjectRoutes
 from server.routes.settings import SettingsRoutes
 from server.job_controller import JobController
+from server.job_runner import JobRunner
 from server.routes.jobs import JobRoutes
 from server.job_stream import JobStream
 from server.dispatcher import RouteDispatcher
@@ -573,11 +572,6 @@ def save_characters(project_name: str, payload: dict):
     return character_service.save(project_name, payload)
 
 
-def task_stop_file(kind: str) -> Path:
-    safe_kind = re.sub(r"[^a-z0-9_-]", "", kind.lower())
-    return ROOT / ".runtime" / f"{safe_kind}.stop"
-
-
 def write_context_safely(path: Path, data: dict):
     context_service._write(path.parent, data)
 
@@ -608,231 +602,6 @@ def confirm_chapter_import(project_name, payload):
     return confirm_staged_chapter_import(
         project_name, project, raw_dir, payload
     )
-
-
-def prepare_manual_prompt(project_name: str):
-    project = safe_project(project_name)
-    if not project.is_dir():
-        raise ValueError(f"Không tìm thấy truyện “{project_name}”")
-    if active_translation():
-        raise ValueError("Hãy chờ tác vụ dịch hiện tại kết thúc trước khi tạo prompt")
-
-    cache = project / ".manual_prompt.json"
-    cache.unlink(missing_ok=True)
-    config = {**saved_settings(), "manual_result": "", "skip_login_prompt": True}
-    process = subprocess.run(
-        [sys.executable, "-u", str(PIPELINES["manual"])],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=60,
-        env={
-            **os.environ,
-            "PYTHONUNBUFFERED": "1",
-            "NOVEL_PROJECT": project_name,
-            "NOVEL_WEB_MODE": "1",
-            "NOVEL_WEB_CONFIG": json.dumps(config, ensure_ascii=False),
-        },
-    )
-    if process.returncode != 0:
-        detail = (process.stderr or process.stdout or "").strip()[-1500:]
-        raise ValueError(detail or "Không thể tạo prompt dịch thủ công")
-    if not cache.exists():
-        raise ValueError("Không còn chương chưa dịch để tạo prompt")
-
-    data = json.loads(cache.read_text(encoding="utf-8"))
-    chapter = str(data.get("chapter", ""))
-    prompt = str(data.get("prompt", ""))
-    raw, translated = project_folders(project_name)
-    safe_file(raw, chapter)
-    if (translated / chapter).exists():
-        raise ValueError("Chương vừa chọn đã có bản dịch. Hãy tải lại danh sách chương")
-    if not prompt.strip():
-        raise ValueError("Prompt dịch thủ công đang trống")
-    return {
-        "chapter": chapter,
-        "title": str(data.get("title", Path(chapter).stem)),
-        "prompt": prompt,
-    }
-
-
-def run_job(
-    kind: str,
-    project_name: str,
-    config: dict | None = None,
-    translation_claim: str | None = None,
-):
-    script = PIPELINES[kind]
-    job_stream_events[kind] = []
-    task_config = dict(config or {})
-    if kind == "manual":
-        manual_result = str(task_config.pop("manual_result", ""))
-        project = safe_project(project_name)
-        result_path = project / ".manual_result.txt"
-        temporary = result_path.with_name(result_path.name + ".tmp")
-        temporary.write_text(manual_result, encoding="utf-8")
-        os.replace(temporary, result_path)
-        task_config["manual_result_ready"] = True
-    effective_config = {**saved_settings(), **task_config, **r19_task_options(project_name)}
-    stop_file = task_stop_file(kind)
-    stop_file.parent.mkdir(exist_ok=True)
-    stop_file.unlink(missing_ok=True)
-    jobs[kind] = {
-        "status": "running",
-        "output": "Đang khởi động…",
-        "project": project_name,
-        "streaming": kind == "interactions",
-        "claim_id": translation_claim,
-        "stream_events": [],
-        "stream_sequence": 0,
-    }
-    try:
-        process = subprocess.Popen(
-            [sys.executable, "-u", str(script)],
-            cwd=ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=1,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env={
-                **os.environ,
-                "PYTHONUNBUFFERED": "1",
-                "NOVEL_PROJECT": project_name,
-                "NOVEL_WEB_MODE": "1",
-                "NOVEL_WEB_CONFIG": json.dumps(effective_config, ensure_ascii=False),
-                "NOVEL_STOP_FILE": str(translation_stop_file(translation_claim))
-                if translation_claim else str(stop_file),
-            },
-            **isolated_process_kwargs(),
-        )
-        job_processes[kind] = process
-        if translation_claim:
-            update_translation_pid(translation_claim, process.pid)
-        output = stream_process_output(process, kind)
-        cancelled = jobs.get(kind, {}).get("cancel_mode") == "immediate"
-        stream_state = jobs.get(kind, {})
-        jobs[kind] = {
-            "status": "cancelled"
-            if cancelled
-            else ("done" if process.returncode == 0 else "error"),
-            "output": output,
-            "stream_events": stream_state.get("stream_events", []),
-            "stream_sequence": stream_state.get("stream_sequence", 0),
-        }
-    except Exception as exc:
-        stream_state = jobs.get(kind, {})
-        jobs[kind] = {
-            "status": "error",
-            "output": str(exc),
-            "stream_events": stream_state.get("stream_events", []),
-            "stream_sequence": stream_state.get("stream_sequence", 0),
-        }
-    finally:
-        job_processes.pop(kind, None)
-        stop_file.unlink(missing_ok=True)
-        if translation_claim:
-            release_translation(translation_claim)
-
-
-def retranslate_job(
-    engine: str,
-    project_name: str,
-    chapter_name: str,
-    translation_claim: str,
-):
-    job_key = "retranslate"
-    job_stream_events[job_key] = []
-    _, translated = project_folders(project_name)
-    target = safe_file(translated, chapter_name)
-    backup = target.with_suffix(target.suffix + ".web-backup")
-    effective_config = {
-        **saved_settings(),
-        **r19_task_options(project_name),
-        "run_until_complete": False,
-        "skip_login_prompt": True,
-        "target_chapter": chapter_name,
-    }
-    provider_ids = {"gemini-api", "gemini-web", "openai-api", "chatgpt-web"}
-    engine = canonical_task_kind(engine)
-    pipeline_kind = "interactions" if engine == "interactions" else "pipeline"
-    if engine in provider_ids:
-        effective_config["translate_provider"] = engine
-    jobs[job_key] = {
-        "status": "running",
-        "output": f"Retranslating {chapter_name} with {engine.upper()}...",
-        "project": project_name,
-        "streaming": engine == "interactions",
-        "claim_id": translation_claim,
-        "stream_events": [],
-        "stream_sequence": 0,
-    }
-    try:
-        if backup.exists():
-            backup.unlink()
-        if target.exists():
-            target.replace(backup)
-        process = subprocess.Popen(
-            [sys.executable, "-u", str(PIPELINES[pipeline_kind])],
-            cwd=ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=1,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env={
-                **os.environ,
-                "PYTHONUNBUFFERED": "1",
-                "NOVEL_PROJECT": project_name,
-                "NOVEL_WEB_MODE": "1",
-                "NOVEL_WEB_CONFIG": json.dumps(effective_config, ensure_ascii=False),
-                "NOVEL_STOP_FILE": str(translation_stop_file(translation_claim)),
-            },
-            **isolated_process_kwargs(),
-        )
-        job_processes[job_key] = process
-        update_translation_pid(translation_claim, process.pid)
-        output = stream_process_output(process, job_key)
-        cancelled = jobs.get(job_key, {}).get("cancel_mode") == "immediate"
-        if cancelled or process.returncode != 0 or not target.exists():
-            if backup.exists():
-                backup.replace(target)
-            stream_state = jobs.get(job_key, {})
-            jobs[job_key] = {
-                "status": "cancelled" if cancelled else "error",
-                "output": output or "Translation did not create an output file",
-                "stream_events": stream_state.get("stream_events", []),
-                "stream_sequence": stream_state.get("stream_sequence", 0),
-            }
-            return
-        if backup.exists():
-            backup.unlink()
-        stream_state = jobs.get(job_key, {})
-        jobs[job_key] = {
-            "status": "done",
-            "output": output,
-            "stream_events": stream_state.get("stream_events", []),
-            "stream_sequence": stream_state.get("stream_sequence", 0),
-        }
-    except Exception as exc:
-        if backup.exists():
-            if target.exists():
-                target.unlink()
-            backup.replace(target)
-        stream_state = jobs.get(job_key, {})
-        jobs[job_key] = {
-            "status": "error",
-            "output": str(exc),
-            "stream_events": stream_state.get("stream_events", []),
-            "stream_sequence": stream_state.get("stream_sequence", 0),
-        }
-    finally:
-        job_processes.pop(job_key, None)
-        release_translation(translation_claim)
 
 
 def lan_configuration():
@@ -913,6 +682,25 @@ settings_routes = SettingsRoutes(
     open_app_browser=open_app_browser,
     active_translation=active_translation,
 )
+job_runner = JobRunner(
+    root=ROOT,
+    pipelines=PIPELINES,
+    jobs=jobs,
+    processes=job_processes,
+    stream_events=job_stream_events,
+    saved_settings=saved_settings,
+    task_options=r19_task_options,
+    safe_project=safe_project,
+    project_folders=project_folders,
+    safe_file=safe_file,
+    canonical_kind=canonical_task_kind,
+    translation_stop_file=translation_stop_file,
+    update_translation_pid=update_translation_pid,
+    release_translation=release_translation,
+    stream_process_output=stream_process_output,
+    process_kwargs=isolated_process_kwargs,
+    active_translation=active_translation,
+)
 job_controller = JobController(
     pipelines=PIPELINES,
     jobs=jobs,
@@ -927,10 +715,8 @@ job_controller = JobController(
     safe_file=safe_file,
     claim_translation=claim_translation,
     release_translation=release_translation,
-    run_job=run_job,
-    retranslate_job=retranslate_job,
+    runner=job_runner,
     translation_stop_file=translation_stop_file,
-    task_stop_file=task_stop_file,
     terminate_process_tree=terminate_process_tree,
 )
 job_routes = JobRoutes(job_controller)
@@ -944,7 +730,7 @@ content_routes = ContentRoutes(
     context=context_service,
     characters=character_service,
     pronouns=pronoun_service,
-    prepare_manual_prompt=prepare_manual_prompt,
+    prepare_manual_prompt=job_runner.prepare_manual_prompt,
     translate_selection=google_translate_details,
 )
 route_dispatcher = RouteDispatcher(
