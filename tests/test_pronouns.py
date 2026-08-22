@@ -2,10 +2,7 @@ import tempfile
 import unittest
 import json
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import patch
-
-import app
+from services.pronouns import PronounService
 
 
 class PronounHistoryTests(unittest.TestCase):
@@ -38,14 +35,9 @@ class PronounHistoryTests(unittest.TestCase):
                 json.dumps(original, ensure_ascii=False), encoding="utf-8"
             )
 
-            with patch.object(
-                app,
-                "library_service",
-                SimpleNamespace(safe_project=lambda _name: project),
-            ):
-                result = app.save_pronouns(
-                    "project",
-                    {
+            result = PronounService(lambda _name: project).save(
+                "project",
+                {
                         "key": "Alice|Bob",
                         "timeline_index": 0,
                         "expected_speaker": "Alice",
@@ -55,8 +47,8 @@ class PronounHistoryTests(unittest.TestCase):
                         "relationship_status": "Bạn bè",
                         "emotional_tone": "Thân thiện",
                         "locked": True,
-                    },
-                )
+                },
+            )
 
             saved = json.loads(path.read_text(encoding="utf-8"))
             timeline = saved["Alice|Bob"]["timeline"]

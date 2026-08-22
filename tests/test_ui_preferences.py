@@ -2,62 +2,86 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
-import app
+from services.settings import ConfigurationService
+from services.settings_schema import (
+    DEFAULT_PINNED_SIDEBAR,
+    FIXED_SIDEBAR_FEATURES,
+    SIDEBAR_FEATURES,
+)
 
 
 class UiPreferencesTests(unittest.TestCase):
+    @staticmethod
+    def service(root):
+        return ConfigurationService(
+            settings_path=root / "settings.json",
+            ui_preferences_path=root / "ui_preferences.json",
+            setting_defaults={},
+            setting_labels={},
+            setting_ranges={},
+            setting_meta={},
+            secret_settings=set(),
+            optional_settings=set(),
+            hidden_settings=set(),
+            default_pinned_sidebar=DEFAULT_PINNED_SIDEBAR,
+            sidebar_features=SIDEBAR_FEATURES,
+            fixed_sidebar_features=FIXED_SIDEBAR_FEATURES,
+            api_keys=object(),
+            api_keys_path=root / "keys.txt",
+            api_key_state_path=root / "key-state.json",
+        )
+
     def test_new_user_gets_compact_default_sidebar(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "ui_preferences.json"
-            with patch.object(app, "UI_PREFERENCES_FILE", path):
-                self.assertEqual(
-                    app.ui_preferences_data()["sidebar"]["pinned"],
-                    ["workspace", "chapters", "pipeline", "terminology", "characters", "help"],
-                )
+            service = self.service(Path(directory))
+            self.assertEqual(
+                service.ui_preferences()["sidebar"]["pinned"],
+                ["workspace", "chapters", "pipeline", "terminology", "characters", "help"],
+            )
 
     def test_sidebar_order_round_trips_in_data(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "ui_preferences.json"
-            with patch.object(app, "UI_PREFERENCES_FILE", path):
-                saved = app.write_ui_preferences(
-                    {"sidebar": {"pinned": ["pipeline", "workspace", "ai-log"]}}
-                )
-                loaded = app.ui_preferences_data()
-            self.assertEqual(saved, loaded)
+            root = Path(directory)
+            service = self.service(root)
+            saved = service.write_ui_preferences(
+                {"sidebar": {"pinned": ["pipeline", "workspace", "ai-log"]}}
+            )
+            self.assertEqual(saved, service.ui_preferences())
+            stored = json.loads((root / "ui_preferences.json").read_text(encoding="utf-8"))
             self.assertEqual(
-                json.loads(path.read_text(encoding="utf-8"))["sidebar"]["pinned"],
-                ["pipeline", "workspace", "ai-log"],
+                stored["sidebar"]["pinned"], ["pipeline", "workspace", "ai-log"]
             )
 
     def test_empty_sidebar_is_preserved(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "ui_preferences.json"
-            with patch.object(app, "UI_PREFERENCES_FILE", path):
-                app.write_ui_preferences({"sidebar": {"pinned": []}})
-                self.assertEqual(app.ui_preferences_data()["sidebar"]["pinned"], [])
+            service = self.service(Path(directory))
+            service.write_ui_preferences({"sidebar": {"pinned": []}})
+            self.assertEqual(service.ui_preferences()["sidebar"]["pinned"], [])
 
     def test_help_can_be_unpinned_but_settings_stays_fixed(self):
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "ui_preferences.json"
-            with patch.object(app, "UI_PREFERENCES_FILE", path):
-                saved = app.write_ui_preferences(
-                    {"sidebar": {"pinned": ["workspace", "help", "settings"]}}
-                )
-                self.assertEqual(saved["sidebar"]["pinned"], ["workspace", "help"])
-                saved = app.write_ui_preferences(
-                    {"sidebar": {"pinned": ["workspace"]}}
-                )
-                self.assertEqual(saved["sidebar"]["pinned"], ["workspace"])
+            service = self.service(Path(directory))
+            saved = service.write_ui_preferences(
+                {"sidebar": {"pinned": ["workspace", "help", "settings"]}}
+            )
+            self.assertEqual(saved["sidebar"]["pinned"], ["workspace", "help"])
+            saved = service.write_ui_preferences(
+                {"sidebar": {"pinned": ["workspace"]}}
+            )
+            self.assertEqual(saved["sidebar"]["pinned"], ["workspace"])
 
     def test_invalid_feature_is_rejected(self):
-        with self.assertRaises(ValueError):
-            app.write_ui_preferences({"sidebar": {"pinned": ["unknown"]}})
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ValueError):
+                self.service(Path(directory)).write_ui_preferences(
+                    {"sidebar": {"pinned": ["unknown"]}}
+                )
 
     def test_frontend_has_search_pin_and_reorder_controls(self):
-        html = (app.WEB / "index.html").read_text(encoding="utf-8")
-        script = (app.WEB / "app.js").read_text(encoding="utf-8")
+        web = Path(__file__).resolve().parents[1] / "web"
+        html = (web / "index.html").read_text(encoding="utf-8")
+        script = (web / "app.js").read_text(encoding="utf-8")
         self.assertIn('id="allFeaturesButton"', html)
         self.assertIn('id="featureSearch"', html)
         self.assertIn('id="featureMenuTabs"', html)
@@ -73,7 +97,7 @@ class UiPreferencesTests(unittest.TestCase):
         self.assertIn('class="sidebar-fixed-navigation"', html)
         self.assertIn('id="sidebarHelpButton" data-view="help" hidden', html)
         self.assertIn('/sidebar-compact.css', html)
-        compact_css = (app.WEB / "sidebar-compact.css").read_text(encoding="utf-8")
+        compact_css = (web / "sidebar-compact.css").read_text(encoding="utf-8")
         self.assertIn("grid-template-columns: minmax(0, 1fr)", compact_css)
         self.assertIn(".sidebar-foot .all-features-button", compact_css)
         self.assertIn('.sidebar-fixed-navigation .nav-item[hidden]', compact_css)

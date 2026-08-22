@@ -1,6 +1,6 @@
 import unittest
 
-from app import merge_process_output
+from server.jobs import merge_process_output
 
 
 class ProcessOutputTests(unittest.TestCase):

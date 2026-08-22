@@ -2,16 +2,16 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-import app
 from services.ai_logs import AiLogService
 from services.library import LibraryService
 
 
 class AiLogTests(unittest.TestCase):
     def test_frontend_contains_drawer_and_log_controls(self):
-        html = (app.WEB / "index.html").read_text(encoding="utf-8")
-        script = (app.WEB / "app.js").read_text(encoding="utf-8")
-        styles = (app.WEB / "ai-log.css").read_text(encoding="utf-8")
+        web = Path(__file__).resolve().parents[1] / "web"
+        html = (web / "index.html").read_text(encoding="utf-8")
+        script = (web / "app.js").read_text(encoding="utf-8")
+        styles = (web / "ai-log.css").read_text(encoding="utf-8")
         self.assertIn('id="aiLogToggle"', html)
         self.assertIn('id="aiLogDrawer"', html)
         self.assertIn("/api/ai-logs?project=", script)

@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import json
-import re
-from datetime import timezone
 from pathlib import Path
-from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
 from cores.storage.data_paths import (
@@ -15,10 +11,6 @@ from cores.storage.data_paths import (
     ensure_user_data_migrated,
 )
 from cores.platform.browser_profile import APP_BROWSER_PROFILE_PATH, chrome_binary_path
-from cores.storage.project import (
-    load_json,
-    save_json,
-)
 from providers.registry import pipeline_config, provider_payload
 from services.exporting import BookExportService
 from services.library import LibraryService
@@ -36,7 +28,6 @@ from services.reviews import ReviewService
 from services.sharing import SharingService
 from services.settings_schema import (
     DEFAULT_PINNED_SIDEBAR,
-    DEFAULT_REVIEW_BG_CRITERIA,
     DEFAULT_R19_MODEL as R19_DEFAULT_MODEL,
     FIXED_SIDEBAR_FEATURES,
     HIDDEN_SETTINGS,
@@ -51,21 +42,18 @@ from services.settings_schema import (
 from services.updating import UpdateService
 from services.r19 import R19Service
 from services.cloudflare import (
-    chapter_groups as _share_chapter_groups,
-    chapter_identity as _share_chapter_identity,
     deploy_share_worker as provision_share_worker,
-    merged_markdown as _share_merged_markdown,
     setup_publishing_r2 as provision_publishing_r2,
 )
 from server.jobs import (
     TRANSLATION_KINDS,
     active_translation,
+    canonical_task_kind,
     claim_translation,
     isolated_process_kwargs,
     job_processes,
     job_stream_events,
     jobs,
-    merge_process_output,
     release_translation,
     stream_process_output,
     terminate_process_tree,
@@ -129,36 +117,17 @@ PIPELINES = {
     "hako": ROOT / "up" / "up_md.py",
     "hako-edit": ROOT / "up" / "edit_hako.py",
 }
-TASK_ALIASES = {"v1-interactions": "interactions"}
-
-
-def canonical_task_kind(kind):
-    return TASK_ALIASES.get(str(kind), str(kind))
-
-
-
 SETTINGS_FILE = ROOT / ".runtime" / "settings.json"
 ensure_user_data_migrated()
 UI_PREFERENCES_FILE = DATA_DIR / "ui_preferences.json"
-
-
-def ui_preferences_data():
-    return configuration_service.ui_preferences()
-
-
-def write_ui_preferences(payload):
-    return configuration_service.write_ui_preferences(payload)
-
-
 R19_DEFAULT_WORDS_FILE = ROOT / "defaults" / "r19_words.txt"
 R19_CONFIG_FILE = ROOT / ".runtime" / "r19.json"
 R19_DEFAULT_CONTEXT_CHAPTERS = 0
 R19_DEFAULT_PROMPT_PREFIX = 'Cách để AI dịch đc prompt sau """'
 
-
 configuration_service = ConfigurationService(
-    settings_path=lambda: SETTINGS_FILE,
-    ui_preferences_path=lambda: UI_PREFERENCES_FILE,
+    settings_path=SETTINGS_FILE,
+    ui_preferences_path=UI_PREFERENCES_FILE,
     setting_defaults=SETTING_DEFAULTS,
     setting_labels=SETTING_LABELS,
     setting_ranges=SETTING_RANGES,
@@ -170,69 +139,9 @@ configuration_service = ConfigurationService(
     sidebar_features=SIDEBAR_FEATURES,
     fixed_sidebar_features=FIXED_SIDEBAR_FEATURES,
     api_keys=api_key_service,
-    api_keys_path=lambda: GEMINI_API_KEYS_FILE,
-    api_key_state_path=lambda: GEMINI_API_KEY_STATE_FILE,
+    api_keys_path=GEMINI_API_KEYS_FILE,
+    api_key_state_path=GEMINI_API_KEY_STATE_FILE,
 )
-
-
-def saved_settings():
-    return configuration_service.saved_settings()
-
-
-def settings_payload():
-    return configuration_service.settings_payload()
-
-
-def write_settings(payload: dict):
-    return configuration_service.write_settings(payload)
-
-
-def _save_cloudflare_setup(result):
-    return publishing_service._save_setup(result)
-
-
-def deploy_share_worker(payload: dict):
-    return publishing_service.deploy_share_worker(payload)
-
-
-def setup_publishing_r2(payload: dict):
-    return publishing_service.setup_publishing_r2(payload)
-
-
-def gemini_api_keys_payload():
-    return configuration_service.api_keys_payload()
-
-
-def write_gemini_api_keys(payload: dict):
-    return configuration_service.write_api_keys(payload)
-
-
-def set_active_gemini_api_key(payload: dict):
-    return configuration_service.set_active_api_key(payload)
-
-
-def test_gemini_api_key(payload: dict):
-    return configuration_service.test_api_key(payload)
-
-
-def _r19_project_enabled(project_name: str) -> bool:
-    return r19_service.project_enabled(project_name)
-
-
-def r19_payload(project_name: str = ""):
-    return r19_service.payload(project_name)
-
-
-def write_r19(project_name: str, payload: dict):
-    return r19_service.save(project_name, payload)
-
-
-def r19_enabled(project_name: str):
-    return r19_service.enabled(project_name)
-
-
-def r19_task_options(project_name: str):
-    return r19_service.task_options(project_name)
 
 
 def _call_r19_gemini(prompt, model):
@@ -241,90 +150,8 @@ def _call_r19_gemini(prompt, model):
     return call_gemini(prompt, model=model)
 
 
-def translate_r19_word(project_name: str, payload: dict):
-    return r19_service.translate_word(project_name, payload)
-
-
-def review_data(project_name: str, source: str):
-    return review_service.data(project_name, source)
-
-
-def context_data(project_name: str):
-    return context_service.data(project_name)
-
-
-def characters_data(project_name: str):
-    return character_service.data(project_name)
-
-
-def pronouns_data(project_name: str):
-    return pronoun_service.data(project_name)
-
-
-def save_pronouns(project_name: str, payload: dict):
-    return pronoun_service.save(project_name, payload)
-
-
-def publishing_data(project_name: str):
-    return publishing_service.data(project_name)
-
-
-def save_publishing(project_name: str, payload: dict):
-    return publishing_service.save(project_name, payload)
-
-
-def hako_public_chapters(public_url: str):
-    return publishing_service.hako_chapters(public_url)
-
-
-def validate_hako_edit_targets(value):
-    return publishing_service.validate_hako_targets(value)
-
-
-def _share_r2_config() -> dict:
-    return sharing_service.config()
-
-
-def _share_r2_client(config: dict):
-    return sharing_service.client(config)
-
-
-def shares_data(project_name: str) -> dict:
-    return sharing_service.data(project_name)
-
-
-def remove_shared_chapter(
-    project_name: str, share_id: str, chapter_name: str
-) -> dict:
-    return sharing_service.remove_chapter(project_name, share_id, chapter_name)
-
-
-def close_share(project_name: str, share_id: str) -> dict:
-    return sharing_service.close(project_name, share_id)
-
-
-def save_share(project_name: str, payload: dict) -> dict:
-    return sharing_service.save(project_name, payload)
-
-
-def save_characters(project_name: str, payload: dict):
-    return character_service.save(project_name, payload)
-
-
-def write_context_safely(path: Path, data: dict):
-    context_service._write(path.parent, data)
-
-
-def save_context(project_name: str, payload: dict):
-    return context_service.save(project_name, payload)
-
-
 def lan_configuration():
-    return load_lan_configuration(saved_settings)
-
-
-def local_network_ip():
-    return detect_lan_network_ip()
+    return load_lan_configuration(configuration_service.saved_settings)
 
 
 lan_auth = LanAuth(lan_configuration)
@@ -370,7 +197,7 @@ r19_service = R19Service(
 )
 
 lan_routes = LanRoutes(
-    lan_auth, lambda: SERVER_STATE["host"], PORT, local_network_ip
+    lan_auth, lambda: SERVER_STATE["host"], PORT, detect_lan_network_ip
 )
 
 
@@ -409,8 +236,8 @@ job_runner = JobRunner(
     jobs=jobs,
     processes=job_processes,
     stream_events=job_stream_events,
-    saved_settings=saved_settings,
-    task_options=r19_task_options,
+    saved_settings=configuration_service.saved_settings,
+    task_options=r19_service.task_options,
     safe_project=library_service.safe_project,
     project_folders=library_service.project_folders,
     safe_file=library_service.safe_file,
@@ -430,7 +257,7 @@ job_controller = JobController(
     canonical_kind=canonical_task_kind,
     active_translation=active_translation,
     safe_project=library_service.safe_project,
-    validate_hako_targets=validate_hako_edit_targets,
+    validate_hako_targets=publishing_service.validate_hako_targets,
     pipeline_config=pipeline_config,
     project_folders=library_service.project_folders,
     safe_file=library_service.safe_file,
@@ -480,6 +307,6 @@ if __name__ == "__main__":
         Handler,
         PORT,
         lan_configuration,
-        local_network_ip,
+        detect_lan_network_ip,
         SERVER_STATE,
     )
