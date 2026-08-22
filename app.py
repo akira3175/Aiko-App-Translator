@@ -48,7 +48,7 @@ from services.settings_schema import (
     SETTING_RANGES,
     SIDEBAR_FEATURES,
 )
-from services import updating as update_service
+from services.updating import UpdateService
 from services.r19 import R19Service
 from services.cloudflare import (
     chapter_groups as _share_chapter_groups,
@@ -108,6 +108,16 @@ GITHUB_LATEST_RELEASE_API = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/r
 UPDATE_ASSET_NAME = "NovelTranslatorStudio-Windows-x64.zip"
 UPDATE_DIR = ROOT / ".runtime" / "updates"
 UPDATER_SOURCE = ROOT / "apply_update.ps1"
+update_service = UpdateService(
+    root=ROOT,
+    update_dir=UPDATE_DIR,
+    updater_source=UPDATER_SOURCE,
+    current_version=APP_VERSION,
+    repository=GITHUB_REPOSITORY,
+    release_api=GITHUB_LATEST_RELEASE_API,
+    asset_name=UPDATE_ASSET_NAME,
+    jobs=jobs,
+)
 
 PIPELINES = {
     "pipeline": ROOT / "cores" / "translation" / "__main__.py",
@@ -187,37 +197,6 @@ def deploy_share_worker(payload: dict):
 
 def setup_publishing_r2(payload: dict):
     return publishing_service.setup_publishing_r2(payload)
-
-
-def version_parts(value: str):
-    return update_service.version_parts(value)
-
-
-def update_payload(check_remote=False):
-    return update_service.payload(
-        check_remote,
-        APP_VERSION,
-        GITHUB_REPOSITORY,
-        GITHUB_LATEST_RELEASE_API,
-        UPDATE_ASSET_NAME,
-    )
-
-
-def validate_update_archive(path: Path, expected_version: str):
-    return update_service.validate_archive(path, expected_version)
-
-
-def prepare_update():
-    return update_service.prepare(
-        ROOT,
-        UPDATE_DIR,
-        UPDATE_ASSET_NAME,
-        UPDATER_SOURCE,
-        APP_VERSION,
-        jobs,
-        update_payload,
-        validate_update_archive,
-    )
 
 
 def gemini_api_keys_payload():
@@ -417,8 +396,8 @@ settings_routes = SettingsRoutes(
     configuration=configuration_service,
     r19=r19_service,
     providers_payload=provider_payload,
-    update_payload=update_payload,
-    prepare_update=prepare_update,
+    update_payload=update_service.payload,
+    prepare_update=update_service.prepare,
     ai_logs=ai_log_service.read,
     clear_ai_logs=ai_log_service.clear,
     open_app_browser=app_browser_service.open,

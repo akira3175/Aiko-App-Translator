@@ -6,7 +6,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from services.updating import checker, downloader, installer
+from services.updating import UpdateService, checker, downloader, installer
 
 
 class _Response(io.BytesIO):
@@ -22,6 +22,47 @@ class _Response(io.BytesIO):
 
 
 class UpdateServiceTests(unittest.TestCase):
+    def service(self, root, opener):
+        return UpdateService(
+            root=root,
+            update_dir=root / "updates",
+            updater_source=root / "apply_update.ps1",
+            current_version="1.1.0",
+            repository="owner/repo",
+            release_api="https://api.github.com/releases/latest",
+            asset_name="app.zip",
+            jobs={},
+            opener=opener,
+        )
+
+    def test_bound_service_returns_local_status_without_network(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service = self.service(
+                Path(directory),
+                lambda *_args, **_kwargs: self.fail("must not check network"),
+            )
+
+            result = service.payload(False)
+
+        self.assertEqual("1.1.0", result["current_version"])
+        self.assertEqual("owner/repo", result["repository"])
+        self.assertFalse(result["update_available"])
+
+    def test_bound_service_reports_release_without_required_asset(self):
+        release = json.dumps(
+            {"tag_name": "v1.2.0", "assets": [], "body": "", "html_url": ""}
+        ).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            service = self.service(
+                Path(directory), lambda *_args, **_kwargs: _Response(release)
+            )
+
+            result = service.payload(True)
+
+        self.assertTrue(result["update_available"])
+        self.assertFalse(result["asset_found"])
+        self.assertFalse(result["download_ready"])
+
     def test_checker_parses_new_release_and_verified_asset(self):
         checksum = "a" * 64
         release = json.dumps(
