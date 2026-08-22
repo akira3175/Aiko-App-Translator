@@ -22,7 +22,7 @@ from cores.storage.project import (
     save_json,
 )
 from providers.registry import pipeline_config, provider_payload
-from services.exporting import build_export
+from services.exporting import BookExportService
 from services.library import (
     chapter_images as library_chapter_images,
     chapter_key as library_chapter_key,
@@ -412,80 +412,6 @@ def chapter_key(name: str):
     return library_chapter_key(name)
 
 
-def _export_body(text: str) -> str:
-    lines = text.replace("\r\n", "\n").split("\n")
-    for index, line in enumerate(lines):
-        if line.strip():
-            if re.match(r"^\s*#{1,6}\s+", line):
-                lines.pop(index)
-            break
-    return "\n".join(lines).strip()
-
-
-def _selected_export_chapters(project_name: str, options: dict):
-    items = chapters(project_name)
-    scope = str(options.get("scope", "all"))
-    if scope == "volume":
-        volume = int(options.get("volume", 0))
-        items = [item for item in items if re.match(rf"^v{volume}_", item["name"], re.I)]
-    elif scope == "range":
-        names = [item["name"] for item in items]
-        start, end = str(options.get("from", "")), str(options.get("to", ""))
-        if start not in names or end not in names:
-            raise ValueError("Phạm vi chương không hợp lệ")
-        first, last = names.index(start), names.index(end)
-        if first > last:
-            first, last = last, first
-        items = items[first:last + 1]
-    elif scope != "all":
-        raise ValueError("Phạm vi xuất không hợp lệ")
-    if not items:
-        raise ValueError("Không có chương nào trong phạm vi đã chọn")
-
-    raw_dir, translated_dir = project_folders(project_name)
-    source = str(options.get("source", "translated"))
-    if source not in {"translated", "raw", "bilingual"}:
-        raise ValueError("Nguồn nội dung không hợp lệ")
-    selected = []
-    for item in items:
-        raw_path = safe_file(raw_dir, item["name"])
-        translated_path = safe_file(translated_dir, item["name"])
-        raw_text = read_live_utf8(raw_path) if raw_path.exists() else ""
-        translated_text = read_live_utf8(translated_path) if translated_path.exists() else ""
-        if source == "translated" and not translated_text:
-            continue
-        if source == "raw" and not raw_text:
-            continue
-        selected.append({**item, "raw_text": raw_text, "translated_text": translated_text})
-    if not selected:
-        label = "bản dịch" if source == "translated" else "bản gốc"
-        raise ValueError(f"Không tìm thấy {label} trong phạm vi đã chọn")
-    return selected, source
-
-
-def _export_sections(project_name: str, options: dict):
-    items, source = _selected_export_chapters(project_name, options)
-    project_path = safe_project(project_name)
-    sections = []
-    for item in items:
-        title = item["title"] or item["id"]
-        if source == "bilingual":
-            body = "### Bản gốc\n\n" + _export_body(item["raw_text"])
-            body += "\n\n### Bản dịch\n\n" + _export_body(item["translated_text"])
-        else:
-            body = _export_body(item[f"{source}_text"])
-        sections.append({"title": title, "body": body, "name": item["name"], "project_path": project_path})
-    return sections
-
-
-def export_book(project_name: str, options: dict):
-    export_format = str(options.get("format", "epub")).lower()
-    if export_format not in {"epub", "docx", "markdown"}:
-        raise ValueError("Định dạng xuất không được hỗ trợ")
-    sections = _export_sections(project_name, options)
-    return build_export(project_name, sections, export_format)
-
-
 def read_live_utf8(path: Path) -> str:
     return library_read_live_utf8(path)
 
@@ -630,6 +556,7 @@ pronoun_service = PronounService(lambda name: safe_project(name))
 context_service = ContextService(lambda name: safe_project(name))
 character_service = CharacterService(lambda name: safe_project(name))
 review_service = ReviewService(lambda name: safe_project(name))
+export_service = BookExportService(LIBRARY)
 r19_service = R19Service(
     safe_project=lambda name: safe_project(name),
     words_path=lambda: R19_WORDS_FILE,
@@ -666,7 +593,7 @@ project_routes = ProjectRoutes(
     read_text=read_live_utf8,
     chapter_images=chapter_images,
     word_count=word_count,
-    export_book=export_book,
+    export_book=export_service.export,
     import_preview=create_chapter_import_preview,
     import_confirm=confirm_chapter_import,
     import_cancel=cancel_chapter_import,
