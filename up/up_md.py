@@ -24,8 +24,6 @@ import sys
 from collections import defaultdict
 from urllib.parse import quote
 
-import yaml
-
 # Fix UnicodeEncodeError trên Windows console (emoji, ký tự đặc biệt)
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -53,7 +51,8 @@ os.chdir(_PROJECT_ROOT)
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from cores.runtime_config import bool_option, int_option, option, web_mode
+from cores.config.runtime import bool_option, int_option, option, web_mode
+from cores.storage.project import load_json
 
 PORTABLE_CHROME = os.path.join(
     _PROJECT_ROOT, "runtime", "chromium", "chrome-win64", "chrome.exe"
@@ -63,14 +62,13 @@ _PROJECT_NAME = os.environ.get("NOVEL_PROJECT", "").strip()
 _PROJECT_DIR = os.path.join("truyen", _PROJECT_NAME) if _PROJECT_NAME else "truyen"
 TRANSLATED_DIR = os.path.join(_PROJECT_DIR, "translated")
 IMAGE_DIR      = os.path.join(_PROJECT_DIR, "image")
-PUBLISHING_FILE = os.path.join(_PROJECT_DIR, "publishing.yaml")
+PUBLISHING_FILE = os.path.join(_PROJECT_DIR, "publishing.json")
 
 
 def load_book_mappings(path=PUBLISHING_FILE):
     if not os.path.exists(path):
         return []
-    with open(path, "r", encoding="utf-8") as file:
-        data = yaml.safe_load(file) or {}
+    data = load_json(path, {})
     hako = data.get("hako", {}) if isinstance(data, dict) else {}
     books = hako.get("books", []) if isinstance(hako, dict) else []
     return books if isinstance(books, list) else []
@@ -87,7 +85,7 @@ def destination_for_volume(volume, book_mappings, fallback_url=""):
             )
     if book_mappings:
         raise RuntimeError(
-            f"Volume {volume} chưa được gán book ID trong publishing.yaml."
+            f"Volume {volume} chưa được gán book ID trong publishing.json."
         )
     if fallback_url:
         return fallback_url, "URL Hako dự phòng"

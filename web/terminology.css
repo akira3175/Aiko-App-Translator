@@ -61,7 +61,7 @@
 .context-modal-actions { flex: none; margin: 14px -26px -26px; padding: 15px 26px; border-top: 1px solid var(--line); background: var(--surface); }
 .context-editor-actions { display: flex; align-items: center; gap: 12px; margin: 18px 0 10px; }
 .context-editor-actions span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.context-yaml-editor { width: 100%; min-height: min(52dvh, 520px); resize: vertical; border: 1px solid var(--line); border-radius: 10px; outline: 0; padding: 14px 16px; background: var(--bg); color: var(--ink); font: 13px/1.65 Consolas, "Courier New", monospace; tab-size: 2; }
-.context-yaml-editor:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(23,126,104,.12); }
+.context-json-editor { width: 100%; min-height: min(52dvh, 520px); resize: vertical; border: 1px solid var(--line); border-radius: 10px; outline: 0; padding: 14px 16px; background: var(--bg); color: var(--ink); font: 13px/1.65 Consolas, "Courier New", monospace; tab-size: 2; }
+.context-json-editor:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(23,126,104,.12); }
 .glossary-import { min-height: 300px; margin-top: 16px; }
 @media (max-width: 900px) { .terminology-head { align-items: stretch; } .context-actions { flex-wrap: wrap; } .context-actions .search { flex: 1 1 100%; } .context-modal-head { display: block; } .context-safety-mark { display: none; } .context-writing-layout, .prompt-editor-grid { grid-template-columns: 1fr; } .prompt-preset-field { grid-template-columns: 1fr; } .context-style-field textarea, .context-glossary-field textarea { min-height: 44dvh; } .prompt-editor-grid textarea { height: 38dvh; min-height: 240px; } .context-status { display: grid; gap: 4px; } }

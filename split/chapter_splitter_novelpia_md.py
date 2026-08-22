@@ -25,6 +25,8 @@ import sys
 import zipfile
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -78,6 +80,9 @@ class EpubHTMLParser(HTMLParser):
             self._current_text = []
             self._in_p = True
 
+        if tag == 'br' and self._in_body and self._in_p:
+            self._current_text.append('\n')
+
         # Ảnh đứng độc lập hoặc bên trong <p>
         if tag == 'img' and self._in_body:
             src = attrs_dict.get('src', '')
@@ -117,8 +122,8 @@ class EpubHTMLParser(HTMLParser):
     def handle_data(self, data):
         if self._skip_depth > 0:
             return
-        if self._in_header or (self._in_body and self._current_tag in (
-                'p', 'div', 'span', 'em', 'strong', 'b', 'i', 'a')):
+        if self._in_header or self._in_p or (self._in_body and self._current_tag in (
+                'div', 'span', 'em', 'strong', 'b', 'i', 'a')):
             self._current_text.append(data)
 
 
@@ -348,6 +353,12 @@ def parse_epub_sections(z, opf_base, html_href, section_titles):
 # ============================================================
 
 CJK_PATTERN = re.compile(r'[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]')
+REMOTE_IMAGE_PATTERN = re.compile(
+    r'\[img(?:=[^\]]+)?\](https?://[^\[]+)\[/img\]', re.IGNORECASE
+)
+VOLUME_TITLE_PATTERN = re.compile(
+    r'^\s*(?:第\s*[^\s卷]{1,12}\s*卷|[终終]卷)(?:\s+.*)?$'
+)
 CHAPTER_PATTERN = re.compile(
     r'^(?:chapter|chap|chương)\s*\d{1,5}\b|^第\s*\d{1,5}\s*[章話话幕]|^제\s*\d{1,5}\s*[화장]',
     re.IGNORECASE,
@@ -373,6 +384,23 @@ def uses_character_limit(text):
 
 def unit_count(text, character_based):
     return len(re.sub(r'\s+', '', text)) if character_based else len(text.split())
+
+
+def document_locations(documents, first_volume):
+    """Assign volume/chapter numbers, resetting at explicit Chinese volume titles."""
+    has_volumes = any(VOLUME_TITLE_PATTERN.match(title or '') for _href, title, _elements in documents)
+    if not has_volumes:
+        return [(first_volume, index) for index in range(len(documents))]
+    current_volume = max(0, first_volume - 1)
+    chapter = 0
+    locations = []
+    for _href, title, _elements in documents:
+        if VOLUME_TITLE_PATTERN.match(title or ''):
+            current_volume += 1
+            chapter = 0
+        locations.append((current_volume, chapter))
+        chapter += 1
+    return locations
 
 
 def split_long_text(text, limit, character_based):
@@ -420,7 +448,62 @@ def segment_elements(elements, limit, character_based=None):
     return segments or [[]], ('characters' if character_based else 'words')
 
 
-def write_document_segments(elements, title, vol_num, chap_index, raw_dir, img_dir, segment_limit, archive=None, character_based=None):
+def _remote_image_extension(url, content_type):
+    extension = os.path.splitext(urlparse(url).path)[1].lower().lstrip('.')
+    if extension == 'jpeg':
+        extension = 'jpg'
+    if extension in {'jpg', 'png', 'gif', 'webp'}:
+        return extension
+    return {
+        'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
+        'image/webp': 'webp',
+    }.get(content_type.split(';', 1)[0].lower(), 'jpg')
+
+
+def localize_remote_images(elements, img_dir, prefix, delay=1.0):
+    """Download legacy [img=WxH]URL[/img] tags, preserving failed tags."""
+    localized, attempt_count, download_count = [], 0, 0
+    for elem in elements:
+        if elem['type'] != 'text':
+            localized.append(elem)
+            continue
+        cursor = 0
+        for match in REMOTE_IMAGE_PATTERN.finditer(elem['content']):
+            before = elem['content'][cursor:match.start()].strip()
+            if before:
+                localized.append({'type': 'text', 'content': before})
+            url = match.group(1).strip()
+            if attempt_count and delay > 0:
+                time.sleep(delay)
+            attempt_count += 1
+            try:
+                request = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urlopen(request, timeout=30) as response:
+                    data = response.read()
+                    content_type = response.headers.get('Content-Type', '')
+                if not data:
+                    raise ValueError('ảnh rỗng')
+                download_count += 1
+                image_id = f"{prefix}_remote_{download_count:03d}"
+                filename = f"{image_id}.{_remote_image_extension(url, content_type)}"
+                with open(os.path.join(img_dir, filename), 'wb') as output:
+                    output.write(data)
+                localized.append({'type': 'image', 'src': url, 'local_filename': filename})
+                print(f"  [IMG] Đã tải {filename}")
+            except Exception as exc:
+                localized.append({'type': 'text', 'content': match.group(0)})
+                print(f"  [IMG] Không tải được {url}: {exc}")
+            cursor = match.end()
+        remainder = elem['content'][cursor:].strip()
+        if remainder:
+            localized.append({'type': 'text', 'content': remainder})
+    return localized
+
+
+def write_document_segments(elements, title, vol_num, chap_index, raw_dir, img_dir, segment_limit, archive=None, character_based=None, remote_image_delay=1.0):
+    elements = localize_remote_images(
+        elements, img_dir, f"v{vol_num}_c{chap_index}", remote_image_delay
+    )
     segments, metric = segment_elements(elements, segment_limit, character_based)
     written = 0
     for seg_index, segment in enumerate(segments, 1):
@@ -431,6 +514,11 @@ def write_document_segments(elements, title, vol_num, chap_index, raw_dir, img_d
                 lines.append(elem['content'])
                 continue
             src = elem.get('src', '')
+            local_filename = elem.get('local_filename')
+            if local_filename:
+                image_id = os.path.splitext(local_filename)[0]
+                lines.append(f"![image:{image_id}](../image/{local_filename})")
+                continue
             ext = src.rsplit('.', 1)[-1].lower() if '.' in src else 'jpg'
             ext = ext.split('?', 1)[0].split('#', 1)[0]
             if ext not in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'}:
@@ -523,7 +611,7 @@ def split_txt_to_md(file_path, vol_num, base_dir, project_dir=None, segment_limi
 # CORE: TÁCH EPUB -> MD
 # ============================================================
 
-def split_epub_to_md(epub_path, vol_num, base_dir, project_dir=None, segment_limit=5000, return_details=False):
+def split_epub_to_md(epub_path, vol_num, base_dir, project_dir=None, segment_limit=5000, return_details=False, remote_image_delay=1.0):
     """
     Tách EPUB thành các file .md trong base_dir/truyen/raw/
     Ảnh lưu vào base_dir/truyen/image/
@@ -605,8 +693,6 @@ def split_epub_to_md(epub_path, vol_num, base_dir, project_dir=None, segment_lim
     chapter_count = 0
     segment_count = 0
     metrics = set()
-    chap_index = 0  # 0-based chapter index (y)
-
     full_text = '\n'.join(
         elem.get('content', '')
         for _href, _title, elements in documents
@@ -618,7 +704,8 @@ def split_epub_to_md(epub_path, vol_num, base_dir, project_dir=None, segment_lim
     metric_name = 'characters' if character_based else 'words'
     print(f"[METRIC] CJK/Hangul: {ratio:.1%} -> {metric_name} cho toàn bộ EPUB")
 
-    for href, title, elements in documents:
+    locations = document_locations(documents, vol_num)
+    for (href, title, elements), (document_volume, chap_index) in zip(documents, locations):
         text_elements = [e for e in elements if e['type'] == 'text']
 
         # Nếu không có title từ h1, fallback sang TOC
@@ -631,14 +718,14 @@ def split_epub_to_md(epub_path, vol_num, base_dir, project_dir=None, segment_lim
             title = f"Chương {chap_index + 1}"
 
         written, metric = write_document_segments(
-            elements, title, vol_num, chap_index, raw_dir, img_dir, segment_limit,
+            elements, title, document_volume, chap_index, raw_dir, img_dir, segment_limit,
             archive=z, character_based=character_based,
+            remote_image_delay=remote_image_delay,
         )
         segment_count += written
         metrics.add(metric)
 
         chapter_count += 1
-        chap_index += 1
 
     z.close()
     print(f"\n[DONE] Đã tách {chapter_count} chương -> {raw_dir}")

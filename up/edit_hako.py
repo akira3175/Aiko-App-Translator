@@ -15,7 +15,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from cores.runtime_config import option, stop_requested
+from cores.config.runtime import option, stop_requested
 from up import up_md
 
 

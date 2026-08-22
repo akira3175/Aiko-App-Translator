@@ -1,30 +1,46 @@
 import tempfile
 import unittest
+import importlib
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from cores import dich_utils
-from cores import translation_workflows
+from cores.translation import runner as translation_runner
+from cores.postprocess import runtime as configured_runtime
+from cores.postprocess import run_background_review
+from cores.postprocess.runtime import TRANSPORT_OVERRIDES
+
+
+runtime_module = importlib.import_module("cores.postprocess.runtime")
 
 
 class BackgroundReviewTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
-        self.review_path = str(Path(self.temporary.name) / "review.yaml")
+        self.review_path = str(Path(self.temporary.name) / "review.json")
 
     def tearDown(self):
         self.temporary.cleanup()
 
     def _run(self, responses):
+        remaining = iter(responses)
+
+        def generate(_stage, _prompt, _attachments=()):
+            result = next(remaining)
+            if isinstance(result, Exception):
+                raise result
+            return result, "gemini-api", "review-model"
+
         with (
-            patch.object(dich_utils, "REVIEW_YAML", self.review_path),
-            patch.object(dich_utils, "call_gemini", side_effect=responses) as generate,
-            patch.object(dich_utils, "switch_api_key") as switch,
-            patch.object(dich_utils, "log_api_call"),
-            patch.object(dich_utils.time, "sleep"),
+            patch.object(configured_runtime, "REVIEW_JSON", self.review_path),
+            patch.object(configured_runtime, "generate", side_effect=generate) as generate_mock,
+            patch.object(configured_runtime, "provider", return_value="gemini-api"),
+            patch.object(configured_runtime, "model_and_thinking", return_value=("review-model", "high")),
+            patch.object(configured_runtime, "switch_api_key") as switch,
+            patch.object(configured_runtime, "log_api_call"),
+            patch("cores.postprocess.review.time.sleep"),
         ):
-            dich_utils._run_background_review("v1_c1_s1", 1, "Tiêu đề", "Bản dịch")
-        return generate, switch
+            run_background_review("v1_c1_s1", 1, "Tiêu đề", "Bản dịch")
+        return generate_mock, switch
 
     def test_4xx_switches_key_then_review_continues(self):
         generate, switch = self._run([RuntimeError("403 PERMISSION_DENIED"), '{"overall_score": 9, "issues": [], "summary": "Ổn"}'])
@@ -38,13 +54,30 @@ class BackgroundReviewTests(unittest.TestCase):
         switch.assert_not_called()
 
     def test_custom_criteria_and_language_neutral_role_are_in_prompt(self):
-        with patch.object(dich_utils, "REVIEW_BG_CRITERIA", "TIÊU CHÍ RIÊNG CỦA USER"):
+        with patch.object(configured_runtime, "REVIEW_BG_CRITERIA", "TIÊU CHÍ RIÊNG CỦA USER"):
             generate, _switch = self._run(['{"overall_score": 10, "issues": [], "summary": "Ổn"}'])
-        prompt = generate.call_args.args[0]
+        prompt = generate.call_args.args[1]
         self.assertIn("ngôn ngữ nguồn bất kỳ sang tiếng Việt", prompt)
         self.assertIn("TIÊU CHÍ RIÊNG CỦA USER", prompt)
         self.assertNotIn("Hàn-Việt", prompt)
         self.assertNotIn("tiếng Hàn", prompt)
+
+    def test_postprocess_runtime_routes_all_four_review_engines(self):
+        response = '{"overall_score": 9, "issues": [], "summary": "Ổn"}'
+        for provider in ("gemini-api", "gemini-web", "openai-api", "chatgpt-web"):
+            transport = Mock(return_value=response)
+            values = {
+                "review_provider": provider,
+                "review_stage_model": "review-only",
+                "review_stage_thinking": "high",
+            }
+            with (
+                patch.object(runtime_module, "option", side_effect=lambda key, default=None: values.get(key, default)),
+                patch.dict(TRANSPORT_OVERRIDES, {provider: transport}, clear=True),
+            ):
+                text, selected, model = configured_runtime.generate("review", "prompt")
+            self.assertEqual((text, selected, model), (response, provider, "review-only"))
+            transport.assert_called_once()
 
     def test_single_translation_saves_final_text_before_queueing_review(self):
         events = []
@@ -58,18 +91,18 @@ class BackgroundReviewTests(unittest.TestCase):
             events.append(("review", item["title_translation"], item["translation"]))
 
         with (
-            patch.object(translation_workflows, "scan_md_dir", return_value=["raw/v1_c1_s1.md"]),
-            patch.object(translation_workflows, "is_translated", return_value=False),
-            patch.object(translation_workflows, "load_md_chapter", return_value=chapter),
-            patch.object(translation_workflows, "_filtered_context_and_names", return_value=("context", [], "pronouns.yaml")),
-            patch.object(translation_workflows, "format_pronoun_context", return_value="pronouns"),
-            patch.object(translation_workflows, "export_recent_translations_to_txt_md"),
-            patch.object(translation_workflows, "option", return_value=0),
-            patch.object(translation_workflows, "bool_option", return_value=False),
-            patch.object(translation_workflows, "save_translated_md", side_effect=save),
-            patch.object(translation_workflows, "enqueue_background_review", side_effect=enqueue),
+            patch.object(translation_runner, "scan_md_dir", return_value=["raw/v1_c1_s1.md"]),
+            patch.object(translation_runner, "is_translated", return_value=False),
+            patch.object(translation_runner, "load_md_chapter", return_value=chapter),
+            patch.object(translation_runner, "filtered_context_and_names", return_value=("context", [], "pronouns.json")),
+            patch.object(translation_runner, "format_pronoun_context", return_value="pronouns"),
+            patch.object(translation_runner, "_export_recent_translations"),
+            patch.object(translation_runner, "option", return_value=0),
+            patch.object(translation_runner, "bool_option", return_value=False),
+            patch.object(translation_runner, "save_translated_md", side_effect=save),
+            patch.object(translation_runner, "enqueue_background_review", side_effect=enqueue),
         ):
-            result = translation_workflows.run_single_translation(
+            result = translation_runner.run_single_translation(
                 lambda *_args: ("Bản dịch", "Nội dung dịch"),
                 "raw",
                 "translated",

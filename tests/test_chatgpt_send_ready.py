@@ -1,6 +1,6 @@
 import unittest
 
-from cores.dich_utils import _ready_chatgpt_send_button
+from cores.chatgpt.web_response import ready_send_button as _ready_chatgpt_send_button
 
 
 class FakeButton:

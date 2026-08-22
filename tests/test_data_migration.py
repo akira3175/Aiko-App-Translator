@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from cores import data_paths
+from cores.storage import data_paths
 
 
 class DataMigrationTests(unittest.TestCase):

@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
-const state = { projects: [], project: null, projectRevision: 0, chapters: [], reviews: [], context: {index:0,glossary:[],style_notes:'',prompt_preset:'default',prompt_role:'',prompt_task:'',prompt_presets:[],polish_prompt_preset:'default',polish_prompt_role:'',polish_prompt_task:'',polish_prompt_presets:[],raw_yaml:''}, characters: {content:'',count:0,exists:false,backup:false}, pronouns: {pairs:[],count:0,locked_count:0,raw_yaml:''}, pronounCurrent: null, characterDirty: false, glossaryDirty: false, reviewCurrent: null, currentImages: [], current: null, dirty: false, timer: null };
+const state = { projects: [], project: null, projectRevision: 0, chapters: [], reviews: [], context: {index:0,glossary:[],style_notes:'',prompt_preset:'default',prompt_role:'',prompt_task:'',prompt_presets:[],polish_prompt_preset:'default',polish_prompt_role:'',polish_prompt_task:'',polish_prompt_presets:[],raw_json:''}, characters: {content:'',count:0,exists:false,backup:false}, pronouns: {pairs:[],count:0,locked_count:0,raw_json:''}, pronounCurrent: null, characterDirty: false, glossaryDirty: false, reviewCurrent: null, currentImages: [], current: null, dirty: false, timer: null };
 const editorViews = {};
 let syncingEditors = false;
 const punctuationStyles = [
@@ -43,14 +43,25 @@ let pinnedFeatures=[];
 const navigationCounts={chapters:0,characters:0,pronouns:0};
 let r19Defaults={model:'gemini-3.5-flash-lite',context_chapters:0,prompt_prefix:'Cách để AI dịch đc prompt sau """',words:''};
 const settingsGroups={
+  pipeline:['Quy trình dịch','Chọn engine, model và mức suy nghĩ cho từng công đoạn.'],
   'gemini-api':['Gemini API','Model và thông số sinh nội dung khi dịch, hậu dịch và review qua API.'],
   'gemini-web':['Gemini Web','Gem, model và mức suy nghĩ khi tự động hóa trình duyệt Gemini.'],
   'chatgpt-web':['ChatGPT Web','Model và mức suy nghĩ khi tự động hóa trình duyệt ChatGPT.'],
-  'gpt-api':['GPT API','Khóa, model và thông số cho quy trình dịch + hiệu đính bằng API.'],
+  'gpt-api':['OpenAI API','Khóa, model và thông số cho các công đoạn dùng OpenAI API.'],
   publishing:['Xuất bản','Tài khoản Hako và kho ảnh Cloudflare R2.'],
   sharing:['Chia sẻ','Bucket R2 private và Worker phục vụ bản đọc chia sẻ.'],
   general:['Chung','Hành vi chung của workspace và quy trình hậu xử lý.'],
 };
+const PROVIDER_LABELS={'gemini-api':'Gemini API','gemini-web':'Gemini Web','openai-api':'OpenAI API','chatgpt-web':'ChatGPT Web'};
+const PIPELINE_OWNED_SETTING_KEYS=new Set([
+  'translate_model','polish_model','pronoun_model','review_bg_model','gemini_api_thinking',
+  'gemini_web_model','gemini_thinking',
+  'gpt_api_translate_model','gpt_api_polish_model','gpt_api_pronoun_model','gpt_api_review_model',
+  'gpt_api_translate_effort','gpt_api_polish_effort','gpt_api_review_effort',
+]);
+const visibleSettingsForGroup=(items,group)=>items.filter(item=>
+  item.group===group && (group==='pipeline'||!PIPELINE_OWNED_SETTING_KEYS.has(item.key))
+);
 const appThemes=[
   {id:'quiet-light',name:'Quiet Light',description:'Sáng, nhẹ mắt',color:'#f5f5f5'},
   {id:'dark-modern',name:'Dark Modern',description:'Tối mặc định',color:'#101412'},
@@ -292,38 +303,22 @@ const pipelineGroups = {
 };
 let activePipelineGroup='translation';
 const pipelineItems = [
-  {id:'v1',code:'V1',group:'translation',title:'Gemini API',desc:'Dịch chương chưa xử lý bằng Gemini API.'},
-  {id:'v1-interactions',code:'VI',group:'translation',title:'Gemini Interactions (Beta)',desc:'Dịch trực tiếp trong editor; biên tập chỉ hiện từng dòng thay đổi.'},
-  {id:'v2',code:'V2',group:'translation',title:'Gemini Web',desc:'Dịch đơn chương qua hồ sơ trình duyệt Gemini.'},
-  {id:'v3',code:'V3',group:'translation',title:'Gemini Web Batch',desc:'Dịch nhiều chương mỗi batch và chạy hậu xử lý.'},
-  {id:'gpt',code:'GPT',group:'translation',title:'ChatGPT Web',desc:'Dịch batch qua hồ sơ trình duyệt ChatGPT.'},
-  {id:'gpt-v2',code:'G2',group:'translation',title:'ChatGPT Web V2',desc:'Dịch, hiệu đính, xưng hô và review theo cùng batch.'},
-  {id:'gpt-api',code:'GA',group:'translation',title:'GPT API',desc:'Dịch và hiệu đính tuần tự trước khi lưu.'},
+  {id:'pipeline',code:'AI',group:'translation',title:'Dịch truyện',desc:'Chọn cách chạy, app tự cấu hình các công đoạn còn lại.'},
   {id:'manual',code:'MN',group:'translation',title:'Dịch thủ công',desc:'Xuất prompt và nhận kết quả AI trực tiếp.'},
-  {id:'context-api',code:'CA',group:'memory',title:'Tạo context bằng Gemini API',desc:'Sinh glossary bằng API, không cần mở trình duyệt.'},
-  {id:'context-v1',code:'C1',group:'memory',title:'Tạo context bằng Gemini Web',desc:'Sinh glossary qua hồ sơ trình duyệt Gemini.'},
-  {id:'context-gpt',code:'CG',group:'memory',title:'Tạo context bằng ChatGPT Web',desc:'Sinh glossary qua hồ sơ trình duyệt ChatGPT.'},
+  {id:'context',code:'CT',group:'memory',title:'Tạo Context',desc:'Sinh glossary bằng engine đã chọn trong Cài đặt.'},
   {id:'characters',code:'CH',group:'memory',title:'Hồ sơ nhân vật',desc:'Phân tích và cập nhật thông tin nhân vật.'},
   {id:'review',code:'RV',group:'quality',title:'Review toàn bộ',desc:'Đối chiếu raw và bản dịch để tìm lỗi nội dung.'},
   {id:'hako',code:'UP',group:'publishing',title:'Đăng lên Hako',desc:'Đăng chương Markdown và tải ảnh lên R2 khi cần.'},
 ];
 const taskSchemas = {
-  v1:{title:'Gemini API V1',description:'Chọn số lượng công việc thực hiện trong lần chạy này.',fields:[]},
-  'v1-interactions':{title:'V1 · Gemini Interactions Streaming (Beta)',description:'Dịch trực tiếp trong Không gian truyện; khi biên tập chỉ cập nhật dòng thay đổi và đặt con trỏ tại vị trí AI đang sửa. Dùng bộ lọc an toàn mặc định của Google.',fields:[]},
+  pipeline:{title:'Dịch truyện',description:'Chọn một cách chạy. App sẽ tự dùng thiết lập phù hợp cho các công đoạn.',fields:[]},
   review: {title:'Review đối chiếu toàn bộ',description:'So sánh từng chương ở ngôn ngữ nguồn với bản dịch Việt. Chọn phạm vi và mức song song trước khi gửi API.',fields:[['start','Bắt đầu từ chương','number','1'],['end','Kết thúc tại chương','number',''],['force','Review lại chương đã có','checkbox',false],['batch_size','Số chương mỗi batch','number','10'],['workers','Số luồng song song','number','10'],['sleep','Giây nghỉ giữa batch','number','4']]},
   hako:{title:'Đăng chương lên Hako',description:'Chọn chương đầu và chương cuối. App tự xác định volume, Book ID và ảnh cần tải lên.',fields:[['set_as_incomplete','Đánh dấu chương chưa hoàn thành','checkbox',false]]},
-  v2:{title:'Gemini Web V2',description:'Cấu hình browser và phạm vi chạy ngay tại đây.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập Gemini','checkbox',true]]},
-  v3:{title:'Gemini Web V3',description:'Cấu hình browser, batch và phạm vi chạy.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập Gemini','checkbox',true],['batch_size','Số chương mỗi batch','number','2'],['batch_runs','Số lần chạy batch (0 = đến hết)','number','1']]},
-  gpt:{title:'ChatGPT Web',description:'Cấu hình browser, batch và phạm vi chạy.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập ChatGPT','checkbox',true],['batch_size','Số chương mỗi batch','number','1'],['batch_runs','Số lần chạy batch (0 = đến hết)','number','1']]},
-  'gpt-v2':{title:'ChatGPT Web V2',description:'Một batch size dùng chung; mỗi công đoạn chạy trong chat mới.',fields:[['open_browser_setup','Mở màn hình kiểm tra đăng nhập ChatGPT','checkbox',true],['batch_size','Số chương mỗi batch','number','1'],['batch_runs','Số lần chạy batch (0 = đến hết)','number','1'],['gpt_v2_polish','Hiệu đính','checkbox',true],['gpt_v2_pronouns','Xuất xưng hô','checkbox',true],['gpt_v2_review','Review','checkbox',true]]},
-  'gpt-api':{title:'GPT API · Dịch và hiệu đính',description:'Mỗi chương được dịch rồi hiệu đính bằng hai lượt GPT API trước khi lưu.',fields:[]},
-  characters:{title:'Tạo hồ sơ nhân vật',description:'Phân tích raw theo phạm vi. Chỉ tăng tiến độ khi AI trả về hồ sơ hợp lệ.',fields:[['character_model','Model Gemini','text','gemini-3.5-flash'],['character_batch_size','Số segment mỗi batch','number','10'],['character_start','Bắt đầu từ segment','number','1'],['character_end','Kết thúc tại segment (để trống = hết)','number',''],['character_retries','Số lần thử API','number','3'],['character_force','Chạy lại phạm vi đã xử lý','checkbox',false]]},
+  characters:{title:'Tạo hồ sơ nhân vật',description:'Phân tích raw bằng engine đã chọn trong Cài đặt. Chỉ tăng tiến độ khi AI trả về hồ sơ hợp lệ.',fields:[['character_batch_size','Số segment mỗi batch','number','10'],['character_start','Bắt đầu từ segment','number','1'],['character_end','Kết thúc tại segment (để trống = hết)','number',''],['character_retries','Số lần thử mỗi batch','number','3'],['open_browser_setup','Mở trình duyệt để kiểm tra đăng nhập khi dùng Web','checkbox',true],['character_force','Chạy lại phạm vi đã xử lý','checkbox',false]]},
   manual:{title:'Dịch thủ công',description:'Sao chép prompt đầy đủ, gửi cho AI rồi dán kết quả để lưu và hậu xử lý.',fields:[]},
-  'context-v1':{title:'Tạo context V1',description:'Chọn số chương xử lý trong mỗi batch và tùy chọn kiểm tra đăng nhập Gemini.',fields:[['batch_size','Số chương mỗi batch','number','30'],['open_browser_setup','Mở màn hình kiểm tra đăng nhập Gemini','checkbox',true]]},
-  'context-api':{title:'Tạo context bằng Gemini API',description:'Tạo glossary theo từng batch bằng model context đã cấu hình. Không cần mở trình duyệt.',fields:[['batch_size','Số chương mỗi batch','number','30'],['context_retries','Số lần thử mỗi batch','number','3']]},
-  'context-gpt':{title:'Tạo context GPT',description:'Chọn số chương xử lý trong mỗi batch và tùy chọn kiểm tra đăng nhập ChatGPT.',fields:[['batch_size','Số chương mỗi batch','number','30'],['open_browser_setup','Mở màn hình kiểm tra đăng nhập ChatGPT','checkbox',true]]},
+  context:{title:'Tạo Context',description:'Tạo glossary theo từng batch bằng engine và model đã chọn trong Cài đặt.',fields:[['batch_size','Số chương mỗi batch','number','30'],['context_retries','Số lần thử mỗi batch','number','3'],['open_browser_setup','Mở trình duyệt để kiểm tra đăng nhập khi dùng Web','checkbox',true]]},
 };
-const multiChapterTasks=new Set(['v1','v1-interactions','v2','gpt-api']);
+const multiChapterTasks=new Set(['pipeline','interactions']);
 let pendingTask=null;
 let pronounEditIndex=null;
 
@@ -388,7 +383,7 @@ function renderPythonSettings(items) {
   if(!$('#publishingR2Account').value)$('#publishingR2Account').value=items.find(item=>item.key==='r2_account_id')?.value||items.find(item=>item.key==='share_r2_account_id')?.value||'';
   if(!$('#publishingR2Bucket').value)$('#publishingR2Bucket').value=items.find(item=>item.key==='r2_bucket')?.value||'aiko-images';
   if(!$('#cloudflareDeployAccount').value)$('#cloudflareDeployAccount').value=items.find(item=>item.key==='share_r2_account_id')?.value||'';
-  $('#settingsTabs').innerHTML=Object.entries(settingsGroups).map(([key,[label]])=>`<button type="button" role="tab" data-settings-tab="${key}" aria-selected="${key===activeSettingsGroup}" class="${key===activeSettingsGroup?'active':''}">${label}<span>${items.filter(item=>item.group===key).length+(key==='general'||key==='publishing'?1:0)}</span></button>`).join('');
+  $('#settingsTabs').innerHTML=Object.entries(settingsGroups).map(([key,[label]])=>`<button type="button" role="tab" data-settings-tab="${key}" aria-selected="${key===activeSettingsGroup}" class="${key===activeSettingsGroup?'active':''}">${label}<span>${visibleSettingsForGroup(items,key).length+(key==='general'||key==='publishing'?1:0)}</span></button>`).join('');
   const [title,description]=settingsGroups[activeSettingsGroup];
   $('#settingsGroupTitle').textContent=title; $('#settingsGroupDescription').textContent=description;
   $('#workspaceSettings').classList.toggle('active',activeSettingsGroup==='general');
@@ -396,15 +391,48 @@ function renderPythonSettings(items) {
   $('#publishingManager').classList.toggle('active',activeSettingsGroup==='publishing');
   $('#publishingR2Manager').classList.toggle('active',activeSettingsGroup==='publishing');
   $('#cloudflareDeployManager').classList.toggle('active',activeSettingsGroup==='sharing');
-  const settingFields=items.filter(item=>item.group===activeSettingsGroup).map(item=>{
+  const renderSetting=item=>{
     const control=item.type==='select'
       ? `<select data-python-setting="${escapeHtml(item.key)}">${item.options.map(([value,label])=>`<option value="${escapeHtml(value)}" ${value===item.value?'selected':''}>${escapeHtml(label)}</option>`).join('')}</select>`
       : item.type==='textarea'
         ? `<textarea data-python-setting="${escapeHtml(item.key)}" rows="10" spellcheck="false">${escapeHtml(item.value)}</textarea>`
       : `<input data-python-setting="${escapeHtml(item.key)}" type="${item.type}" value="${escapeHtml(item.value)}" ${item.inputmode?`inputmode="${item.inputmode}"`:''} ${item.type==='number'?`min="${item.min}" max="${item.max}"`:''} autocomplete="off">`;
     return `<label class="python-setting ${item.type==='textarea'?'textarea-setting':''}"><span>${escapeHtml(item.label)}${item.overridden?'<em>Đã tùy chỉnh</em>':''}</span>${control}<small>${item.description?escapeHtml(item.description)+' · ':''}${item.type==='textarea'?'Dùng “Khôi phục mặc định” để lấy lại tiêu chí chuẩn.':`Mặc định: ${escapeHtml(item.default||'để trống')}`}</small></label>`;
+  };
+  const groupItems=visibleSettingsForGroup(items,activeSettingsGroup);
+  const settingFields=groupItems.map(renderSetting).join('');
+  const settingItem=key=>items.find(item=>item.key===key);
+  const providerDefaults={
+    'gemini-api':{
+      translate:['translate_model','gemini_api_thinking'],polish:['polish_model','gemini_api_thinking'],
+      pronouns:['pronoun_model','gemini_api_thinking'],review:['review_bg_model','gemini_api_thinking'],context:['context_model','gemini_api_thinking'],characters:['character_model','gemini_api_thinking'],
+    },
+    'gemini-web':{
+      translate:['gemini_web_model','gemini_thinking'],polish:['gemini_web_model','gemini_thinking'],
+      pronouns:['gemini_web_model','gemini_thinking'],review:['gemini_web_model','gemini_thinking'],context:['gemini_web_model','gemini_thinking'],characters:['gemini_web_model','gemini_thinking'],
+    },
+    'openai-api':{
+      translate:['gpt_api_translate_model','gpt_api_translate_effort'],polish:['gpt_api_polish_model','gpt_api_polish_effort'],
+      pronouns:['gpt_api_pronoun_model','gpt_api_polish_effort'],review:['gpt_api_review_model','gpt_api_review_effort'],context:['gpt_api_translate_model','gpt_api_translate_effort'],characters:['gpt_api_translate_model','gpt_api_translate_effort'],
+    },
+    'chatgpt-web':{
+      translate:['chatgpt_model','chatgpt_thinking'],polish:['chatgpt_model','chatgpt_thinking'],
+      pronouns:['chatgpt_model','chatgpt_thinking'],review:['chatgpt_model','chatgpt_thinking'],context:['chatgpt_model','chatgpt_thinking'],characters:['chatgpt_model','chatgpt_thinking'],
+    },
+  };
+  const engineOptions=(stage,value)=>[['gemini-api','Gemini API'],['gemini-web','Gemini Web'],['openai-api','OpenAI API'],['chatgpt-web','ChatGPT Web']].map(([key,label])=>{
+    const supported=Boolean(providerDefaults[key][stage]);
+    return `<option value="${key}" ${key===value?'selected':''} ${supported?'':'disabled'}>${label}${supported?'':' (chưa hỗ trợ)'}</option>`;
   }).join('');
-  $('#pythonSettingsFields').innerHTML=activeSettingsGroup==='publishing'&&settingFields
+  const pipelineStage=(label,stage)=>{
+    const provider=settingItem(`pipeline_${stage}_provider`);
+    const model={...settingItem(`pipeline_${stage}_model`),description:`Model riêng cho ${label.toLowerCase()}.`};
+    const thinking={...settingItem(`pipeline_${stage}_thinking`),description:provider.value==='openai-api'?'Reasoning riêng cho công đoạn này.':'Thinking riêng cho công đoạn này.'};
+    return `<details class="pipeline-stage-setting" data-pipeline-stage="${stage}" ${stage==='translate'?'open':''}><summary><strong>${label}</strong><span>${PROVIDER_LABELS[provider.value]||provider.value}</span></summary><div class="pipeline-stage-body"><label class="python-setting"><span>Engine</span><select data-python-setting="${provider.key}" data-stage-engine="${stage}">${engineOptions(stage,provider.value)}</select><small>Engine dùng riêng cho công đoạn này.</small></label>${renderSetting(model)}${renderSetting(thinking)}</div></details>`;
+  };
+  $('#pythonSettingsFields').innerHTML=activeSettingsGroup==='pipeline'
+    ? `<div class="pipeline-stage-list">${pipelineStage('Dịch','translate')}${pipelineStage('Hiệu đính','polish')}${pipelineStage('Xuất xưng hô','pronouns')}${pipelineStage('Review','review')}${pipelineStage('Tạo Context','context')}${pipelineStage('Hồ sơ nhân vật','characters')}</div>`
+    : activeSettingsGroup==='publishing'&&settingFields
     ? `${r2CredentialGuide('publishing')}<details class="publishing-advanced"><summary>Cài đặt nâng cao: tài khoản Hako và kho ảnh</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
     : activeSettingsGroup==='sharing'&&settingFields
       ? `${r2CredentialGuide('sharing')}<details class="publishing-advanced"><summary>Cài đặt R2 nâng cao</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
@@ -413,6 +441,18 @@ function renderPythonSettings(items) {
     $$('[data-python-setting]').forEach(input=>{ const item=settingsItems.find(entry=>entry.key===input.dataset.pythonSetting); if(item)item.value=input.value; });
     activeSettingsGroup=button.dataset.settingsTab;
     renderPythonSettings(settingsItems);
+  });
+  $$('[data-stage-engine]').forEach(select=>select.onchange=()=>{
+    $$('[data-python-setting]').forEach(input=>{ const item=settingsItems.find(entry=>entry.key===input.dataset.pythonSetting); if(item)item.value=input.value; });
+    const stage=select.dataset.stageEngine;
+    const sourceKeys=providerDefaults[select.value][stage];
+    const model=settingsItems.find(item=>item.key===`pipeline_${stage}_model`);
+    const thinking=settingsItems.find(item=>item.key===`pipeline_${stage}_thinking`);
+    model.value=settingItem(sourceKeys[0])?.value||'';
+    thinking.value=settingItem(sourceKeys[1])?.value||'';
+    const opened=new Set($$('.pipeline-stage-setting[open]').map(detail=>detail.dataset.pipelineStage));
+    renderPythonSettings(settingsItems);
+    $$('.pipeline-stage-setting').forEach(detail=>detail.open=opened.has(detail.dataset.pipelineStage));
   });
 }
 
@@ -933,7 +973,7 @@ async function selectProject(name) {
   updateChapterNavigation();
   setEditorValue('source',''); setEditorValue('target','');
   updateLineNumbers('source'); updateLineNumbers('target');
-  state.reviews=[]; state.context={index:0,glossary:[],style_notes:'',prompt_preset:'default',prompt_role:'',prompt_task:'',prompt_presets:[],polish_prompt_preset:'default',polish_prompt_role:'',polish_prompt_task:'',polish_prompt_presets:[],raw_yaml:''};
+  state.reviews=[]; state.context={index:0,glossary:[],style_notes:'',prompt_preset:'default',prompt_role:'',prompt_task:'',prompt_presets:[],polish_prompt_preset:'default',polish_prompt_role:'',polish_prompt_task:'',polish_prompt_presets:[],raw_json:''};
   projectShares=[];renderShares();
   renderContext();
   state.currentImages=[]; renderMarkdownEditors();
@@ -955,7 +995,7 @@ async function loadContext() {
     state.glossaryDirty=false;
   } catch(error) {
     if(state.project!==project||state.projectRevision!==revision)return;
-    state.context={index:0,glossary:[],style_notes:'',prompt_preset:'default',prompt_role:'',prompt_task:'',prompt_presets:[],polish_prompt_preset:'default',polish_prompt_role:'',polish_prompt_task:'',polish_prompt_presets:[],raw_yaml:''}; toast(error.message);
+    state.context={index:0,glossary:[],style_notes:'',prompt_preset:'default',prompt_role:'',prompt_task:'',prompt_presets:[],polish_prompt_preset:'default',polish_prompt_role:'',polish_prompt_task:'',polish_prompt_presets:[],raw_json:''}; toast(error.message);
   }
   state.glossaryDirty=false;
   renderContext($('#glossarySearch')?.value||'');
@@ -993,7 +1033,7 @@ async function loadPronouns() {
     renderPronouns();
   } catch(error) {
     if(state.project!==project||state.projectRevision!==revision)return;
-    state.pronouns={pairs:[],count:0,locked_count:0,raw_yaml:''};state.pronounCurrent=null;renderPronouns();toast(error.message);
+    state.pronouns={pairs:[],count:0,locked_count:0,raw_json:''};state.pronounCurrent=null;renderPronouns();toast(error.message);
   }
 }
 
@@ -1003,7 +1043,7 @@ function pronounPairLabel(pair) {
 }
 
 function renderPronouns() {
-  const data=state.pronouns||{pairs:[],count:0,locked_count:0,raw_yaml:''};
+  const data=state.pronouns||{pairs:[],count:0,locked_count:0,raw_json:''};
   const query=($('#pronounSearch')?.value||'').trim().toLocaleLowerCase('vi');
   const filter=$('#pronounFilter')?.value||'all';
   const pairs=data.pairs.filter(pair=>{
@@ -1013,7 +1053,7 @@ function renderPronouns() {
   navigationCounts.pronouns=data.count||0;if($('#pronounBadge'))$('#pronounBadge').textContent=data.count||0;
   $('#pronounSummary').textContent=state.project?`${state.project} · ${data.count||0} cặp · ${data.locked_count||0} đã khóa`:'Chưa chọn truyện.';
   $('#pronounCount').textContent=`${pairs.length}/${data.count||0} cặp`;
-  $('#pronounRawYaml').textContent=data.raw_yaml||'# Chưa có dữ liệu xưng hô.';
+  $('#pronounRawJson').textContent=data.raw_json||'# Chưa có dữ liệu xưng hô.';
   $('#pronounList').innerHTML=pairs.length?pairs.map((pair,index)=>{
     const latest=pair.latest||{};
     return `<button class="pronoun-row ${pair.key===state.pronounCurrent?'active':''}" data-pronoun-key="${escapeHtml(pair.key)}"><span><strong>${escapeHtml(pronounPairLabel(pair))}</strong><small>${escapeHtml(latest.speaker_self||'?')} / ${escapeHtml(latest.speaker_to_listener||'?')} · Chương ${escapeHtml(latest.chapter_number??'—')}</small></span><span class="pronoun-row-meta">${pair.changed?'<i class="pronoun-chip">Đã đổi</i>':''}${pair.locked?'<i class="pronoun-chip locked">Đã khóa</i>':''}</span></button>`;
@@ -1229,7 +1269,7 @@ function updateContextEditorStatus() {
   status.querySelector('small').textContent=invalid.length?'Mỗi dòng cần có dạng Raw = Dịch.':promptMissing?'Chọn một preset hoặc tự nhập đầy đủ hai phần prompt.':'Bản cũ sẽ được sao lưu tự động trước khi thay thế.';
 }
 
-async function saveContextYaml() {
+async function saveContextJson() {
   const button=$('#saveContextEdit'); button.disabled=true; button.textContent='Đang lưu…';
   try {
     const nextIndex=Number($('#contextIndexEditor').value);
@@ -2075,10 +2115,13 @@ async function configureTask(kind) {
     }
     return;
   }
-  let fields=(schema.fields||[]).map(([id,label,type,value])=>type==='checkbox'
+  let fields=(schema.fields||[]).map(([id,label,type,value,options])=>type==='checkbox'
     ? `<label class="task-check"><input data-task-field="${id}" type="checkbox" ${value?'checked':''}><span>${label}</span></label>`
+    : type==='select'?`<label class="task-field"><span>${label}</span><select data-task-field="${id}">${options.map(([key,text])=>`<option value="${key}" ${key===value?'selected':''}>${text}</option>`).join('')}</select></label>`
     : `<label class="task-field"><span>${label}</span>${type==='textarea'?`<textarea data-task-field="${id}" rows="9">${escapeHtml(value)}</textarea>`:`<input data-task-field="${id}" type="${type}" value="${value}" ${type==='number'?'min="0"':''}>`}</label>`).join('');
-  if(multiChapterTasks.has(kind))fields=`<label class="task-field"><span>Số chương muốn chạy</span><input data-task-field="max_chapters" type="number" min="1" step="1" value="1" placeholder="Tất cả"><small>Để trống để chạy đến hết.</small></label>${fields}`;
+  if(kind==='pipeline'){
+    fields=`<label class="task-field"><span>Số chương muốn chạy</span><input data-task-field="max_chapters" type="number" min="1" step="1" value="1" placeholder="Tất cả"><small>Để trống để chạy đến hết.</small></label><div class="pipeline-options"><label class="task-check"><input data-task-field="enable_polish" type="checkbox" checked><span>Hiệu đính bản dịch</span></label><label class="task-check"><input data-task-field="enable_pronouns" type="checkbox" checked><span>Xuất xưng hô</span></label><label class="task-check"><input data-task-field="enable_review" type="checkbox" checked><span>Review sau khi dịch</span></label></div><small class="pipeline-settings-hint">Engine và model được quản lý trong Cài đặt > Quy trình dịch.</small>`;
+  } else if(multiChapterTasks.has(kind))fields=`<label class="task-field"><span>Số chương muốn chạy</span><input data-task-field="max_chapters" type="number" min="1" step="1" value="1" placeholder="Tất cả"><small>Để trống để chạy đến hết.</small></label>${fields}`;
   if(kind==='hako'){
     const targets=publishingChapterTargets();
     if(!targets.length)return toast('Truyện này chưa có chương đã dịch để đăng');
@@ -2096,6 +2139,41 @@ async function configureTask(kind) {
 
 function confirmTask() {
   const config=Object.fromEntries($$('[data-task-field]').map(field=>[field.dataset.taskField,field.type==='checkbox'?field.checked:field.value]));
+  if(pendingTask==='pipeline'){
+    const saved=key=>settingsItems.find(item=>item.key===key)?.value||'';
+    config.translate_provider=saved('pipeline_translate_provider')||'gemini-api';
+    config.polish_provider=saved('pipeline_polish_provider')||'gemini-api';
+    config.pronouns_provider=saved('pipeline_pronouns_provider')||'gemini-api';
+    config.review_provider=saved('pipeline_review_provider')||'gemini-api';
+    ['translate','polish','pronouns','review'].forEach(stage=>{
+      config[`${stage}_stage_model`]=saved(`pipeline_${stage}_model`);
+      config[`${stage}_stage_thinking`]=saved(`pipeline_${stage}_thinking`);
+    });
+    config.open_browser_setup=true;config.batch_size=1;config.batch_runs=1;
+    if(!config.enable_polish)config.polish_provider='off';
+    if(!config.enable_pronouns)config.pronouns_provider='off';
+    if(!config.enable_review)config.review_provider='off';
+    delete config.enable_polish;delete config.enable_pronouns;delete config.enable_review;
+  }
+  if(pendingTask==='context'){
+    const saved=key=>settingsItems.find(item=>item.key===key)?.value||'';
+    config.context_provider=saved('pipeline_context_provider')||'gemini-api';
+    config.context_stage_model=saved('pipeline_context_model');
+    config.context_stage_thinking=saved('pipeline_context_thinking');
+  }
+  if(pendingTask==='characters'){
+    const saved=key=>settingsItems.find(item=>item.key===key)?.value||'';
+    config.characters_provider=saved('pipeline_characters_provider')||'gemini-api';
+    config.characters_stage_model=saved('pipeline_characters_model');
+    config.characters_stage_thinking=saved('pipeline_characters_thinking');
+  }
+  if(pendingTask==='review'){
+    const saved=key=>settingsItems.find(item=>item.key===key)?.value||'';
+    config.review_provider=saved('pipeline_review_provider')||'gemini-api';
+    config.review_stage_model=saved('pipeline_review_model');
+    config.review_stage_thinking=saved('pipeline_review_thinking');
+    config.open_browser_setup=true;
+  }
   if('max_chapters' in config&&config.max_chapters!==''&&(!/^\d+$/.test(config.max_chapters)||Number(config.max_chapters)<1))return toast('Số chương muốn chạy phải là số nguyên từ 1 trở lên');
   if('batch_runs' in config&&!/^\d+$/.test(config.batch_runs))return toast('Số lần chạy batch phải là số nguyên từ 0 trở lên');
   if(pendingTask==='manual'){
@@ -2116,7 +2194,7 @@ function confirmTask() {
 }
 
 function confirmGlossaryCoverage(kind,config={}) {
-  if(!['v1','v1-interactions','v2','v3','gpt','gpt-v2','gpt-api','manual','retranslate'].includes(kind))return true;
+  if(!['pipeline','interactions','manual','retranslate'].includes(kind))return true;
   const glossaryIndex=Number(state.context?.index)||0;
   let startIndex=kind==='retranslate'
     ? state.chapters.findIndex(item=>item.name===state.current)
@@ -2124,11 +2202,7 @@ function confirmGlossaryCoverage(kind,config={}) {
   if(startIndex<0)return true;
   let endChapter=startIndex+1;
   if(kind!=='retranslate'){
-    if(['v3','gpt','gpt-v2'].includes(kind)){
-      const batchRuns=Number(config.batch_runs);
-      endChapter=batchRuns===0?state.chapters.length:Math.min(state.chapters.length,startIndex+Math.max(1,Number(config.batch_size)||1)*Math.max(1,batchRuns||1));
-    }
-    else endChapter=config.max_chapters===''?state.chapters.length:Math.min(state.chapters.length,startIndex+Math.max(1,Number(config.max_chapters)||1));
+    endChapter=config.max_chapters===''?state.chapters.length:Math.min(state.chapters.length,startIndex+Math.max(1,Number(config.max_chapters)||1));
   }
   if(endChapter<=glossaryIndex)return true;
   const range=endChapter===startIndex+1?`chương ${endChapter}`:`chương ${startIndex+1}–${endChapter}`;
@@ -2149,14 +2223,14 @@ async function executePipeline(kind,config) {
   const pipelineItem=pipelineItems.find(item=>item.id===kind);
   if(pipelineItem)selectPipelineGroup(pipelineItem.group);
   const button = $(`[data-run="${kind}"]`)||(kind==='hako-edit'?$('#runHakoEdit'):null); button.disabled=true; button.textContent='Đang chạy…'; $('#console').classList.add('open'); updateConsoleOutput('Đang khởi động tác vụ…');
-  const translation=['v1','v1-interactions','v2','v3','gpt','gpt-v2','gpt-api','manual'].includes(kind);
+  const translation=['pipeline','interactions','manual'].includes(kind);
   setTaskStopControls(translation,true);
   if (!state.project) { button.disabled=false; button.textContent='Chạy tác vụ'; return toast('Hãy chọn truyện trước'); }
   showView('pipeline');
-  try { await api('/api/run/'+kind+'?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({config:{skip_login_prompt:true,...config}})}); if(kind==='v1-interactions')openNovelEventStream(kind); pollJob(kind,button); } catch(error){ button.disabled=false; button.textContent='Chạy lại'; toast(error.message); }
+  try { await api('/api/run/'+kind+'?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({config:{skip_login_prompt:true,...config}})}); if(kind==='interactions')openNovelEventStream(kind); pollJob(kind,button); } catch(error){ button.disabled=false; button.textContent='Chạy lại'; toast(error.message); }
 }
 async function pollJob(kind, button) {
-  try { const job=await api('/api/job/'+kind); if(!novelStreamSource)await applyNovelStreamEvents(job); updateConsoleOutput(job.output || 'Đang xử lý…'); if(job.status==='running') return setTimeout(()=>pollJob(kind,button),500); activeJobKind=null; button.disabled=false; button.textContent=job.status==='done'?'Chạy lại':'Thử lại'; toast(job.status==='done'?'Tác vụ đã hoàn tất':job.status==='cancelled'?'Đã dừng tác vụ':'Tác vụ gặp lỗi'); await loadChapters(); if(['review','split-review'].includes(kind))await loadReviews(); if(['context-api','context-v1','context-gpt','glossary'].includes(kind))await loadContext(); if(kind==='characters')await loadCharacters(); } catch(error){ button.disabled=false; toast(error.message); }
+  try { const job=await api('/api/job/'+kind); if(!novelStreamSource)await applyNovelStreamEvents(job); updateConsoleOutput(job.output || 'Đang xử lý…'); if(job.status==='running') return setTimeout(()=>pollJob(kind,button),500); activeJobKind=null; button.disabled=false; button.textContent=job.status==='done'?'Chạy lại':'Thử lại'; toast(job.status==='done'?'Tác vụ đã hoàn tất':job.status==='cancelled'?'Đã dừng tác vụ':'Tác vụ gặp lỗi'); await loadChapters(); if(kind==='review')await loadReviews(); if(kind==='context')await loadContext(); if(kind==='characters')await loadCharacters(); } catch(error){ button.disabled=false; toast(error.message); }
 }
 
 async function restoreActiveJob(job) {
@@ -2166,7 +2240,7 @@ async function restoreActiveJob(job) {
   $('#console').classList.add('open');
   updateConsoleOutput(job.output||'Đang xử lý…');
   showView('pipeline');
-  const translation=['v1','v1-interactions','v2','v3','gpt','gpt-api','manual','retranslate'].includes(job.kind);
+  const translation=['pipeline','interactions','manual','retranslate'].includes(job.kind);
   $('#stopAfterCurrent').style.display=translation?'':'none';
   $('#stopImmediately').style.display=translation?'':'none';
   $('#stopCurrentTask').style.display=translation?'none':'';
@@ -2228,7 +2302,7 @@ async function startRetranslate() {
   updateConsoleOutput(`Đang dịch lại ${state.current} bằng ${engine.toUpperCase()}…`);
   try {
     await api('/api/retranslate?project='+encodeURIComponent(state.project), {method:'POST', body:JSON.stringify({engine,chapter:state.current})});
-    if(engine==='v1-interactions')openNovelEventStream('retranslate');
+    if(engine==='interactions')openNovelEventStream('retranslate');
     pollRetranslate();
   } catch(error) { toast(error.message); }
 }
@@ -2319,7 +2393,7 @@ $('#cancelPronounEdit').onclick=()=>$('#pronounModal').classList.remove('open');
 $('#savePronounEdit').onclick=savePronounEdit;
 $('#editContextButton').onclick=openContextEditor;
 $('#cancelContextEdit').onclick=()=>$('#contextModal').classList.remove('open');
-$('#saveContextEdit').onclick=saveContextYaml;
+$('#saveContextEdit').onclick=saveContextJson;
 ['contextIndexEditor','contextStyleEditor','contextGlossaryEditor'].forEach(id=>$(`#${id}`).oninput=updateContextEditorStatus);
 ['contextPromptRole','contextPromptTask'].forEach(id=>$(`#${id}`).oninput=()=>{syncPromptPreset();updateContextEditorStatus();});
 $('#contextPromptPreset').onchange=applyPromptPreset;

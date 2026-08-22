@@ -147,6 +147,17 @@
 .task-field-row .task-field { min-width: 0; }
 #taskModal .modal { display: flex; flex-direction: column; max-height: calc(100dvh - 40px); overflow: hidden; }
 #taskModal .task-fields { min-height: 0; overflow-y: auto; padding-right: 5px; scrollbar-gutter: stable; }
+.pipeline-options { display: grid; gap: 8px; }
+.pipeline-stage-list { grid-column: 1 / -1; display: grid; gap: 10px; }
+.pipeline-stage-setting { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.pipeline-stage-setting summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; padding: 14px; }
+.pipeline-stage-setting summary span { color: var(--muted); font-size: 12px; }
+.pipeline-stage-body { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: stretch; gap: 12px; padding: 0 14px 14px; }
+.pipeline-stage-body .python-setting { min-width: 0; height: 100%; grid-template-rows: auto 52px minmax(44px,auto); }
+.pipeline-stage-body .python-setting input,.pipeline-stage-body .python-setting select { height: 52px; }
+.pipeline-stage-body .python-setting small { line-height: 1.45; }
+.pipeline-settings-hint { color: var(--muted); font-size: 12px; }
+@media(max-width:700px){.pipeline-stage-body{grid-template-columns:1fr}}
 #taskModal .modal-actions { flex: 0 0 auto; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); background: var(--surface); }
 .manual-prompt-loading,.manual-prompt-error { display: grid; gap: 5px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .manual-prompt-loading span,.manual-prompt-error span { color: var(--muted); font-size: 12px; line-height: 1.5; }

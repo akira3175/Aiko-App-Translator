@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import app
-from cores import r19_translation
+from cores.r19 import storage as r19_storage
 
 
 class R19ManagerTests(unittest.TestCase):
@@ -38,8 +38,8 @@ class R19ManagerTests(unittest.TestCase):
 
     def test_r19_task_options_only_override_context_when_enabled(self):
         with patch.object(
-            app,
-            "r19_payload",
+            app.r19_service,
+            "payload",
             return_value={
                 "enabled": True,
                 "model": "r19-model",
@@ -50,8 +50,8 @@ class R19ManagerTests(unittest.TestCase):
             enabled = app.r19_task_options("project-a")
         self.assertEqual(enabled["previous_context_chapters"], 7)
         with patch.object(
-            app,
-            "r19_payload",
+            app.r19_service,
+            "payload",
             return_value={
                 "enabled": False,
                 "model": "r19-model",
@@ -127,7 +127,7 @@ class R19ManagerTests(unittest.TestCase):
                 patch.object(app, "active_translation", lambda: None),
                 patch.object(app, "saved_settings", lambda: {"r19_model": "test-model"}),
                 patch.object(app, "_call_r19_gemini", lambda _prompt, _model: '{"translation":"từ nhạy cảm"}'),
-                patch.object(r19_translation, "R19_WORDS_FILE", words),
+                patch.object(r19_storage, "R19_WORDS_FILE", words),
             ):
                 result = app.translate_r19_word("project", {"source": "敏感词"})
             self.assertEqual(result["translation"], "từ nhạy cảm")

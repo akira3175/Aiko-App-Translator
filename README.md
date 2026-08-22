@@ -28,4 +28,4 @@ Dữ liệu truyện, cài đặt cục bộ và API key không được đưa v
 
 ## Giấy phép
 
-Copyright © 2026 Akira Satoh. Phần mã nguồn do dự án sở hữu được cấp phép theo [PolyForm Noncommercial 1.0.0](LICENSE): cho phép sử dụng, chỉnh sửa và phân phối vì mục đích phi thương mại; không cho phép khai thác thương mại khi chưa có sự đồng ý bằng văn bản. Thành phần bên thứ ba tiếp tục tuân theo giấy phép riêng của chúng.
+Copyright © 2026 Akira Satoh. Phần mã nguồn do dự án sở hữu được cấp phép theo [PolyForm Noncommercial 1.0.0](LICENSE): cho phép sử dụng, chỉnh sửa và phân phối vì mục đích phi thương mại; không cho phép khai thác thương mại khi chưa có sự đồng ý bằng văn bản. Thành phần bên thứ ba tiếp tục tuân theo giấy phép riêng.

@@ -27,7 +27,7 @@ Không cần cài package web. Các pipeline AI vẫn dùng dependency của nh�
 - Không gian dịch: đọc bản gốc, biên tập và tự động lưu bản dịch.
 - Kho chương: tìm kiếm, xem trạng thái và mở chương.
 - Quy trình AI: chạy dịch, review, cập nhật nhân vật và xuất bản thảo.
-- Engine dịch: V1 Gemini API, V2 Gemini Web, V3 Gemini Web batch và GPT ChatGPT Web.
+- Pipeline theo công đoạn: chọn riêng Gemini API, Gemini Web, OpenAI API hoặc ChatGPT Web cho từng bước được hỗ trợ.
 - Có thể dịch lại chương đang mở; app sao lưu và tự khôi phục bản cũ nếu engine lỗi.
 - Công cụ dự án: tạo context V1/GPT, glossary và tách review.
 - Form trên web thay thế các câu hỏi `input()` của review, tách review và bước xác nhận đăng nhập trình duyệt.

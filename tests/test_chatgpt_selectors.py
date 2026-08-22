@@ -1,6 +1,6 @@
 import unittest
 
-from cores.dich_utils import (
+from cores.chatgpt.web_controls import (
     _find_visible_chatgpt_choice,
     _normalized_chatgpt_label,
 )

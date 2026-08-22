@@ -39,7 +39,7 @@ class HakoEditTests(unittest.TestCase):
             ]
         }
         with patch.dict(os.environ, {"NOVEL_WEB_MODE": "1", "NOVEL_WEB_CONFIG": json.dumps(config)}):
-            from cores import runtime_config
+            from cores.config import runtime as runtime_config
             from up import edit_hako
 
             runtime_config.task_config.cache_clear()

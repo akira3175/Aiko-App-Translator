@@ -1,9 +1,8 @@
 import tempfile
 import unittest
+import json
 from pathlib import Path
 from unittest.mock import patch
-
-import yaml
 
 import app
 
@@ -12,7 +11,7 @@ class PronounHistoryTests(unittest.TestCase):
     def test_edit_specific_history_record_preserves_other_record(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
-            path = project / "pronouns.yaml"
+            path = project / "pronouns.json"
             original = {
                 "Alice|Bob": {
                     "characters": ["Alice", "Bob"],
@@ -35,7 +34,7 @@ class PronounHistoryTests(unittest.TestCase):
                 }
             }
             path.write_text(
-                yaml.safe_dump(original, allow_unicode=True), encoding="utf-8"
+                json.dumps(original, ensure_ascii=False), encoding="utf-8"
             )
 
             with patch.object(app, "safe_project", return_value=project):
@@ -54,7 +53,7 @@ class PronounHistoryTests(unittest.TestCase):
                     },
                 )
 
-            saved = yaml.safe_load(path.read_text(encoding="utf-8"))
+            saved = json.loads(path.read_text(encoding="utf-8"))
             timeline = saved["Alice|Bob"]["timeline"]
             self.assertEqual(
                 (timeline[0]["speaker_self"], timeline[0]["speaker_to_listener"]),
@@ -66,7 +65,7 @@ class PronounHistoryTests(unittest.TestCase):
             )
             self.assertEqual(timeline[0]["source"], "manual")
             self.assertTrue(saved["Alice|Bob"]["locked"])
-            self.assertTrue(path.with_name("pronouns.yaml.bak").exists())
+            self.assertTrue(path.with_name("pronouns.json.bak").exists())
             self.assertEqual(result["pairs"][0]["timeline"][0]["record_index"], 0)
 
 

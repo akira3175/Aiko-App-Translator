@@ -1,18 +1,24 @@
 import json
+import importlib
 import os
 import tempfile
 import unittest
-from contextlib import redirect_stdout
-from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-from cores import r19_translation
-from cores import dich_gpt_api, gen_context_api
-from cores.gen_characters import build_character_prompt
-from cores.runtime_config import task_config
-from cores.translation_prompts import build_batch_prompt, build_single_prompt
-from cores.translation_workflows import _context_with_previous_titles, translate_batch_with_web
+from cores import r19 as r19_translation
+from cores.r19 import storage as r19_storage
+from cores.r19 import translation as r19_fragment_translation
+from cores.translation import stage as translation_stage
+from cores.context import generation as context_generation
+from cores.characters import build_character_prompt
+from cores.config.runtime import task_config
+from cores.translation.prompts import build_batch_prompt, build_single_prompt
+from cores.translation.context import with_previous_titles
+
+
+postprocess_runtime_module = importlib.import_module("cores.postprocess.runtime")
+postprocess_polish_module = importlib.import_module("cores.postprocess.polish")
 
 
 class R19TranslationTests(unittest.TestCase):
@@ -69,47 +75,49 @@ class R19TranslationTests(unittest.TestCase):
             ensure_ascii=False,
         )
         task_config.cache_clear()
-        captured = []
-        with patch.object(
-            gen_context_api,
-            "call_gemini",
-            lambda prompt, **_kwargs: captured.append(prompt) or "###START###\n###END###",
-        ):
-            gen_context_api.generate_glossary(
-                [{"title": "T", "content": "Nội dung"}], ""
-            )
+        context_prompt = context_generation.build_glossary_prompt(
+            [{"title": "T", "content": "Nội dung"}], ""
+        )
         character_prompt = build_character_prompt(
             [{"title": "T", "content": "Nội dung"}], "", ""
         )
-        self.assertTrue(captured[0].startswith('R19 tùy chỉnh """'))
-        self.assertTrue(captured[0].endswith('"""'))
+        self.assertTrue(context_prompt.startswith('R19 tùy chỉnh """'))
+        self.assertTrue(context_prompt.endswith('"""'))
         self.assertTrue(character_prompt.startswith('R19 tùy chỉnh """'))
         self.assertTrue(character_prompt.endswith('"""'))
 
-    def test_r19_prefix_wraps_gpt_polish_prompt(self):
+    def test_r19_prefix_wraps_stage_polish_prompt(self):
         os.environ["NOVEL_WEB_CONFIG"] = json.dumps(
             {"r19_mode": True, "r19_prompt_prefix": 'Hiệu đính R19 """'},
             ensure_ascii=False,
         )
         task_config.cache_clear()
         captured = []
-        with (
-            patch.object(dich_gpt_api, "POLISH_MODEL", "test-model"),
-            patch.object(
-                dich_gpt_api,
-                "call_gpt_api",
-                lambda prompt, **_kwargs: captured.append(prompt)
-                or "###TITLE###\nT\n###CONTENT###\nC\n###END###",
-            ),
-        ):
-            dich_gpt_api.polish_chapter(
+        values = {"polish_provider": "openai-api", "polish_stage_model": "test-model"}
+        with patch.object(
+            postprocess_runtime_module, "option", side_effect=lambda key, default=None: values.get(key, default)
+        ), patch.object(
+            postprocess_polish_module, "build_characters_snapshot", return_value=None
+        ), patch.object(
+            postprocess_polish_module, "build_pronouns_snapshot", return_value=None
+        ), patch.dict(
+            translation_stage.TRANSPORT_OVERRIDES,
+            {"openai-api": lambda prompt, **_kwargs: captured.append(prompt)
+            or "###TITLE###\nT\n###CONTENT###\nC\n###END###"},
+            clear=True,
+        ), patch.object(postprocess_runtime_module.runtime, "log_api_call"):
+            postprocess_runtime_module.runtime.polish_translation(
                 {
+                    "id": "v1_c1_s1",
                     "title": "Raw",
                     "content": "Raw content",
                     "title_translation": "T",
                     "translation": "C",
                 },
                 1,
+                "",
+                "",
+                pronouns_file=None,
             )
         self.assertTrue(captured[0].startswith('Hiệu đính R19 """'))
         self.assertTrue(captured[0].endswith('"""'))
@@ -119,7 +127,7 @@ class R19TranslationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             words = Path(directory) / "r19_words.txt"
             words.write_text("phrase\nsensitive phrase\n", encoding="utf-8")
-            with patch.object(r19_translation, "R19_WORDS_FILE", words):
+            with patch.object(r19_storage, "R19_WORDS_FILE", words):
                 masked, entries = r19_translation.prepare_chapters(
                     [{"title": "T", "content": "A sensitive phrase appears twice: sensitive phrase."}]
                 )
@@ -138,7 +146,7 @@ class R19TranslationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             words = Path(directory) / "r19_words.txt"
             words.write_text("raw term = từ đã dịch\n", encoding="utf-8")
-            with patch.object(r19_translation, "R19_WORDS_FILE", words):
+            with patch.object(r19_storage, "R19_WORDS_FILE", words):
                 masked, entries = r19_translation.prepare_chapters(
                     [
                         {
@@ -213,7 +221,7 @@ class R19TranslationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             words = Path(directory) / "r19_words.txt"
             words.write_text("current term\nold filtered term\n", encoding="utf-8")
-            with patch.object(r19_translation, "R19_WORDS_FILE", words):
+            with patch.object(r19_storage, "R19_WORDS_FILE", words):
                 _masked, entries = r19_translation.prepare_chapters(
                     [{"title": "T", "content": "A current term."}]
                 )
@@ -236,7 +244,7 @@ class R19TranslationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             words = Path(directory) / "r19_words.txt"
             words.write_text("raw term = từ đã dịch\n", encoding="utf-8")
-            with patch.object(r19_translation, "R19_WORDS_FILE", words):
+            with patch.object(r19_storage, "R19_WORDS_FILE", words):
                 cleaned = r19_translation.strip_previous_context(
                     "Chương trước có raw term và từ đã dịch."
                 )
@@ -250,13 +258,13 @@ class R19TranslationTests(unittest.TestCase):
             words = Path(directory) / "r19_words.txt"
             words.write_text("raw term = từ đã dịch\n", encoding="utf-8")
             with (
-                patch.object(r19_translation, "R19_WORDS_FILE", words),
+                patch.object(r19_storage, "R19_WORDS_FILE", words),
                 patch(
-                    "cores.translation_workflows.get_translated_title",
+                    "cores.translation.context.get_translated_title",
                     return_value="Tiêu đề có từ đã dịch",
                 ),
             ):
-                context = _context_with_previous_titles(
+                context = with_previous_titles(
                     "Glossary", ["old.md", "current.md"], 1, directory, 1, "Tiêu đề trước:"
                 )
         self.assertNotIn("từ đã dịch", context)
@@ -266,7 +274,7 @@ class R19TranslationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             words = Path(directory) / "r19_words.txt"
             words.write_text("raw term = từ đã dịch\n", encoding="utf-8")
-            with patch.object(r19_translation, "R19_WORDS_FILE", words):
+            with patch.object(r19_storage, "R19_WORDS_FILE", words):
                 value = r19_translation.strip_r19_terms("raw term và từ đã dịch")
         self.assertEqual(value, "raw term và từ đã dịch")
 
@@ -275,7 +283,7 @@ class R19TranslationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             words = Path(directory) / "r19_words.txt"
             words.write_text("raw term = từ đã dịch\n", encoding="utf-8")
-            with patch.object(r19_translation, "R19_WORDS_FILE", words):
+            with patch.object(r19_storage, "R19_WORDS_FILE", words):
                 masked, entries, translations = (
                     r19_translation.prepare_postprocess_chapter(
                         {
@@ -302,7 +310,7 @@ class R19TranslationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             words = Path(directory) / "r19_words.txt"
             words.write_text("raw term = từ đã dịch\n", encoding="utf-8")
-            with patch.object(r19_translation, "R19_WORDS_FILE", words):
+            with patch.object(r19_storage, "R19_WORDS_FILE", words):
                 masked, _entries, translations = (
                     r19_translation.prepare_postprocess_chapter(
                         {"translation": "Bản dịch từ đã dịch"}
@@ -316,62 +324,6 @@ class R19TranslationTests(unittest.TestCase):
         self.assertTrue(all(token in value for value in contexts))
         self.assertNotIn("raw term", contexts[0])
         self.assertNotIn("từ đã dịch", contexts[1])
-
-    def test_batch_masks_once_and_restores_in_every_chapter(self):
-        self.enable()
-        prompts = []
-        r19_prompts = []
-        r19_logs = []
-
-        def generate(prompt):
-            prompts.append(prompt)
-            return """###SECTION 1###
-###TITLE###
-Một
-###CONTENT###
-A __20AGE_0001__.
-###SECTION 2###
-###TITLE###
-Hai
-###CONTENT###
-B __20AGE_0001__.
-###END###"""
-
-        with tempfile.TemporaryDirectory() as directory:
-            words = Path(directory) / "r19_words.txt"
-            words.write_text("sensitive phrase\n", encoding="utf-8")
-            def generate_r19(prompt, _model):
-                r19_prompts.append(prompt)
-                return '{"translation": "cụm đã dịch"}'
-            with (
-                patch.object(r19_translation, "R19_WORDS_FILE", words),
-                patch.object(r19_translation, "_gemini_generate", generate_r19),
-                patch.object(r19_translation, "_log_r19_call", lambda *args, **kwargs: r19_logs.append((args, kwargs))),
-            ):
-                with redirect_stdout(StringIO()):
-                    results = translate_batch_with_web(
-                        [
-                            {"title": "One", "content": "A sensitive phrase."},
-                            {"title": "Two", "content": "B sensitive phrase."},
-                        ],
-                        1,
-                        "",
-                        "",
-                        novel_text_path=words.with_name("missing.txt"),
-                        build_prompt=lambda batch, *_: "\n".join(ch["content"] for ch in batch),
-                        generate=generate,
-                        reset_browser=lambda: None,
-                        engine_name="test",
-                    )
-                saved_words = words.read_text(encoding="utf-8")
-        self.assertEqual(len(prompts), 1)
-        self.assertEqual(len(r19_prompts), 1)
-        self.assertEqual(len(r19_logs), 1)
-        self.assertTrue(r19_logs[0][0][-1])
-        self.assertNotIn("Ngữ cảnh", r19_prompts[0])
-        self.assertIn("sensitive phrase = cụm đã dịch", saved_words)
-        self.assertEqual(results[0][1], "A cụm đã dịch.")
-        self.assertEqual(results[1][1], "B cụm đã dịch.")
 
     def test_each_new_term_uses_one_request_then_cache_is_reused(self):
         entries = [
@@ -388,8 +340,8 @@ B __20AGE_0001__.
                 value = "dịch một" if "term one" in prompt else "dịch hai"
                 return json.dumps({"translation": value}, ensure_ascii=False)
             with (
-                patch.object(r19_translation, "R19_WORDS_FILE", words),
-                patch.object(r19_translation, "_log_r19_call", lambda *args, **kwargs: logs.append((args, kwargs))),
+                patch.object(r19_storage, "R19_WORDS_FILE", words),
+                patch.object(r19_fragment_translation, "_log_r19_call", lambda *args, **kwargs: logs.append((args, kwargs))),
             ):
                 first = r19_translation.translate_fragments(entries, generate)
                 second = r19_translation.translate_fragments(
@@ -409,8 +361,8 @@ B __20AGE_0001__.
             words = Path(directory) / "r19_words.txt"
             words.write_text("raw term\n", encoding="utf-8")
             with (
-                patch.object(r19_translation, "R19_WORDS_FILE", words),
-                patch.object(r19_translation, "_log_r19_call", lambda *args, **kwargs: logs.append((args, kwargs))),
+                patch.object(r19_storage, "R19_WORDS_FILE", words),
+                patch.object(r19_fragment_translation, "_log_r19_call", lambda *args, **kwargs: logs.append((args, kwargs))),
             ):
                 with self.assertRaisesRegex(ValueError, "sai JSON"):
                     r19_translation.translate_fragments(entries, lambda _prompt: "not json")
@@ -441,6 +393,45 @@ B __20AGE_0001__.
         self.assertEqual(len(calls), 2)
         self.assertEqual(len(switches), 1)
         self.assertEqual(logs, [False, True])
+
+    def test_r19_uses_each_selected_translation_provider(self):
+        entries = [{"token": "__20AGE_0001__", "source": "raw term"}]
+        for provider in ("gemini-api", "gemini-web", "openai-api", "chatgpt-web"):
+            calls = []
+
+            def transport(prompt, **kwargs):
+                calls.append((prompt, kwargs))
+                return '{"translation":"đã dịch"}'
+
+            values = {
+                "translate_provider": provider,
+                "translate_stage_model": "translate-only",
+                "translate_stage_thinking": "high",
+            }
+
+            def translate(items, generate, **kwargs):
+                self.assertEqual(items, entries)
+                self.assertEqual(kwargs["provider"], provider)
+                self.assertEqual(kwargs["model"], "translate-only")
+                return {entries[0]["token"]: generate("prompt")}
+
+            with (
+                patch.object(
+                    translation_stage,
+                    "option",
+                    side_effect=lambda key, default=None: values.get(key, default),
+                ),
+                patch.dict(
+                    translation_stage.TRANSPORT_OVERRIDES,
+                    {provider: transport},
+                    clear=True,
+                ),
+                patch.object(translation_stage, "translate_fragments", side_effect=translate),
+            ):
+                result = translation_stage.translate_r19_fragments(entries)
+
+            self.assertEqual(result[entries[0]["token"]], '{"translation":"đã dịch"}')
+            self.assertEqual(len(calls), 1)
 
 
 if __name__ == "__main__":
