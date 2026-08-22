@@ -1,8 +1,16 @@
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from services.importing import cancel, confirm, create_preview, previews
+from services.importing import (
+    ChapterImportService,
+    cancel,
+    confirm,
+    create_preview,
+    previews,
+)
 
 
 class ChapterImportServiceTests(unittest.TestCase):
@@ -90,6 +98,46 @@ class ChapterImportServiceTests(unittest.TestCase):
         self.assertEqual({"ok": True}, cancel(token))
         self.assertNotIn(token, previews)
         self.assertFalse(staging.exists())
+
+    def test_bound_service_resolves_project_paths_for_preview(self):
+        library = SimpleNamespace(
+            safe_project=lambda _name: self.project,
+            project_folders=lambda _name: (self.raw, self.project / "translated"),
+        )
+        service = ChapterImportService(self.runtime, library)
+
+        with patch(
+            "services.importing.service.create_preview",
+            return_value={"token": "test"},
+        ) as create:
+            result = service.preview("demo", "epub", 5000, b"content")
+
+        self.assertEqual({"token": "test"}, result)
+        create.assert_called_once_with(
+            "demo",
+            self.project,
+            self.raw,
+            self.runtime,
+            "epub",
+            5000,
+            b"content",
+        )
+
+    def test_bound_service_resolves_project_paths_for_confirm(self):
+        library = SimpleNamespace(
+            safe_project=lambda _name: self.project,
+            project_folders=lambda _name: (self.raw, self.project / "translated"),
+        )
+        service = ChapterImportService(self.runtime, library)
+        payload = {"token": "test"}
+
+        with patch(
+            "services.importing.service.confirm", return_value={"ok": True}
+        ) as confirm_call:
+            result = service.confirm("demo", payload)
+
+        self.assertEqual({"ok": True}, result)
+        confirm_call.assert_called_once_with("demo", self.project, self.raw, payload)
 
 
 if __name__ == "__main__":

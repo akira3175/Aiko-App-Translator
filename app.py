@@ -22,11 +22,7 @@ from cores.storage.project import (
 from providers.registry import pipeline_config, provider_payload
 from services.exporting import BookExportService
 from services.library import LibraryService
-from services.importing import (
-    cancel as cancel_chapter_import,
-    confirm as confirm_staged_chapter_import,
-    create_preview as create_staged_chapter_import,
-)
+from services.importing import ChapterImportService
 from services import ai_logs as ai_log_service
 from services import api_keys as api_key_service
 from services.settings import ConfigurationService
@@ -355,30 +351,6 @@ def save_context(project_name: str, payload: dict):
     return context_service.save(project_name, payload)
 
 
-def create_chapter_import_preview(
-    project_name, source_format, segment_limit, content
-):
-    project = library_service.safe_project(project_name)
-    raw_dir, _translated = library_service.project_folders(project_name)
-    return create_staged_chapter_import(
-        project_name,
-        project,
-        raw_dir,
-        ROOT / ".runtime",
-        source_format,
-        segment_limit,
-        content,
-    )
-
-
-def confirm_chapter_import(project_name, payload):
-    project = library_service.safe_project(project_name)
-    raw_dir, _translated = library_service.project_folders(project_name)
-    return confirm_staged_chapter_import(
-        project_name, project, raw_dir, payload
-    )
-
-
 def lan_configuration():
     return load_lan_configuration(saved_settings)
 
@@ -406,6 +378,7 @@ context_service = ContextService(lambda name: library_service.safe_project(name)
 character_service = CharacterService(lambda name: library_service.safe_project(name))
 review_service = ReviewService(lambda name: library_service.safe_project(name))
 export_service = BookExportService(library_service)
+chapter_import_service = ChapterImportService(ROOT / ".runtime", library_service)
 source_translation_service = SourceTranslationService()
 app_browser_service = AppBrowserService(
     root=ROOT,
@@ -451,9 +424,9 @@ project_routes = ProjectRoutes(
     chapter_images=library_service.chapter_images,
     word_count=library_service.word_count,
     export_book=export_service.export,
-    import_preview=create_chapter_import_preview,
-    import_confirm=confirm_chapter_import,
-    import_cancel=cancel_chapter_import,
+    import_preview=chapter_import_service.preview,
+    import_confirm=chapter_import_service.confirm,
+    import_cancel=chapter_import_service.cancel,
 )
 settings_routes = SettingsRoutes(
     configuration=configuration_service,
