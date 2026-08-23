@@ -23,7 +23,6 @@ class JobRunner:
     safe_project: object
     project_folders: object
     safe_file: object
-    canonical_kind: object
     translation_stop_file: object
     update_translation_pid: object
     release_translation: object
@@ -97,6 +96,11 @@ class JobRunner:
         self.jobs[kind] = self._running_job(
             project_name, translation_claim, kind == "interactions", "Đang khởi động…"
         )
+        if kind == "polish":
+            self.jobs[kind]["chapter"] = str(task_config.get("target_chapter", ""))
+        if kind == "review" and task_config.get("workspace_review"):
+            self.jobs[kind]["workspace_review"] = True
+            self.jobs[kind]["chapter"] = str(task_config.get("target_chapter", ""))
         try:
             process = self._start_process(
                 kind,
@@ -133,7 +137,7 @@ class JobRunner:
             "skip_login_prompt": True,
             "target_chapter": chapter_name,
         }
-        engine = self.canonical_kind(engine)
+        engine = str(engine)
         pipeline_kind = "interactions" if engine == "interactions" else "pipeline"
         if engine in {"gemini-api", "gemini-web", "openai-api", "chatgpt-web"}:
             config["translate_provider"] = engine

@@ -168,7 +168,7 @@ class ConfigurationService:
         sidebar = data.get("sidebar", {}) if isinstance(data, dict) else {}
         pinned = sidebar.get("pinned") if isinstance(sidebar, dict) else None
         if not isinstance(pinned, list):
-            return {"sidebar": {"pinned": list(self.default_pinned_sidebar)}}
+            pinned = list(self.default_pinned_sidebar)
         cleaned = []
         for item in pinned:
             item = str(item)
@@ -178,10 +178,34 @@ class ConfigurationService:
                 and item not in cleaned
             ):
                 cleaned.append(item)
-        return {"sidebar": {"pinned": cleaned}}
+        editor = data.get("editor", {}) if isinstance(data, dict) else {}
+        if not isinstance(editor, dict):
+            editor = {}
+        font = str(editor.get("font", "system"))
+        if font not in {"system", "georgia", "sans", "monospace", "times"}:
+            font = "system"
+        try:
+            size = int(editor.get("size", 17))
+        except (TypeError, ValueError):
+            size = 17
+        try:
+            line_height = float(editor.get("line_height", 1.75))
+        except (TypeError, ValueError):
+            line_height = 1.75
+        return {
+            "sidebar": {"pinned": cleaned},
+            "editor": {
+                "font": font,
+                "size": min(24, max(14, size)),
+                "line_height": round(min(2.2, max(1.4, line_height)), 2),
+            },
+        }
 
     def write_ui_preferences(self, payload):
-        sidebar = payload.get("sidebar", {}) if isinstance(payload, dict) else {}
+        if not isinstance(payload, dict):
+            raise ValueError("Tùy chọn giao diện không hợp lệ")
+        current = self.ui_preferences()
+        sidebar = payload.get("sidebar", current["sidebar"])
         pinned = sidebar.get("pinned") if isinstance(sidebar, dict) else None
         if not isinstance(pinned, list):
             raise ValueError("Danh sách chức năng đã ghim không hợp lệ")
@@ -192,19 +216,33 @@ class ConfigurationService:
                 raise ValueError(f"Chức năng không hợp lệ: {item}")
             if item not in self.fixed_sidebar_features and item not in cleaned:
                 cleaned.append(item)
+        editor = payload.get("editor", current["editor"])
+        if not isinstance(editor, dict):
+            raise ValueError("Tùy chọn trình soạn thảo không hợp lệ")
+        font = str(editor.get("font", current["editor"]["font"]))
+        if font not in {"system", "georgia", "sans", "monospace", "times"}:
+            raise ValueError("Kiểu chữ trình soạn thảo không hợp lệ")
+        try:
+            size = int(editor.get("size", current["editor"]["size"]))
+            line_height = float(editor.get("line_height", current["editor"]["line_height"]))
+        except (TypeError, ValueError):
+            raise ValueError("Cỡ chữ hoặc giãn dòng không hợp lệ") from None
+        if not 14 <= size <= 24 or not 1.4 <= line_height <= 2.2:
+            raise ValueError("Cỡ chữ hoặc giãn dòng nằm ngoài phạm vi cho phép")
+        result = {"sidebar": {"pinned": cleaned}, "editor": {"font": font, "size": size, "line_height": round(line_height, 2)}}
         path = self._path(self._ui_preferences_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_suffix(".tmp")
         temporary.write_text(
             json.dumps(
-                {"sidebar": {"pinned": cleaned}},
+                result,
                 ensure_ascii=False,
                 indent=2,
             ),
             encoding="utf-8",
         )
         os.replace(temporary, path)
-        return {"sidebar": {"pinned": cleaned}}
+        return result
 
     def api_keys_payload(self):
         return self.api_keys.payload(

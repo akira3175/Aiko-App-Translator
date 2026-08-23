@@ -11,11 +11,13 @@ class AiLogTests(unittest.TestCase):
         web = Path(__file__).resolve().parents[1] / "web"
         html = (web / "index.html").read_text(encoding="utf-8")
         script = (web / "app.js").read_text(encoding="utf-8")
+        feature = (web / "features" / "ai-logs.js").read_text(encoding="utf-8")
         styles = (web / "ai-log.css").read_text(encoding="utf-8")
         self.assertIn('id="aiLogToggle"', html)
         self.assertIn('id="aiLogDrawer"', html)
-        self.assertIn("/api/ai-logs?project=", script)
-        self.assertIn("attachment-", script)
+        self.assertIn("createAiLogFeature", script)
+        self.assertIn("/api/ai-logs?project=", feature)
+        self.assertIn("attachment-", feature)
         self.assertIn("@media(max-width:650px)", styles)
 
     def test_reads_newest_logs_and_redacts_secrets(self):

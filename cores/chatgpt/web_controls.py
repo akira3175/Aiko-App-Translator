@@ -3,6 +3,11 @@
 import time
 import unicodedata
 
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    StaleElementReferenceException,
+    TimeoutException,
+)
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -321,4 +326,3 @@ def select_chatgpt_model(driver, model="gpt-5.6 sol"):
     except Exception as e:
         print(f"⚠️ Lỗi khi chọn model ChatGPT: {e}")
         return False
-

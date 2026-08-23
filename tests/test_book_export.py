@@ -27,7 +27,7 @@ class BookExportTests(unittest.TestCase):
             "# Chương một\n\n原文 một", encoding="utf-8"
         )
         (translated / "v1_c1_s1.md").write_text(
-            "# Chương một\n\nBản dịch một\n\n![Minh họa](../image/minh-hoa.png)",
+            "# Chương một\n\nChương một\n\nBản dịch một\n\n![Minh họa](../image/minh-hoa.png)",
             encoding="utf-8",
         )
         (raw / "v2_c2_s1.md").write_text(
@@ -73,6 +73,10 @@ class BookExportTests(unittest.TestCase):
                 self.assertIn("OEBPS/nav.xhtml", archive.namelist())
                 chapter = archive.read("OEBPS/chapter-1.xhtml").decode("utf-8")
                 self.assertIn("Bản dịch một", chapter)
+                self.assertNotIn("<body><h1>", chapter)
+                root = ElementTree.fromstring(chapter)
+                body_text = "".join(root.find("{http://www.w3.org/1999/xhtml}body").itertext())
+                self.assertNotIn("Chương một", body_text)
                 self.assertIn("OEBPS/images/image-1.png", archive.namelist())
             self.assertEqual(content_type, "application/epub+zip")
 

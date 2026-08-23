@@ -118,7 +118,12 @@ Write-Output $targets.Count
         if close_orphans:
             self.close_orphans()
 
-    def setup(self, skip_login_prompt=False, input_func=input):
+    def setup(
+        self,
+        skip_login_prompt=False,
+        input_func=input,
+        link="https://chatgpt.com/",
+    ):
         print("\n" + "=" * 60)
         print("🔧 CHẾ ĐỘ CÀI ĐẶT CHATGPT")
         print("=" * 60)
@@ -127,8 +132,8 @@ Write-Output $targets.Count
         print("  2. Chọn model (GPT-4o, o3, v.v.)")
         print("  3. Cài đặt khác (nếu cần)")
         print("=" * 60 + "\n")
-        self.get_driver().get("https://chatgpt.com/")
-        print("🌐 Trình duyệt đã mở tại: https://chatgpt.com/")
+        self.get_driver().get(link)
+        print(f"🌐 Trình duyệt đã mở tại: {link}")
         print("\n🔔 Sau khi đăng nhập và cài đặt xong, nhấn ENTER để bắt đầu dịch...")
         if not skip_login_prompt:
             input_func()

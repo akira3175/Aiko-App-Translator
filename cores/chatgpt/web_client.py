@@ -20,6 +20,26 @@ from cores.chatgpt.web_response import (
 )
 
 
+END_MARKER_SETTLE_SECONDS = 3
+
+
+def _settle_end_marker_response(
+    driver, response_turn, response_token, old_assistant_count, current_text
+):
+    """Give the rendered response time to finish updating after its end marker."""
+    time.sleep(END_MARKER_SETTLE_SECONDS)
+    try:
+        refreshed = _chatgpt_response_text(response_turn)
+    except StaleElementReferenceException:
+        response_turn = _find_new_chatgpt_response(
+            driver, response_token, old_assistant_count
+        )
+        refreshed = (
+            _chatgpt_response_text(response_turn) if response_turn is not None else ""
+        )
+    return refreshed if len(refreshed or "") >= len(current_text) else current_text
+
+
 def generate_content(
     prompt,
     *,
@@ -170,9 +190,17 @@ def generate_content(
 
                 if "###END###" in current_text:
                     print(
-                        "\n✅ Streaming hoàn tất (phát hiện thấy ###END###, chốt ngay!)."
+                        "\n⏳ Đã thấy ###END###, đợi thêm 3 giây để response ổn định..."
                     )
-                    return current_text
+                    final_text = _settle_end_marker_response(
+                        driver,
+                        response_turn,
+                        response_token,
+                        old_assistant_count,
+                        current_text,
+                    )
+                    print("✅ Streaming hoàn tất, đã đọc lại response cuối.")
+                    return final_text
 
                 if current_text and current_text == last_text:
                     stable_count += 1

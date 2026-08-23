@@ -1,6 +1,5 @@
 """Shared chapter iteration for glossary generation engines."""
 
-import os
 import sys
 import time
 from pathlib import Path

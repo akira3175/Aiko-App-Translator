@@ -1,4 +1,5 @@
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -6,13 +7,47 @@ from unittest.mock import patch
 from cores.config import REVIEW_BG_CRITERIA
 from cores.full_review import load_review_chapters, review_worker_count
 from cores.full_review import service as review_service
+from cores.full_review import runner as review_runner
 from cores.postprocess import build_translation_review_prompt
 from cores.full_review import build_review_prompt, prepare_review_item, process_review_result
 
 
 class ReviewAllTests(unittest.TestCase):
+    def test_review_json_accepts_web_control_character_and_removes_end_marker(self):
+        response = '{"overall_score": 8.5, "issues": [], "gender_ok": true, "address_ok": true, "summary": "Dòng một\nDòng hai ###END###"}'
+        result = review_service.parse_review_json(response)
+        self.assertEqual(result["overall_score"], 8.5)
+        self.assertEqual(result["summary"], "Dòng một\nDòng hai ")
+
+    def test_review_json_rejects_incomplete_schema(self):
+        with self.assertRaisesRegex(ValueError, "overall_score"):
+            review_service.parse_review_json("{}")
+
+    def test_web_review_requests_end_marker_outside_json(self):
+        response = '{"overall_score": 9, "issues": [], "gender_ok": true, "address_ok": true, "summary": "Ổn"}\n###END###'
+        captured = []
+
+        def transport(prompt, **_kwargs):
+            captured.append(prompt)
+            return response
+
+        values = {"review_stage_model": "test", "review_stage_thinking": "cao"}
+        with patch.dict(
+            review_service.TRANSPORT_OVERRIDES,
+            {"chatgpt-web": transport},
+            clear=True,
+        ), patch.object(
+            review_service,
+            "option",
+            side_effect=lambda key, default=None: values.get(key, default),
+        ):
+            review_service.call_review_api("review prompt", "chatgpt-web")
+
+        self.assertIn("Sau dấu } kết thúc JSON", captured[0])
+        self.assertIn("Không đặt marker này bên trong", captured[0])
+
     def test_all_four_engines_can_review(self):
-        response = '{"overall_score": 9, "issues": [], "summary": "Ổn"}'
+        response = '{"overall_score": 9, "issues": [], "gender_ok": true, "address_ok": true, "summary": "Ổn"}'
         for provider in ("gemini-api", "gemini-web", "openai-api", "chatgpt-web"):
             calls = []
 
@@ -44,8 +79,57 @@ class ReviewAllTests(unittest.TestCase):
     def test_web_review_is_serial_but_api_review_can_be_parallel(self):
         self.assertEqual(review_worker_count("gemini-web", 10), 1)
         self.assertEqual(review_worker_count("chatgpt-web", 10), 1)
-        self.assertEqual(review_worker_count("gemini-api", 10), 30)
-        self.assertEqual(review_worker_count("openai-api", 10), 30)
+        self.assertEqual(review_worker_count("gemini-api", 10), 10)
+        self.assertEqual(review_worker_count("openai-api", 10), 10)
+
+    def test_next_batch_waits_for_current_batch_to_finish(self):
+        items = [
+            (f"v1_c{i}_s1", i, "Raw title", "Raw", "Title", "Translation")
+            for i in range(1, 5)
+        ]
+        started = []
+        first_batch_started = threading.Event()
+        release_first_batch = threading.Event()
+
+        def call_api(_prompt, _provider):
+            started.append(len(started) + 1)
+            if len(started) >= 2:
+                first_batch_started.set()
+            release_first_batch.wait(2)
+            return {
+                "overall_score": 9,
+                "issues": [],
+                "gender_ok": True,
+                "address_ok": True,
+                "summary": "Ổn",
+            }
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            review_runner, "call_review_api", side_effect=call_api
+        ), patch.object(review_runner.time, "sleep"):
+            root = Path(directory)
+            thread = threading.Thread(
+                target=review_runner.run_review_items,
+                args=(items, "", {}, []),
+                kwargs={
+                    "provider": "gemini-api",
+                    "batch_size": 2,
+                    "workers": 4,
+                    "sleep_between": 0,
+                    "review_path": root / "review.json",
+                    "manual_path": root / "manual_check.json",
+                },
+            )
+            thread.start()
+            try:
+                self.assertTrue(first_batch_started.wait(1))
+                threading.Event().wait(0.05)
+                self.assertEqual(len(started), 2)
+            finally:
+                release_first_batch.set()
+                thread.join(3)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(len(started), 4)
 
     def test_medium_issue_is_added_to_manual_check(self):
         review_store = {}

@@ -34,13 +34,11 @@ if _PROJECT_ROOT not in sys.path:
 from cores.config import CONTEXT_JSON, RAW_DIR, REVIEW_JSON, TRANSLATED_DIR
 from cores.context import load_context_text as load_context
 from cores.full_review import (
-    build_review_prompt,
     call_review_api as _call_review_api,
     load_manual_check,
     load_review,
     load_review_chapters,
     prepare_review_item,
-    process_review_result,
     run_review_items,
 )
 from cores.config.runtime import bool_option, int_option, option, web_mode

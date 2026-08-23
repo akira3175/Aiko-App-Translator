@@ -3,9 +3,6 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from unittest.mock import patch
-
-from cores.r19 import storage as r19_storage
 from services.ai_logs import append_r19
 from services.r19.service import R19Service
 from services.settings_schema import (
@@ -133,10 +130,7 @@ class R19ManagerTests(unittest.TestCase):
             )
             (root / "r19_words.txt").write_text("敏感词\n", encoding="utf-8")
 
-            with patch.object(
-                r19_storage, "R19_WORDS_FILE", root / "r19_words.txt"
-            ):
-                result = service.translate_word("project", {"source": "敏感词"})
+            result = service.translate_word("project", {"source": "敏感词"})
 
             self.assertEqual("từ nhạy cảm", result["translation"])
             words = (root / "r19_words.txt").read_text(encoding="utf-8")

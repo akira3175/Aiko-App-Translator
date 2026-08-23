@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 
 
-SETTINGS_FILE = Path(__file__).resolve().parents[1] / ".runtime" / "settings.json"
+SETTINGS_FILE = Path(__file__).resolve().parents[2] / ".runtime" / "settings.json"
 
 
 def web_mode():

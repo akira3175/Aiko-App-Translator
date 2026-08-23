@@ -62,7 +62,6 @@ class JobControllerTests(unittest.TestCase):
             "jobs": self.jobs,
             "processes": self.processes,
             "translation_kinds": {"pipeline", "manual"},
-            "canonical_kind": lambda value: str(value),
             "active_translation": lambda: None,
             "safe_project": lambda _name: self.project,
             "validate_hako_targets": lambda value: value,
@@ -102,6 +101,24 @@ class JobControllerTests(unittest.TestCase):
 
         self.assertEqual(409, raised.exception.status)
         self.assertEqual([], _Thread.created)
+
+    def test_polish_requires_and_targets_existing_translation(self):
+        chapter = "v1_c1_s1.md"
+        (self.project / "raw" / chapter).write_text("# Raw\n\nText", encoding="utf-8")
+        (self.project / "translated" / chapter).write_text(
+            "# Dịch\n\nNội dung", encoding="utf-8"
+        )
+        controller = self.controller(
+            pipelines={"polish": self.pipeline}, translation_kinds={"polish"}
+        )
+
+        result = controller.start(
+            "polish", "Demo", {"config": {"target_chapter": chapter}}
+        )
+
+        self.assertEqual({"ok": True}, result)
+        self.assertEqual("polish", _Thread.created[0].kwargs["args"][0])
+        self.assertEqual(chapter, _Thread.created[0].kwargs["args"][2]["target_chapter"])
 
     def test_immediate_cancel_terminates_only_matching_pid(self):
         self.jobs["pipeline"] = {

@@ -53,6 +53,19 @@ if (Test-Path $zipPath) {
 }
 New-Item -ItemType Directory -Force -Path $stageRoot | Out-Null
 
+$launcherSource = Join-Path $projectRoot "launcher\AikoLauncher.cs"
+$launcherIcon = Join-Path $projectRoot "launcher\aiko.ico"
+$launcherLogo = Join-Path $projectRoot "web\assets\anime\aiko-blue-logo.png"
+$launcherPath = Join-Path $stageRoot "Aiko App Translator.exe"
+$csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+if (-not (Test-Path -LiteralPath $csc)) {
+    throw "Khong tim thay trinh bien dich .NET Framework de tao launcher"
+}
+& $csc /nologo /target:winexe /optimize+ "/win32icon:$launcherIcon" "/resource:$launcherLogo,AikoBlueLogo.png" "/out:$launcherPath" /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll /reference:System.Management.dll /reference:Microsoft.CSharp.dll $launcherSource
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $launcherPath)) {
+    throw "Bien dich Aiko launcher that bai"
+}
+
 Copy-Item -LiteralPath (Join-Path $projectRoot "app.py") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "start_app.bat") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "restart_app.ps1") -Destination $stageRoot
@@ -61,7 +74,7 @@ Copy-Item -LiteralPath (Join-Path $projectRoot "README_USER.md") -Destination $s
 Copy-Item -LiteralPath (Join-Path $projectRoot "LICENSE") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "requirements-portable.txt") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "VERSION") -Destination $stageRoot
-foreach ($folder in @("cloudflare", "cores", "defaults", "split", "web", "up")) {
+foreach ($folder in @("cloudflare", "cores", "defaults", "providers", "server", "services", "split", "web", "up")) {
     Copy-Item -LiteralPath (Join-Path $projectRoot $folder) -Destination $stageRoot -Recurse
 }
 "{}" | Set-Content -LiteralPath (Join-Path $stageRoot "up\image_cache.json") -Encoding UTF8

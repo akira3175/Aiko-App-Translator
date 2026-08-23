@@ -1,6 +1,23 @@
 {
   "versions": [
     {
+      "version": "1.0.0",
+      "date": "2026-08-23",
+      "title": "Aiko 1.0 — Quy trình dịch hợp nhất",
+      "summary": "Aiko 1.0 hợp nhất các engine cũ thành một quy trình dịch linh hoạt, cho phép chọn AI riêng cho từng công đoạn, đồng thời bổ sung launcher Windows và tự chuyển đổi project từ v0.13.",
+      "highlights": [
+        "Hợp nhất các chế độ V1, V2, V3 và GPT thành một quy trình dịch 1.0 dễ cấu hình hơn.",
+        "Cho phép chọn riêng Gemini API, Gemini Web, OpenAI API hoặc ChatGPT Web cho từng công đoạn: dịch, hiệu đính, xưng hô, review, tạo Context và hồ sơ nhân vật.",
+        "Mỗi công đoạn có thể chọn model và mức suy nghĩ riêng; các bước hiệu đính, xưng hô và review có thể tắt độc lập.",
+        "Thêm Aiko Launcher cho Windows với bảng điều khiển server, khởi động lại, tạo shortcut Desktop/Start Menu và tắt server.",
+        "Người dùng nâng cấp từ v0.13 được hướng dẫn mở launcher mới ngay trong ứng dụng và chỉ cần thiết lập một lần.",
+        "Project v0.13 được giữ nguyên và tự chuyển đổi an toàn khi mở lần đầu; dữ liệu YAML cũ được lưu lại dưới dạng .legacy.",
+        "Chuyển Context, glossary, xưng hô, review, publishing và trạng thái project sang định dạng JSON/TXT dễ kiểm tra và ổn định hơn.",
+        "Cải thiện độ ổn định của dịch, hiệu đính và review; giữ bản dịch cũ và dữ liệu project khi một công đoạn gặp lỗi.",
+        "Tổ chức lại giao diện cài đặt theo từng công đoạn, giúp nhìn rõ engine, model và mức suy nghĩ đang được sử dụng."
+      ]
+    },
+    {
       "version": "0.13.0",
       "date": "2026-08-17",
       "title": "ChatGPT Web V2 và Chrome dùng chung",

@@ -12,7 +12,7 @@ for stream in (sys.stdout, sys.stderr):
     if stream and hasattr(stream, "reconfigure"):
         stream.reconfigure(encoding="utf-8", errors="replace")
 
-from cores.characters import build_character_prompt, run_character_generation
+from cores.characters import run_character_generation
 from cores.config import CHARACTERS_MD, CONTEXT_JSON, RAW_DIR
 from cores.config.runtime import bool_option, option, web_mode
 from cores.stages import browser_lifecycle, stage_model_and_thinking, stage_provider

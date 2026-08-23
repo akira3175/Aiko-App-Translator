@@ -1,9 +1,13 @@
 """Translate one R19 term from the settings page."""
 
+from cores.r19 import storage
+from cores.r19.translation import request_word_translation
+
 
 def translate_word(
     source,
     project_path,
+    words_path,
     current_payload,
     active_translation,
     translation_guard,
@@ -15,9 +19,7 @@ def translate_word(
     if not project_path.is_dir():
         raise ValueError("Truyện không tồn tại")
 
-    from cores import r19
-
-    terms, translations = r19.load_word_mappings()
+    terms, translations = storage.load_word_mappings(words_path)
     if source.casefold() not in {term.casefold() for term in terms}:
         raise ValueError("Hãy lưu dòng R19 trước khi dịch")
     cached = translations.get(source.casefold())
@@ -27,7 +29,7 @@ def translate_word(
     with translation_guard:
         if active_translation():
             raise ValueError("Hãy chờ tác vụ dịch hiện tại kết thúc")
-        translation = r19.request_word_translation(
+        translation = request_word_translation(
             source,
             "manager",
             model,
@@ -36,7 +38,7 @@ def translate_word(
                 source, model, request_prompt, response, ok
             ),
         )
-        r19.save_word_translation(source, translation)
+        storage.save_word_translation(source, translation, words_path)
     return {
         **current_payload(),
         "source": source,

@@ -3,7 +3,6 @@
 import os
 from pathlib import Path
 
-import yaml
 from cores.storage.project import load_context
 
 from cores.config.runtime import bool_option, option

@@ -54,7 +54,6 @@ class JobRunnerTests(unittest.TestCase):
             safe_project=lambda _name: self.project,
             project_folders=lambda _name: (self.raw, self.translated),
             safe_file=lambda folder, name: folder / name,
-            canonical_kind=lambda value: value,
             translation_stop_file=lambda claim: self.root / f"{claim}.stop",
             update_translation_pid=lambda claim, pid: self.pids.append((claim, pid)),
             release_translation=self.released.append,

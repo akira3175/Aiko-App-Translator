@@ -1,7 +1,6 @@
 """Update existing Hako chapters from the active App Translator project."""
 
 import asyncio
-import json
 import os
 import re
 import sys

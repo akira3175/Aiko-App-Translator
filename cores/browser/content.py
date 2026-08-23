@@ -76,7 +76,8 @@ def close_orphaned_chatgpt_chrome():
 
 def setup_chatgpt_browser():
     browser_runtime.setup_chatgpt(
-        skip_login_prompt=web_mode() and bool_option("skip_login_prompt", True)
+        skip_login_prompt=web_mode() and bool_option("skip_login_prompt", True),
+        link=LINK_CHATGPT,
     )
 
 

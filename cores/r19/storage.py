@@ -5,9 +5,14 @@ from cores.storage.data_paths import R19_WORDS_FILE, ensure_user_data_migrated
 ensure_user_data_migrated()
 
 
-def load_word_mappings():
+def _words_path(path=None):
+    return path or R19_WORDS_FILE
+
+
+def load_word_mappings(path=None):
+    path = _words_path(path)
     try:
-        lines = R19_WORDS_FILE.read_text(encoding="utf-8").splitlines()
+        lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
         return [], {}
     terms, translations, seen = [], {}, set()
@@ -29,13 +34,14 @@ def load_word_mappings():
     return sorted(terms, key=len, reverse=True), translations
 
 
-def load_terms():
-    return load_word_mappings()[0]
+def load_terms(path=None):
+    return load_word_mappings(path)[0]
 
 
-def save_word_translation(source, translation):
+def save_word_translation(source, translation, path=None):
+    path = _words_path(path)
     try:
-        lines = R19_WORDS_FILE.read_text(encoding="utf-8").splitlines()
+        lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
         lines = []
     key = source.casefold()
@@ -49,6 +55,6 @@ def save_word_translation(source, translation):
             break
     else:
         lines.append(f"{source} = {translation}")
-    temporary = R19_WORDS_FILE.with_suffix(".tmp")
+    temporary = path.with_suffix(".tmp")
     temporary.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    temporary.replace(R19_WORDS_FILE)
+    temporary.replace(path)

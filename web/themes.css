@@ -7,6 +7,7 @@ html[data-theme="sakura-night"]{color-scheme:dark;--bg:#101625;--surface:#182238
 html[data-theme="tokyo-night"]{color-scheme:dark;--bg:#1a1b26;--surface:#202330;--ink:#bdc7f0;--muted:#959cbd;--line:#343a52;--accent:#7aa2f7;--accent-dark:#5f83d5;--accent-ink:#111827;--soft:#2a3150;--shadow:0 18px 60px rgba(8,9,18,.5);--sidebar:#16161e;--sidebar-ink:#bdc7f0;--sidebar-muted:#959cbd;--sidebar-active:#292e42;--topbar:rgba(26,27,38,.92);--editor-source:#a9b1d6;--segmented:#24283b;--row-hover:#24283b;--pending-bg:#292e42;--pending-ink:#959cbd;--console-bg:#101117;--toast-bg:#bdc7f0;--toast-ink:#1a1b26;--modal-backdrop:rgba(7,8,15,.78);--gutter:rgba(122,162,247,.04);--brand-mark-ink:#111827;--body-background:var(--bg)}
 html[data-theme="abyss"]{color-scheme:dark;--bg:#000c18;--surface:#071426;--ink:#b7c9f2;--muted:#829ed5;--line:#17345c;--accent:#6688cc;--accent-dark:#4f6fae;--accent-ink:#000c18;--soft:#10294a;--shadow:0 18px 60px rgba(0,3,12,.58);--sidebar:#060621;--sidebar-ink:#c2d1f2;--sidebar-muted:#829ed5;--sidebar-active:#10192c;--topbar:rgba(0,12,24,.93);--editor-source:#91abe0;--segmented:#0b1d35;--row-hover:#0d2240;--pending-bg:#101f38;--pending-ink:#8ea6d8;--console-bg:#000711;--toast-bg:#b7c9f2;--toast-ink:#000c18;--modal-backdrop:rgba(0,2,10,.82);--gutter:rgba(102,136,204,.05);--brand-mark-ink:#000c18;--body-background:var(--bg)}
 html[data-theme="kimbie-dark"]{color-scheme:dark;--bg:#221a0f;--surface:#2d2214;--ink:#e7c9a1;--muted:#bd9e79;--line:#554127;--accent:#d3af86;--accent-dark:#b58e62;--accent-ink:#221a0f;--soft:#423523;--shadow:0 18px 60px rgba(12,8,3,.5);--sidebar:#362712;--sidebar-ink:#efd4ad;--sidebar-muted:#c3a27c;--sidebar-active:#4a3519;--topbar:rgba(34,26,15,.92);--editor-source:#d3af86;--segmented:#3a2b18;--row-hover:#3c2d1a;--pending-bg:#423523;--pending-ink:#c6a985;--console-bg:#171109;--toast-bg:#e7c9a1;--toast-ink:#221a0f;--modal-backdrop:rgba(12,8,3,.8);--gutter:rgba(211,175,134,.045);--brand-mark-ink:#221a0f;--body-background:var(--bg)}
+html[data-theme="aiko-anime"]{color-scheme:dark;--bg:#0f1218;--surface:#1c2029;--editor-panel:#171a21;--ink:#e6e9ef;--muted:#a5acb8;--line:#303641;--accent:#73c7ec;--accent-dark:#55afd4;--accent-ink:#0b151c;--soft:#26384a;--shadow:0 18px 60px rgba(0,0,0,.42);--sidebar:#0a0d12;--sidebar-ink:#eef1f6;--sidebar-muted:#9da5b2;--sidebar-active:#202a38;--topbar:rgba(15,18,24,.93);--editor-source:#c8cdd6;--segmented:#242933;--row-hover:#232a35;--pending-bg:#292e37;--pending-ink:#a8aeb8;--console-bg:#080a0e;--toast-bg:#e9edf3;--toast-ink:#0f1218;--modal-backdrop:rgba(0,0,0,.78);--gutter:rgba(115,199,236,.03);--brand-mark-ink:#0b151c;--anime-gold:#e5c07b;--body-background:radial-gradient(circle at 92% 8%,rgba(115,199,236,.055),transparent 24%),#0f1218}
 
 html[data-theme] body{background:var(--body-background);color:var(--ink)}
 html[data-theme] .sidebar{background:var(--sidebar);color:var(--sidebar-ink)}
@@ -30,7 +31,8 @@ html[data-theme] .modal-backdrop{background:var(--modal-backdrop)}
 html[data-theme] .editor-shell .CodeMirror-gutters{background:var(--gutter)}
 html[data-theme] .editor-shell .CodeMirror-linenumber{color:var(--muted)}
 html[data-theme] .editor-shell .CodeMirror .cm-header,html[data-theme] .editor-shell .CodeMirror .cm-header.cm-link,html[data-theme] .editor-shell .CodeMirror .cm-header.cm-image-alt-text{color:var(--accent)}
-html[data-theme] .editor-shell .CodeMirror-focused .CodeMirror-selected{background:color-mix(in srgb,var(--accent) 25%,transparent)}
+html[data-theme] .editor-shell .CodeMirror .CodeMirror-selected,html[data-theme] .editor-shell .CodeMirror-focused .CodeMirror-selected{background:transparent}
+html[data-theme] .editor-shell .CodeMirror span.CodeMirror-selectedtext{background:color-mix(in srgb,var(--accent) 25%,transparent)}
 html[data-theme] .target-panel .markdown-preview [data-source-line]:hover{background:color-mix(in srgb,var(--accent) 9%,transparent)}
 html[data-theme] .manual-prompt-step textarea{background:var(--bg);color:var(--editor-source)}
 html[data-theme] .markdown-preview strong{color:var(--ink)}
@@ -45,6 +47,46 @@ html[data-theme] .official-notice span,html[data-theme] .official-notice a{color
 html[data-theme] .primary{box-shadow:0 7px 22px color-mix(in srgb,var(--accent) 16%,transparent)}
 html[data-theme] .primary{color:var(--accent-ink)}
 html[data-theme="synthwave-84"] .eyebrow,html[data-theme="synthwave-84"] .nav-icon{text-shadow:0 0 12px color-mix(in srgb,var(--accent) 65%,transparent)}
+html[data-theme="aiko-anime"] .brand-mark{background:#f7f9ff;outline:1px solid color-mix(in srgb,var(--anime-gold) 55%,transparent)}
+html[data-theme="aiko-anime"] .editor-panel,html[data-theme="aiko-anime"] .character-editor-shell{background:var(--editor-panel)}
+html[data-theme="aiko-anime"] .brand-mark{transition:transform .2s ease}
+html[data-theme="aiko-anime"] .brand:hover .brand-mark{transform:translateY(-1px) rotate(-2deg)}
+html[data-theme="aiko-anime"] .brand strong{position:relative;width:max-content;max-width:100%;background:linear-gradient(105deg,#f7f9ff 8%,#bdefff 34%,#6edcff 52%,#d9f5ff 70%,#f7f9ff 92%);background-size:240% 100%;background-position:100% 0;background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:aiko-brand-shimmer 10s ease-in-out infinite}
+html[data-theme="aiko-anime"] .brand strong::after{content:"✦";position:absolute;right:-13px;top:-8px;color:var(--anime-gold);font-size:9px;line-height:1;-webkit-text-fill-color:var(--anime-gold);opacity:0;animation:aiko-brand-star 10s ease-in-out infinite;pointer-events:none}
+html[data-theme="aiko-anime"] .pipeline-card .number{border:1px solid color-mix(in srgb,var(--anime-gold) 42%,var(--line))}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .chapter-nav,html[data-theme="aiko-anime"][data-anime-illustrations="on"] .chapter-nav:hover{width:118px;height:48px;padding:0;display:inline-grid;place-items:center;border-color:transparent;background:transparent;box-shadow:none;font-size:0;overflow:hidden}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .chapter-nav::before{content:"";display:block;width:112px;height:49px;background:url("/assets/anime/aiko-chapter-arrow-256.png") center/contain no-repeat;transition:transform .16s ease}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] #nextChapter::before{transform:scaleX(-1)}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .chapter-nav:not(:disabled):hover::before{transform:translateX(-2px)}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] #nextChapter:not(:disabled):hover::before{transform:scaleX(-1) translateX(-2px)}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view="workspace"]{--anime-nav-icon:url("/assets/anime/nav-workspace-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view="chapters"]{--anime-nav-icon:url("/assets/anime/nav-chapters-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view="pipeline"]{--anime-nav-icon:url("/assets/anime/nav-pipeline-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-feature-action="ai-log"]{--anime-nav-icon:url("/assets/anime/nav-ai-log-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view="terminology"]{--anime-nav-icon:url("/assets/anime/nav-terminology-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view="characters"]{--anime-nav-icon:url("/assets/anime/nav-characters-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view="pronouns"]{--anime-nav-icon:url("/assets/anime/nav-pronouns-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view="r19"]{--anime-nav-icon:url("/assets/anime/nav-r19-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view="hakoEdit"]{--anime-nav-icon:url("/assets/anime/nav-hako-edit-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view="sharing"]{--anime-nav-icon:url("/assets/anime/nav-sharing-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view="help"]{--anime-nav-icon:url("/assets/anime/nav-help-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view="settings"]{--anime-nav-icon:url("/assets/anime/nav-settings-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-view]>.nav-icon,html[data-theme="aiko-anime"][data-anime-illustrations="on"] .nav-item[data-feature-action="ai-log"]>.nav-icon{flex:0 0 22px;width:22px;height:22px;margin:0;padding:0;border:0;border-radius:0;background-color:transparent;background-image:var(--anime-nav-icon);background-position:center;background-size:contain;background-repeat:no-repeat;font-size:0}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="workspace"]{--anime-feature-icon:url("/assets/anime/nav-workspace-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="chapters"]{--anime-feature-icon:url("/assets/anime/nav-chapters-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="pipeline"]{--anime-feature-icon:url("/assets/anime/nav-pipeline-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="ai-log"]{--anime-feature-icon:url("/assets/anime/nav-ai-log-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="terminology"]{--anime-feature-icon:url("/assets/anime/nav-terminology-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="characters"]{--anime-feature-icon:url("/assets/anime/nav-characters-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="pronouns"]{--anime-feature-icon:url("/assets/anime/nav-pronouns-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="r19"]{--anime-feature-icon:url("/assets/anime/nav-r19-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="hakoEdit"]{--anime-feature-icon:url("/assets/anime/nav-hako-edit-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="sharing"]{--anime-feature-icon:url("/assets/anime/nav-sharing-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="help"]{--anime-feature-icon:url("/assets/anime/nav-help-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] [data-feature-icon="settings"]{--anime-feature-icon:url("/assets/anime/nav-settings-96.png")}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .feature-row-icon[data-feature-icon]{width:30px;height:30px;margin:0;padding:0;border:0;border-radius:0;background-color:transparent;background-image:var(--anime-feature-icon);background-position:center;background-size:contain;background-repeat:no-repeat;font-size:0}
+@keyframes aiko-brand-shimmer{0%,76%,100%{background-position:100% 0}88%{background-position:0 0}}
+@keyframes aiko-brand-star{0%,78%,92%,100%{opacity:0;transform:translate(-5px,4px) scale(.65)}84%{opacity:1;transform:translate(0,0) scale(1)}88%{opacity:.45;transform:translate(3px,-2px) scale(.82)}}
 
 .theme-setting{padding:16px 2px 18px;border-bottom:1px solid var(--line)}
 .theme-setting>div:first-child strong,.theme-setting>div:first-child small{display:block}
@@ -67,5 +109,17 @@ html[data-theme="synthwave-84"] .eyebrow,html[data-theme="synthwave-84"] .nav-ic
 .theme-option[data-theme-option="tokyo-night"]{--preview-bg:#1a1b26;--preview-surface:#202330;--preview-accent:#7aa2f7}
 .theme-option[data-theme-option="abyss"]{--preview-bg:#000c18;--preview-surface:#071426;--preview-accent:#6688cc}
 .theme-option[data-theme-option="kimbie-dark"]{--preview-bg:#221a0f;--preview-surface:#362712;--preview-accent:#d3af86}
+.theme-option[data-theme-option="aiko-anime"]{--preview-bg:#0f1218;--preview-surface:#1c2029;--preview-accent:#73c7ec}
+.anime-illustration-setting{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 2px;border-bottom:1px solid var(--line)}
+.anime-illustration-setting strong,.anime-illustration-setting small{display:block}.anime-illustration-setting small{max-width:520px;margin-top:5px;color:var(--muted)}
+html[data-brush-cursor="on"] :is(textarea,.CodeMirror-lines,.markdown-preview,[contenteditable="true"]){cursor:url("/assets/anime/aiko-quill-cursor-48.png") 6 44,text}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] :is(.character-empty,.pronoun-empty,.empty-review,.ai-log-empty)::before{content:"";display:block;justify-self:center;width:min(210px,65vw);height:174px;margin-bottom:4px;background:url("/assets/anime/aiko-blue-mascot.png") center/contain no-repeat;pointer-events:none}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] :is(.empty-review,.ai-log-empty)::before{width:150px;height:124px}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .review-loading{position:relative;isolation:isolate;min-height:320px;place-content:center;place-items:center;overflow:hidden}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .review-loading :is(span,i){display:none}
+html[data-theme="aiko-anime"][data-anime-illustrations="on"] .review-loading::before{content:"";display:block;width:min(235px,66vw);aspect-ratio:430/561;background-image:url("/assets/anime/aiko-wand-circle-padded-v15.png");background-repeat:no-repeat;background-size:400% 200%;background-position:0 0;filter:drop-shadow(0 8px 20px rgba(55,175,226,.18));animation:aiko-wand-circle 1.2s linear infinite;pointer-events:none}
+@keyframes aiko-wand-circle{0%,12.49%{background-position:0 0}12.5%,24.99%{background-position:33.333333% 0}25%,37.49%{background-position:66.666667% 0}37.5%,49.99%{background-position:100% 0}50%,62.49%{background-position:0 100%}62.5%,74.99%{background-position:33.333333% 100%}75%,87.49%{background-position:66.666667% 100%}87.5%,100%{background-position:100% 100%}}
 @media(max-width:700px){.theme-options{grid-template-columns:1fr 1fr}}
 @media(max-width:440px){.theme-options{grid-template-columns:1fr}}
+@media(pointer:coarse){html[data-brush-cursor="on"] :is(textarea,.CodeMirror-lines,.markdown-preview,[contenteditable="true"]){cursor:text}}
+@media(prefers-reduced-motion:reduce){html[data-theme="aiko-anime"] .brand strong,html[data-theme="aiko-anime"] .brand strong::after,html[data-theme="aiko-anime"][data-anime-illustrations="on"] .review-loading::before{animation:none}html[data-theme="aiko-anime"] .brand:hover .brand-mark{transform:none}}

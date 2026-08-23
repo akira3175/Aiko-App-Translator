@@ -6,6 +6,7 @@ import html
 import io
 import mimetypes
 import re
+import unicodedata
 import uuid
 import zipfile
 from datetime import datetime, timezone
@@ -40,6 +41,19 @@ def _blocks(section: dict):
         if value:
             blocks.append(("text", value))
     return blocks
+
+
+def _without_leading_title(body: str, title: str) -> str:
+    def normalized(value: str) -> str:
+        value = unicodedata.normalize("NFKC", value or "")
+        value = re.sub(r"^\s*#{1,6}\s*", "", value)
+        return " ".join(value.split()).casefold()
+
+    lines = body.splitlines()
+    first = next((index for index, line in enumerate(lines) if line.strip()), None)
+    if first is not None and normalized(lines[first]) == normalized(title):
+        lines.pop(first)
+    return "\n".join(lines).strip()
 
 
 def _image_asset(path: Path):
@@ -110,10 +124,11 @@ def _docx(project_name: str, sections: list[dict]) -> bytes:
 
 def _epub(project_name: str, sections: list[dict]) -> bytes:
     chapter_files, nav_items, manifest, spine, images = [], [], [], [], {}
-    css = "body{font-family:serif;line-height:1.65;margin:5%;}h1{font-size:1.45em;}h2{font-size:1.1em;}p{text-align:justify;margin:.65em 0;}figure{margin:1em 0;text-align:center;}img{max-width:100%;height:auto;}"
+    css = "body{font-family:serif;line-height:1.65;margin:5%;}h2{font-size:1.1em;}p{text-align:justify;margin:.65em 0;}figure{margin:1em 0;text-align:center;}img{max-width:100%;height:auto;}"
     for index, section in enumerate(sections, 1):
         blocks = []
-        for block in _blocks(section):
+        epub_section = {**section, "body": _without_leading_title(section["body"], section["title"])}
+        for block in _blocks(epub_section):
             if block[0] == "text":
                 blocks.append(f"<p>{html.escape(block[1])}</p>")
             else:
@@ -124,7 +139,7 @@ def _epub(project_name: str, sections: list[dict]) -> bytes:
                 href, _data, _mime = images[key]
                 blocks.append(f'<figure><img src="{html.escape(href)}" alt="{html.escape(block[2])}"/></figure>')
         filename = f"chapter-{index}.xhtml"
-        page = f'''<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" xml:lang="vi"><head><title>{html.escape(section['title'])}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body><h1>{html.escape(section['title'])}</h1>{''.join(blocks)}</body></html>'''
+        page = f'''<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml" xml:lang="vi"><head><title>{html.escape(section['title'])}</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body>{''.join(blocks)}</body></html>'''
         chapter_files.append((filename, page))
         nav_items.append(f'<li><a href="{filename}">{html.escape(section["title"])}</a></li>')
         manifest.append(f'<item id="c{index}" href="{filename}" media-type="application/xhtml+xml"/>')

@@ -18,6 +18,7 @@ class SettingsRoutes:
     clear_ai_logs: object
     open_app_browser: object
     active_translation: object
+    launcher: object = None
 
     def handle_get(self, handler, path, query):
         project = query.get("project", [""])[0]
@@ -37,6 +38,11 @@ class SettingsRoutes:
                 )
             except (ValueError, OSError) as exc:
                 handler.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
+        if path == "/api/launcher":
+            if self.launcher is None:
+                return False
+            handler.json_response(self.launcher.payload())
             return True
         if path == "/api/gemini-api-keys":
             handler.json_response(self.configuration.api_keys_payload())
@@ -88,6 +94,16 @@ class SettingsRoutes:
                 self.open_app_browser,
                 (ValueError, OSError),
             )
+        if path == "/api/launcher/open":
+            if self.launcher is None:
+                return False
+            if not handler.is_loopback():
+                handler.json_response(
+                    {"error": "Chỉ có thể mở launcher trên máy đang chạy app."},
+                    HTTPStatus.FORBIDDEN,
+                )
+                return True
+            return self._json_call(handler, self.launcher.open, (ValueError, OSError))
         if path == "/api/update":
             try:
                 result = self.prepare_update()

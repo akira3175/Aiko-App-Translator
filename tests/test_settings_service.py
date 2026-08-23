@@ -88,7 +88,11 @@ class SettingsServiceTests(unittest.TestCase):
                 {"sidebar": {"pinned": ["help", "settings", "help"]}}
             )
 
-            self.assertEqual({"sidebar": {"pinned": ["help"]}}, saved)
+            self.assertEqual(["help"], saved["sidebar"]["pinned"])
+            self.assertEqual(
+                {"font": "system", "size": 17, "line_height": 1.75},
+                saved["editor"],
+            )
             self.assertEqual(saved, service.ui_preferences())
 
     def test_api_key_diagnostic_uses_saved_translation_model(self):

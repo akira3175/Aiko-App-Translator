@@ -12,6 +12,7 @@ from cores.stages import generate_stage
 
 
 TRANSPORT_OVERRIDES = {}
+WEB_PROVIDERS = {"gemini-web", "chatgpt-web"}
 
 
 def build_review_prompt(
@@ -35,15 +36,51 @@ def build_review_prompt(
     )
 
 
+def parse_review_json(text):
+    """Extract a complete review object while tolerating web-rendered controls."""
+    clean = re.sub(r"```json\s*|\s*```", "", str(text or "")).replace(
+        "###END###", ""
+    ).strip()
+    start, end = clean.find("{"), clean.rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("không tìm thấy object JSON")
+    payload = clean[start : end + 1]
+    try:
+        result = json.loads(payload)
+    except json.JSONDecodeError as error:
+        if "Invalid control character" not in str(error):
+            raise
+        result = json.loads(payload, strict=False)
+    if not isinstance(result, dict):
+        raise ValueError("response review không phải object")
+    if not isinstance(result.get("overall_score"), (int, float)):
+        raise ValueError("overall_score bị thiếu hoặc không hợp lệ")
+    if not isinstance(result.get("issues"), list):
+        raise ValueError("issues bị thiếu hoặc không phải danh sách")
+    if not isinstance(result.get("gender_ok"), bool) or not isinstance(
+        result.get("address_ok"), bool
+    ):
+        raise ValueError("gender_ok/address_ok bị thiếu hoặc không hợp lệ")
+    if not isinstance(result.get("summary"), str):
+        raise ValueError("summary bị thiếu hoặc không hợp lệ")
+    return result
+
+
 def call_review_api(prompt, provider):
     """Call the configured provider until a valid review JSON object is returned."""
     attempt = 0
     while True:
         attempt += 1
         try:
+            request_prompt = prompt
+            if provider in WEB_PROVIDERS:
+                request_prompt += (
+                    "\n\nSau dấu } kết thúc JSON, hãy ghi ###END### trên một dòng riêng. "
+                    "Không đặt marker này bên trong bất kỳ giá trị JSON nào."
+                )
             text = generate_stage(
                 "review",
-                prompt,
+                request_prompt,
                 provider=provider,
                 get_option=option,
                 overrides=TRANSPORT_OVERRIDES,
@@ -52,16 +89,11 @@ def call_review_api(prompt, provider):
                 print(f"  ⚠️ Response rỗng, thử lại (lần {attempt})...")
                 time.sleep(5)
                 continue
-            clean = re.sub(r"```json\s*|\s*```", "", text).strip()
-            start = clean.find("{")
-            end = clean.rfind("}")
-            if start != -1 and end != -1:
-                return json.loads(clean[start : end + 1])
-            print(f"  ⚠️ Không tìm thấy JSON trong response, thử lại (lần {attempt})...")
-            time.sleep(3)
-        except json.JSONDecodeError as error:
-            print(f"  ⚠️ Lỗi parse JSON: {error}, thử lại (lần {attempt})...")
-            time.sleep(3)
+            try:
+                return parse_review_json(text)
+            except (json.JSONDecodeError, ValueError) as error:
+                print(f"  ⚠️ Lỗi parse JSON: {error}, thử lại (lần {attempt})...")
+                time.sleep(3)
         except Exception as error:
             message = str(error)
             if provider == "gemini-api" and (

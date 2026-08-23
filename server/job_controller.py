@@ -18,7 +18,6 @@ class JobController:
     jobs: dict
     processes: dict
     translation_kinds: set
-    canonical_kind: object
     active_translation: object
     safe_project: object
     validate_hako_targets: object
@@ -33,7 +32,7 @@ class JobController:
     thread_factory: object = threading.Thread
 
     def job(self, kind):
-        key = self.canonical_kind(kind)
+        key = str(kind)
         return self.jobs.get(key, {"status": "idle", "output": ""})
 
     def active_jobs(self):
@@ -44,13 +43,13 @@ class JobController:
         ]
 
     def stream_kind(self, kind):
-        key = self.canonical_kind(kind)
+        key = str(kind)
         if key not in self.pipelines and key != "retranslate":
             raise JobRequestError("Unknown job", HTTPStatus.NOT_FOUND)
         return key
 
     def start(self, kind, project, request):
-        kind = self.canonical_kind(kind)
+        kind = str(kind)
         if kind not in self.pipelines or not self.pipelines[kind].exists():
             raise JobRequestError("Pipeline không tồn tại", HTTPStatus.NOT_FOUND)
         if self.jobs.get(kind, {}).get("status") == "running":
@@ -92,6 +91,13 @@ class JobController:
             )
         if kind == "pipeline":
             config = self.pipeline_config(config)
+        if kind == "polish":
+            target = str(config.get("target_chapter", ""))
+            raw, translated = self.project_folders(project)
+            self.safe_file(raw, target)
+            translated_target = self.safe_file(translated, target)
+            if not translated_target.is_file():
+                raise JobRequestError("Chương này chưa có bản dịch để hiệu đính")
         self._validate_counts(config)
         if kind == "manual":
             self._validate_manual(project, config)
@@ -152,7 +158,7 @@ class JobController:
         return {"ok": True, "mode": mode}
 
     def cancel_job(self, request):
-        kind = self.canonical_kind(request.get("kind", ""))
+        kind = str(request.get("kind", ""))
         job = self.jobs.get(kind)
         process = self.processes.get(kind)
         if not job or job.get("status") != "running" or process is None:
@@ -165,7 +171,7 @@ class JobController:
         return {"ok": True, "kind": kind}
 
     def retranslate(self, project, request):
-        engine = self.canonical_kind(request.get("engine", ""))
+        engine = str(request.get("engine", ""))
         chapter = request.get("chapter", "")
         raw, _ = self.project_folders(project)
         self.safe_file(raw, chapter)

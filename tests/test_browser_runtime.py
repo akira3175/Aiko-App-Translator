@@ -12,14 +12,16 @@ class _Session:
         self.close_other = close_other
         self.driver = object()
         self.setup_value = None
+        self.setup_link = None
         self.closed = None
         self.orphans_closed = False
 
     def get_driver(self):
         return self.driver
 
-    def setup(self, skip_login_prompt=False):
+    def setup(self, skip_login_prompt=False, link=None):
         self.setup_value = skip_login_prompt
+        self.setup_link = link
 
     def close(self, close_orphans=False):
         self.closed = close_orphans
@@ -45,11 +47,12 @@ class BrowserRuntimeTests(unittest.TestCase):
         self.assertIs(runtime.get_gemini_driver(), runtime.gemini.driver)
         self.assertIs(runtime.get_chatgpt_driver(), runtime.chatgpt.driver)
         runtime.setup_gemini(skip_login_prompt=True)
-        runtime.setup_chatgpt(skip_login_prompt=True)
+        runtime.setup_chatgpt(skip_login_prompt=True, link="https://chatgpt.com/c/test")
         runtime.close_gemini()
         runtime.close_chatgpt(close_orphans=True)
         self.assertTrue(runtime.gemini.setup_value)
         self.assertTrue(runtime.chatgpt.setup_value)
+        self.assertEqual("https://chatgpt.com/c/test", runtime.chatgpt.setup_link)
         self.assertFalse(runtime.gemini.closed)
         self.assertTrue(runtime.chatgpt.closed)
 

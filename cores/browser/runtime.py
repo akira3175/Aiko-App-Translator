@@ -59,8 +59,8 @@ class BrowserRuntime:
     def close_chatgpt(self, close_orphans=False):
         self.chatgpt.close(close_orphans=close_orphans)
 
-    def setup_chatgpt(self, skip_login_prompt=False):
-        self.chatgpt.setup(skip_login_prompt=skip_login_prompt)
+    def setup_chatgpt(self, skip_login_prompt=False, link="https://chatgpt.com/"):
+        self.chatgpt.setup(skip_login_prompt=skip_login_prompt, link=link)
 
     def generate_chatgpt(
         self,

@@ -18,7 +18,13 @@ Neu da giai nen, hay kiem tra Windows Security/antivirus co cach ly python.exe h
 "@
     exit 2
 } else {
-    $systemPython = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+    $systemPython = @(
+        Get-Command python -CommandType Application -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Source -notlike "*\Microsoft\WindowsApps\python.exe" -and
+                (Test-Path -LiteralPath $_.Source)
+            }
+    ) | Select-Object -First 1
     if (-not $systemPython) {
         Write-Host "LOI: Khong tim thay Python. Hay cai Python hoac dung ban portable day du." -ForegroundColor Red
         exit 2

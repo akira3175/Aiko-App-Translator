@@ -12,9 +12,9 @@ Mỗi truyện nằm trong thư mục riêng: `truyen/<ten-truyen>/raw` và `tru
 
 ## Mở app
 
-Nhấp đúp `start_app.bat`. Trình duyệt sẽ tự mở tại `http://127.0.0.1:8765`.
+Trong bản portable, nhấp đúp `Aiko App Translator.exe`. Trình duyệt sẽ tự mở tại `http://127.0.0.1:8765`; bảng điều khiển launcher cho phép mở lại, khởi động lại, tạo shortcut hoặc tắt server.
 
-Hoặc chạy:
+Khi chạy trực tiếp từ mã nguồn, dùng `start_app.bat` hoặc:
 
 ```powershell
 python app.py

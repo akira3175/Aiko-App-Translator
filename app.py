@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -40,6 +41,7 @@ from services.settings_schema import (
     SIDEBAR_FEATURES,
 )
 from services.updating import UpdateService
+from services.launcher import LauncherService
 from services.r19 import R19Service
 from services.cloudflare import (
     deploy_share_worker as provision_share_worker,
@@ -48,7 +50,6 @@ from services.cloudflare import (
 from server.jobs import (
     TRANSLATION_KINDS,
     active_translation,
-    canonical_task_kind,
     claim_translation,
     isolated_process_kwargs,
     job_processes,
@@ -106,11 +107,13 @@ update_service = UpdateService(
     asset_name=UPDATE_ASSET_NAME,
     jobs=jobs,
 )
+launcher_service = LauncherService(ROOT)
 
 PIPELINES = {
     "pipeline": ROOT / "cores" / "translation" / "__main__.py",
     "interactions": ROOT / "cores" / "translation" / "interactions.py",
     "manual": ROOT / "cores" / "manual" / "__main__.py",
+    "polish": ROOT / "cores" / "postprocess" / "__main__.py",
     "review": ROOT / "cores" / "full_review" / "__main__.py",
     "characters": ROOT / "cores" / "characters" / "__main__.py",
     "context": ROOT / "cores" / "context" / "__main__.py",
@@ -229,6 +232,7 @@ settings_routes = SettingsRoutes(
     clear_ai_logs=ai_log_service.clear,
     open_app_browser=app_browser_service.open,
     active_translation=active_translation,
+    launcher=launcher_service,
 )
 job_runner = JobRunner(
     root=ROOT,
@@ -241,7 +245,6 @@ job_runner = JobRunner(
     safe_project=library_service.safe_project,
     project_folders=library_service.project_folders,
     safe_file=library_service.safe_file,
-    canonical_kind=canonical_task_kind,
     translation_stop_file=translation_stop_file,
     update_translation_pid=update_translation_pid,
     release_translation=release_translation,
@@ -254,7 +257,6 @@ job_controller = JobController(
     jobs=jobs,
     processes=job_processes,
     translation_kinds=TRANSLATION_KINDS,
-    canonical_kind=canonical_task_kind,
     active_translation=active_translation,
     safe_project=library_service.safe_project,
     validate_hako_targets=publishing_service.validate_hako_targets,
@@ -309,4 +311,5 @@ if __name__ == "__main__":
         lan_configuration,
         detect_lan_network_ip,
         SERVER_STATE,
+        open_browser=os.environ.get("AIKO_NO_BROWSER") != "1",
     )

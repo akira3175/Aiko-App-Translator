@@ -48,6 +48,10 @@ class SettingsRouteTests(unittest.TestCase):
             "clear_ai_logs": lambda _project: {"removed": 1},
             "open_app_browser": lambda: {"ok": True},
             "active_translation": lambda: None,
+            "launcher": SimpleNamespace(
+                payload=lambda: {"available": True, "configured": False},
+                open=lambda: {"ok": True},
+            ),
         }
         values.update(overrides)
         return SettingsRoutes(**values)
@@ -91,6 +95,13 @@ class SettingsRouteTests(unittest.TestCase):
         handler = _Handler(loopback=False)
 
         self.assertTrue(routes.handle_post(handler, "/api/app-browser/open", {}))
+        self.assertEqual(403, handler.responses[0][0])
+
+    def test_launcher_open_requires_loopback(self):
+        routes = self._routes()
+        handler = _Handler(loopback=False)
+
+        self.assertTrue(routes.handle_post(handler, "/api/launcher/open", {}))
         self.assertEqual(403, handler.responses[0][0])
 
     def test_update_schedules_shutdown_after_success(self):

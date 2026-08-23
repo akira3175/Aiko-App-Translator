@@ -11,8 +11,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TRANSLATION_KINDS = {"pipeline", "interactions", "manual"}
-TASK_ALIASES = {"v1-interactions": "interactions"}
+TRANSLATION_KINDS = {"pipeline", "interactions", "manual", "polish"}
 TRANSLATION_LOCK = ROOT / ".runtime" / "translation.lock"
 STREAM_PROGRESS_PREFIXES = ("✍️ Đang nhận:", "📥 Đang nhận:")
 
@@ -20,10 +19,6 @@ jobs: dict[str, dict] = {}
 job_processes: dict[str, subprocess.Popen] = {}
 job_stream_events: dict[str, list[dict]] = {}
 translation_guard = threading.RLock()
-
-
-def canonical_task_kind(kind):
-    return TASK_ALIASES.get(str(kind), str(kind))
 
 
 def process_is_running(pid: int) -> bool:

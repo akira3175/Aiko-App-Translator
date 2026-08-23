@@ -76,6 +76,7 @@ class R19Service:
         return translate_word(
             source,
             project_path,
+            self._path(self._words_path),
             lambda: self.payload(project_name),
             self._active_translation,
             self._translation_guard,

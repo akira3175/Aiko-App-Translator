@@ -21,6 +21,7 @@ import json
 import re
 import os
 import sys
+import unicodedata
 from collections import defaultdict
 from urllib.parse import quote
 
@@ -29,11 +30,10 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-from playwright.async_api import async_playwright, TimeoutError
+from playwright.async_api import async_playwright
 
 try:
     import boto3
-    from botocore.exceptions import BotoCoreError, ClientError
 except ImportError:
     boto3 = None
 
@@ -137,7 +137,33 @@ def parse_md_file(filepath):
         else:
             elements.append({"type": "text", "content": block})
 
-    return {"id": chapter_id, "title": title, "elements": elements}
+    return {
+        "id": chapter_id,
+        "title": title,
+        "elements": _drop_duplicate_title_line(elements, title),
+    }
+
+
+def _normalized_title(value: str) -> str:
+    value = unicodedata.normalize("NFKC", value or "")
+    value = re.sub(r"^\s*#{1,6}\s*", "", value)
+    return " ".join(value.split()).casefold()
+
+
+def _drop_duplicate_title_line(elements: list, title: str) -> list:
+    """Bỏ dòng nội dung đầu nếu nó lặp lại đúng tiêu đề chương."""
+    if not elements or elements[0].get("type") != "text" or not title:
+        return elements
+    lines = elements[0].get("content", "").splitlines()
+    if not lines or _normalized_title(lines[0]) != _normalized_title(title):
+        return elements
+    remaining = "\n".join(lines[1:]).strip()
+    result = [dict(element) for element in elements]
+    if remaining:
+        result[0]["content"] = remaining
+    else:
+        result.pop(0)
+    return result
 
 
 def group_segments_into_chapters(md_files):

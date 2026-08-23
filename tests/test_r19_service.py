@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from cores.r19 import storage as r19_storage
 from services import ai_logs
 from services.r19 import repository
 from services.r19.service import R19Service
@@ -106,6 +107,24 @@ class R19ServiceTests(unittest.TestCase):
 
         self.assertNotIn("private-token", item["prompt"])
         self.assertEqual("[REDACTED]", item["response"])
+
+    def test_storage_paths_are_isolated(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = root / "first.txt"
+            second = root / "second.txt"
+            first.write_text("甲\n", encoding="utf-8")
+            second.write_text("乙\n", encoding="utf-8")
+
+            r19_storage.save_word_translation("甲", "một", first)
+
+            first_terms, first_translations = r19_storage.load_word_mappings(first)
+            second_terms, second_translations = r19_storage.load_word_mappings(second)
+
+        self.assertEqual(["甲"], first_terms)
+        self.assertEqual("một", first_translations["甲"])
+        self.assertEqual(["乙"], second_terms)
+        self.assertEqual({}, second_translations)
 
 
 if __name__ == "__main__":

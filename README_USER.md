@@ -10,8 +10,10 @@ https://github.com/akira3175/Aiko-App-Translator. Không trả tiền cho bên t
 ## Khởi động
 
 1. Giải nén toàn bộ file ZIP vào một thư mục có quyền ghi.
-2. Nhấp đúp `start_app.bat`.
+2. Nhấp đúp `Aiko App Translator.exe`.
 3. App tự mở tại `http://127.0.0.1:8765`.
+
+Lần đầu mở, bạn có thể chọn tạo shortcut ngoài Desktop. Bảng điều khiển launcher cho phép mở app, khởi động lại, tạo shortcut Desktop/Start Menu hoặc tắt server. Đóng bảng điều khiển chỉ ẩn cửa sổ; server vẫn tiếp tục chạy. `start_app.bat` được giữ làm cách khởi động dự phòng khi cần xem lỗi chi tiết.
 
 Không cần cài Python, package, Chrome hoặc ChromeDriver. Tất cả đã nằm trong thư mục `runtime`.
 
@@ -20,7 +22,7 @@ Không cần cài Python, package, Chrome hoặc ChromeDriver. Tất cả đã n
 1. Trên máy tính, mở **Cài đặt → Chung**.
 2. Chọn **Bật trong mạng LAN** tại mục truy cập điện thoại.
 3. Nhập PIN 6–12 số, hoặc để trống để app tự sinh PIN, rồi lưu.
-4. Đóng app và chạy lại `start_app.bat`.
+4. Mở bảng điều khiển launcher và chọn **Khởi động lại**.
 5. Nếu Windows Firewall hỏi, chỉ cho phép trên **Private networks**.
 6. Trên điện thoại cùng Wi-Fi, mở địa chỉ LAN hiển thị trong Cài đặt và nhập PIN.
 
