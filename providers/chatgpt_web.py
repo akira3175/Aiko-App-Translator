@@ -8,7 +8,7 @@ class ChatGptWebProvider(ProviderAdapter):
     label = "ChatGPT Web"
 
     def generate(self, request):
-        options = {"chat_url": "https://chatgpt.com/", **request.options}
+        options = dict(request.options)
         prompt = request.prompt
         if request.stage != "translate":
             prompt = prompt_with_attachments(prompt, request.attachments)

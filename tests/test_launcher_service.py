@@ -7,26 +7,24 @@ from services.launcher import LauncherService
 
 
 class LauncherServiceTests(unittest.TestCase):
-    def test_reports_first_run_and_opens_options_only(self):
+    def test_reports_and_opens_unified_launcher(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            executable = root / "Aiko App Translator.exe"
+            local = root / "local"
+            executable = local / "Aiko Launcher" / "Aiko-Launcher.exe"
+            executable.parent.mkdir(parents=True)
             executable.write_bytes(b"exe")
-            service = LauncherService(root)
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(local)}):
+                service = LauncherService(root)
 
             self.assertEqual(
-                {"available": True, "configured": False}, service.payload()
+                {"available": True, "configured": True}, service.payload()
             )
             with patch("services.launcher.subprocess.Popen") as popen:
                 service.open()
             popen.assert_called_once_with(
-                [str(executable), "--options-only"], cwd=str(root)
+                [str(executable), f"--install-root={root}"], cwd=str(executable.parent)
             )
-
-            marker = root / ".runtime" / "launcher-shortcut-prompted"
-            marker.parent.mkdir()
-            marker.write_text("1", encoding="utf-8")
-            self.assertTrue(service.payload()["configured"])
 
 
 if __name__ == "__main__":

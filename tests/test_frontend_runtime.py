@@ -28,8 +28,13 @@ class FrontendRuntimeTests(unittest.TestCase):
         self.assertIn("config.workers=1", script)
         self.assertIn("xử lý tuần tự từng chương", script)
         self.assertIn("function render(nextItems)", settings_script)
+        self.assertIn("let activeGroup='pipeline'", settings_script)
         self.assertIn("items=nextItems", settings_script)
         self.assertNotIn("items=items", settings_script)
+        self.assertIn("const button=$('#savePythonSettings')", settings_script)
+        self.assertIn("const button=$('#resetPythonSettings')", settings_script)
+        self.assertNotIn("const button=$('#save')", settings_script)
+        self.assertNotIn("const button=$('#reset')", settings_script)
 
 
 if __name__ == "__main__":

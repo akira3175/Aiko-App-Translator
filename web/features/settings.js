@@ -25,7 +25,7 @@ const visibleSettingsForGroup=(items,group)=>items.filter(item=>
 
 export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toast}) {
   let items=[];
-  let activeGroup='gemini-api';
+  let activeGroup='pipeline';
   const cloudflareSettingsFeature=createCloudflareSettingsFeature({api,getSettingsItems:()=>items,renderSettings:render,toast});
 
   function render(nextItems) {
@@ -148,7 +148,7 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
   }
   
   async function save() {
-    const button=$('#save'); button.disabled=true;
+    const button=$('#savePythonSettings'); button.disabled=true;
     const values=Object.fromEntries(items.map(item=>[item.key,item.value]));
     $$('[data-python-setting]').forEach(input=>values[input.dataset.pythonSetting]=input.value);
     try { render((await api('/api/settings',{method:'POST',body:JSON.stringify({values})})).items); await Promise.all([refreshUpdate(),loadLanStatus()]); toast('Đã lưu cấu hình · thay đổi LAN cần khởi động lại app'); }
@@ -157,7 +157,7 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
   }
   
   async function reset() {
-    const button=$('#reset'); button.disabled=true;
+    const button=$('#resetPythonSettings'); button.disabled=true;
     try { render((await api('/api/settings',{method:'POST',body:JSON.stringify({reset:true})})).items); await loadLanStatus(); toast('Đã khôi phục toàn bộ giá trị mặc định'); }
     catch(error) { toast(error.message); }
     finally { button.disabled=false; }

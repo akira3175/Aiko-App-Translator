@@ -1,6 +1,20 @@
 {
   "versions": [
     {
+      "version": "1.0.2",
+      "date": "2026-08-23",
+      "title": "Aiko ổn định và dễ sử dụng hơn",
+      "summary": "Bản cập nhật cải thiện Launcher, cấu hình quy trình dịch và độ ổn định khi sử dụng ChatGPT Web hoặc Gemini Web.",
+      "highlights": [
+        "Ra mắt Launcher mới với giao diện đẹp và dễ sử dụng hơn.",
+        "Chỉ cần tải một file EXE để cài đặt và cập nhật Aiko.",
+        "Sửa lỗi không lưu được cấu hình quy trình dịch.",
+        "ChatGPT giờ mở đúng cuộc trò chuyện đã thiết lập.",
+        "Khắc phục trình duyệt đóng mở liên tục khi dịch.",
+        "Cải thiện độ ổn định khi khởi động và chạy tác vụ."
+      ]
+    },
+    {
       "version": "1.0.1",
       "date": "2026-08-23",
       "title": "Sửa lỗi mở ChatGPT Web và Gemini Web",

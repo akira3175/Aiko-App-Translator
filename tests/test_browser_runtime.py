@@ -7,9 +7,14 @@ from cores.browser.runtime import BrowserRuntime
 
 
 class _Session:
-    def __init__(self, profile, service, configure, close_other=None):
+    def __init__(
+        self, profile, service, configure, close_other=None,
+        shared_driver_getter=None, shared_driver_closer=None,
+    ):
         self.profile = profile
         self.close_other = close_other
+        self.shared_driver_getter = shared_driver_getter
+        self.shared_driver_closer = shared_driver_closer
         self.driver = object()
         self.setup_value = None
         self.setup_link = None
@@ -17,7 +22,7 @@ class _Session:
         self.orphans_closed = False
 
     def get_driver(self):
-        return self.driver
+        return self.shared_driver_getter() if self.shared_driver_getter else self.driver
 
     def setup(self, skip_login_prompt=False, link=None):
         self.setup_value = skip_login_prompt
@@ -25,6 +30,8 @@ class _Session:
 
     def close(self, close_orphans=False):
         self.closed = close_orphans
+        if self.shared_driver_closer:
+            self.shared_driver_closer()
 
     def close_orphans(self):
         self.orphans_closed = True
@@ -44,7 +51,7 @@ class BrowserRuntimeTests(unittest.TestCase):
 
     def test_owns_both_sessions_and_forwards_lifecycle(self):
         runtime = self._runtime()
-        self.assertIs(runtime.get_gemini_driver(), runtime.gemini.driver)
+        self.assertIs(runtime.get_gemini_driver(), runtime.chatgpt.driver)
         self.assertIs(runtime.get_chatgpt_driver(), runtime.chatgpt.driver)
         runtime.setup_gemini(skip_login_prompt=True)
         runtime.setup_chatgpt(skip_login_prompt=True, link="https://chatgpt.com/c/test")
@@ -53,8 +60,12 @@ class BrowserRuntimeTests(unittest.TestCase):
         self.assertTrue(runtime.gemini.setup_value)
         self.assertTrue(runtime.chatgpt.setup_value)
         self.assertEqual("https://chatgpt.com/c/test", runtime.chatgpt.setup_link)
-        self.assertFalse(runtime.gemini.closed)
         self.assertTrue(runtime.chatgpt.closed)
+
+    def test_gemini_and_chatgpt_share_one_driver(self):
+        runtime = self._runtime()
+        self.assertIs(runtime.get_gemini_driver(), runtime.get_chatgpt_driver())
+        self.assertIs(runtime.gemini.shared_driver_getter.__self__, runtime.chatgpt)
 
     def test_forwards_generation_configuration(self):
         calls = []

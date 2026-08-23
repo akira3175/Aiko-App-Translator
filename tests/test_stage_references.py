@@ -83,6 +83,24 @@ class StageReferenceTests(unittest.TestCase):
         )
         self.assertIn("## Reference file: characters.md", prompts[0])
 
+    def test_chatgpt_web_does_not_override_configured_conversation_url(self):
+        calls = []
+        provider = ChatGptWebProvider(
+            lambda prompt, **kwargs: calls.append(kwargs) or "ok"
+        )
+        provider.generate(ProviderRequest("translate", "prompt", "model"))
+        self.assertNotIn("chat_url", calls[0])
+
+        provider.generate(
+            ProviderRequest(
+                "translate",
+                "prompt",
+                "model",
+                options={"chat_url": "https://chatgpt.com/c/test"},
+            )
+        )
+        self.assertEqual("https://chatgpt.com/c/test", calls[1]["chat_url"])
+
     def test_gemini_web_does_not_embed_documents_in_translation_prompt(self):
         prompts = []
         provider = GeminiWebProvider(

@@ -15,7 +15,11 @@ from cores.config import (
     WEB_THINKING_LEVEL,
 )
 from cores.gemini.web_client import generate_content as generate_gemini_content
-from cores.config.runtime import bool_option, web_mode
+from cores.config.runtime import bool_option, option, web_mode
+
+
+def _chatgpt_link():
+    return str(option("link_chatgpt", "https://chatgpt.com/")).strip()
 
 
 def _service():
@@ -77,7 +81,7 @@ def close_orphaned_chatgpt_chrome():
 def setup_chatgpt_browser():
     browser_runtime.setup_chatgpt(
         skip_login_prompt=web_mode() and bool_option("skip_login_prompt", True),
-        link=LINK_CHATGPT,
+        link=_chatgpt_link(),
     )
 
 
@@ -90,7 +94,7 @@ def generate_content_with_chatgpt(
 ):
     return browser_runtime.generate_chatgpt(
         prompt,
-        link=LINK_CHATGPT,
+        link=_chatgpt_link(),
         default_model=CHATGPT_SELECT_MODEL,
         default_thinking=CHATGPT_SELECT_THINKING,
         max_retries=max_retries,

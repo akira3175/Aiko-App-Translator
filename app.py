@@ -12,6 +12,7 @@ from cores.storage.data_paths import (
     ensure_user_data_migrated,
 )
 from cores.platform.browser_profile import APP_BROWSER_PROFILE_PATH, chrome_binary_path
+from cores.config.runtime import SETTINGS_FILE, ensure_settings_migrated
 from providers.registry import pipeline_config, provider_payload
 from services.exporting import BookExportService
 from services.library import LibraryService
@@ -120,8 +121,9 @@ PIPELINES = {
     "hako": ROOT / "up" / "up_md.py",
     "hako-edit": ROOT / "up" / "edit_hako.py",
 }
-SETTINGS_FILE = ROOT / ".runtime" / "settings.json"
 ensure_user_data_migrated()
+ensure_settings_migrated()
+active_translation()
 UI_PREFERENCES_FILE = DATA_DIR / "ui_preferences.json"
 R19_DEFAULT_WORDS_FILE = ROOT / "defaults" / "r19_words.txt"
 R19_CONFIG_FILE = ROOT / ".runtime" / "r19.json"

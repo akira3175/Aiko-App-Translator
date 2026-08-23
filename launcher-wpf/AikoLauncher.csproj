@@ -1,0 +1,39 @@
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <RootNamespace>AikoLauncher</RootNamespace>
+    <AssemblyName>Aiko-Launcher</AssemblyName>
+    <ApplicationIcon>..\launcher\aiko.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <OutputPath>bin\Release\</OutputPath>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <LangVersion>7.3</LangVersion>
+    <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Management" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+  </ItemGroup>
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml"><Generator>MSBuild:Compile</Generator></ApplicationDefinition>
+    <Page Include="MainWindow.xaml"><Generator>MSBuild:Compile</Generator></Page>
+    <Compile Include="App.xaml.cs"><DependentUpon>App.xaml</DependentUpon></Compile>
+    <Compile Include="LauncherController.cs" />
+    <Compile Include="MainWindow.xaml.cs"><DependentUpon>MainWindow.xaml</DependentUpon></Compile>
+    <Resource Include="..\web\assets\anime\aiko-launcher-background.png"><Link>Assets\aiko-background.png</Link></Resource>
+    <Resource Include="..\web\assets\anime\aiko-blue-logo.png"><Link>Assets\aiko-logo.png</Link></Resource>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

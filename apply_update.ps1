@@ -68,6 +68,15 @@ try {
     }
 
     $items = @(Get-ChildItem -LiteralPath $payload -Force)
+    $legacyLauncher = Join-Path $root "Aiko App Translator.exe"
+    if (Test-Path -LiteralPath $legacyLauncher) {
+        Get-CimInstance Win32_Process -Filter "Name = 'Aiko App Translator.exe'" -ErrorAction SilentlyContinue | Where-Object {
+            $_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath) -eq [IO.Path]::GetFullPath($legacyLauncher)
+        } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Start-Sleep -Milliseconds 300
+        $installedNames += "Aiko App Translator.exe"
+        Move-Item -LiteralPath $legacyLauncher -Destination (Join-Path $backupRoot "Aiko App Translator.exe") -Force
+    }
     Write-Host "Đang thay thế file chương trình. Dữ liệu cá nhân được giữ nguyên..." -ForegroundColor Cyan
     foreach ($item in $items) {
         if ($protected -contains $item.Name) { continue }

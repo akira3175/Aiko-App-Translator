@@ -12,7 +12,7 @@ Mỗi truyện nằm trong thư mục riêng: `truyen/<ten-truyen>/raw` và `tru
 
 ## Mở app
 
-Trong bản portable, nhấp đúp `Aiko App Translator.exe`. Trình duyệt sẽ tự mở tại `http://127.0.0.1:8765`; bảng điều khiển launcher cho phép mở lại, khởi động lại, tạo shortcut hoặc tắt server.
+Tải và chạy `Aiko-Launcher.exe`. Launcher duy nhất này cài hoặc cập nhật gói portable, xác minh SHA-256, mở ứng dụng tại `http://127.0.0.1:8765`, khởi động lại, tạo shortcut và tắt server. Python, Chrome và dữ liệu ứng dụng được quản lý bên trong, người dùng không cần mở thêm launcher thứ hai.
 
 Khi chạy trực tiếp từ mã nguồn, dùng `start_app.bat` hoặc:
 

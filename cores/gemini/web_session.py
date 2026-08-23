@@ -18,6 +18,8 @@ class GeminiWebSession:
         service_factory,
         configure_chrome,
         orphan_cleanup,
+        shared_driver_getter=None,
+        shared_driver_closer=None,
         driver_factory=webdriver.Chrome,
         options_factory=Options,
     ):
@@ -25,6 +27,8 @@ class GeminiWebSession:
         self.service_factory = service_factory
         self.configure_chrome = configure_chrome
         self.orphan_cleanup = orphan_cleanup
+        self.shared_driver_getter = shared_driver_getter
+        self.shared_driver_closer = shared_driver_closer
         self.driver_factory = driver_factory
         self.options_factory = options_factory
         self.driver = None
@@ -41,6 +45,8 @@ class GeminiWebSession:
         return options
 
     def get_driver(self):
+        if self.shared_driver_getter is not None:
+            return self.shared_driver_getter()
         if self.driver is not None:
             try:
                 self.driver.current_url
@@ -75,6 +81,9 @@ class GeminiWebSession:
         return self.driver
 
     def close(self):
+        if self.shared_driver_closer is not None:
+            self.shared_driver_closer()
+            return
         if self.driver:
             try:
                 self.driver.quit()

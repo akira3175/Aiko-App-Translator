@@ -5,8 +5,23 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+from cores.config.project_paths import USER_DATA_ROOT
 
-SETTINGS_FILE = Path(__file__).resolve().parents[2] / ".runtime" / "settings.json"
+ROOT = Path(__file__).resolve().parents[2]
+SETTINGS_FILE = USER_DATA_ROOT / "settings.json"
+LEGACY_SETTINGS_FILE = ROOT / ".runtime" / "settings.json"
+
+
+def ensure_settings_migrated():
+    """Move the current installation's settings to shared per-user storage once."""
+    if SETTINGS_FILE.is_file():
+        return None
+    if not LEGACY_SETTINGS_FILE.is_file():
+        return None
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    os.replace(LEGACY_SETTINGS_FILE, SETTINGS_FILE)
+    task_config.cache_clear()
+    return LEGACY_SETTINGS_FILE
 
 
 def web_mode():

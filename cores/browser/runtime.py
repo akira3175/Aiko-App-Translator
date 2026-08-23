@@ -25,6 +25,8 @@ class BrowserRuntime:
             service_factory,
             options_configurator,
             self.chatgpt.close_orphans,
+            self.chatgpt.get_driver,
+            self.chatgpt.close,
         )
 
     def get_gemini_driver(self):
