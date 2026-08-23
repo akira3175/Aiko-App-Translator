@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "1.0.1",
+      "date": "2026-08-23",
+      "title": "Sửa lỗi mở ChatGPT Web và Gemini Web",
+      "summary": "Bản vá sửa lỗi trình duyệt của ứng dụng không thể khởi động trên một số bản portable.",
+      "highlights": [
+        "Sửa lỗi Binary Location Must be a String khi mở ChatGPT Web hoặc Gemini Web.",
+        "Chuẩn hóa đường dẫn Chrome và ChromeDriver portable để tương thích đúng với Selenium."
+      ]
+    },
+    {
       "version": "1.0.0",
       "date": "2026-08-23",
       "title": "Aiko 1.0 — Quy trình dịch hợp nhất",

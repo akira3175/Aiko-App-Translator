@@ -79,8 +79,10 @@ class BrowserRuntimeTests(unittest.TestCase):
             service = create_chrome_service(driver)
             options = type("Options", (), {"binary_location": None})()
             apply_portable_chrome(options, browser)
-            self.assertEqual(Path(service.path), driver)
-            self.assertEqual(Path(options.binary_location), browser)
+            self.assertIsInstance(service.path, str)
+            self.assertEqual(service.path, str(driver))
+            self.assertIsInstance(options.binary_location, str)
+            self.assertEqual(options.binary_location, str(browser))
 
     def test_driver_manager_is_fallback_when_portable_driver_is_missing(self):
         class Manager:
