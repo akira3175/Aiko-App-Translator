@@ -9,15 +9,18 @@ from pathlib import Path
 
 class LauncherService:
     def __init__(self, root):
-        self.root = root
+        self.root = Path(root)
         local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-        self.executable = local / "Aiko Launcher" / "Aiko-Launcher.exe"
+        bundled = self.root / "Aiko-Launcher.exe"
+        installed = local / "Aiko Launcher" / "Aiko-Launcher.exe"
+        self.executable = bundled if bundled.is_file() else installed
+        self.opened_marker = self.root / ".runtime" / "launcher-opened"
 
     def payload(self):
         available = self.executable.is_file()
         return {
             "available": available,
-            "configured": available,
+            "configured": self.opened_marker.is_file(),
         }
 
     def open(self):
@@ -27,4 +30,6 @@ class LauncherService:
             [str(self.executable), f"--install-root={self.root}"],
             cwd=str(self.executable.parent),
         )
+        self.opened_marker.parent.mkdir(parents=True, exist_ok=True)
+        self.opened_marker.write_text("opened\n", encoding="ascii")
         return {"ok": True, "message": "Đã mở bảng điều khiển launcher."}
