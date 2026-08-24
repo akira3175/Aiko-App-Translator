@@ -94,6 +94,22 @@ class SettingsRoutes:
                 self.open_app_browser,
                 (ValueError, OSError),
             )
+        if path == "/api/server/shutdown":
+            if not handler.is_loopback():
+                handler.json_response(
+                    {"error": "Chỉ có thể tắt server trực tiếp trên máy đang chạy app."},
+                    HTTPStatus.FORBIDDEN,
+                )
+                return True
+            if self.active_translation():
+                handler.json_response(
+                    {"error": "Hãy dừng tác vụ đang chạy trước khi tắt server."},
+                    HTTPStatus.CONFLICT,
+                )
+                return True
+            threading.Timer(0.2, handler.server.shutdown).start()
+            handler.json_response({"ok": True, "message": "Server đang tắt."})
+            return True
         if path == "/api/launcher/open":
             if self.launcher is None:
                 return False

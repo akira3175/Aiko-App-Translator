@@ -3,7 +3,6 @@ using System.Collections;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
-using System.Management;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -67,11 +66,11 @@ namespace AikoLauncher
         public async Task RestartAsync()
         {
             SetBusy("Đang khởi động lại Aiko…");
-            try { await Task.Run(() => { StopAppServers(); Thread.Sleep(500); EnsureServer(); }); Process.Start(new ProcessStartInfo(AppUrl) { UseShellExecute = true }); State.Busy = false; State.Status = "Aiko đã khởi động lại"; State.ServerRunning = true; Raise(); }
+            try { await Task.Run(() => { RequestServerShutdown(); WaitForServerToStop(); EnsureServer(); }); Process.Start(new ProcessStartInfo(AppUrl) { UseShellExecute = true }); State.Busy = false; State.Status = "Aiko đã khởi động lại"; State.ServerRunning = true; Raise(); }
             catch (Exception error) { Fail("Không khởi động lại được Aiko", error); }
         }
 
-        public void StopServer() { StopAppServers(); State.Status = "Server đã tắt"; State.ServerRunning = false; Raise(); }
+        public void StopServer() { RequestServerShutdown(); WaitForServerToStop(); State.Status = "Server đã tắt"; State.ServerRunning = false; Raise(); }
 
         public void UseExisting(string selected)
         {
@@ -115,13 +114,17 @@ namespace AikoLauncher
             {
                 await Task.Run(() =>
                 {
-                    string updateDir = Path.Combine(installRoot, ".runtime", "updates"); Directory.CreateDirectory(updateDir);
-                    string archive = Path.Combine(updateDir, AssetName); DownloadAndVerify(latest, archive); ValidateArchivePaths(archive, Path.Combine(updateDir, "validation")); ValidateArchiveVersion(archive, latest.Version);
-                    string updater = Path.Combine(updateDir, "apply_update.ps1"); File.Copy(Path.Combine(installRoot, "apply_update.ps1"), updater, true);
-                    StopLegacyLauncher(); StopAppServers();
-                    Process.Start(new ProcessStartInfo("powershell", "-NoProfile -ExecutionPolicy Bypass -File \"" + updater + "\" -ZipPath \"" + archive + "\" -AppRoot \"" + installRoot + "\" -ExpectedVersion \"" + latest.Version + "\" -ServerPid 2147483647") { WorkingDirectory = installRoot, UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden });
-                    for (int i = 0; i < 180; i++) { Thread.Sleep(1000); if (InstalledVersion() == latest.Version && IsHealthy()) return; }
-                    throw new TimeoutException("Aiko chưa xác nhận cập nhật thành công. Bản cũ sẽ tự được khôi phục nếu có lỗi.");
+                    string work = Path.Combine(Path.GetTempPath(), "AikoUpdate-" + Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(work);
+                    try
+                    {
+                        string archive = Path.Combine(work, AssetName); DownloadAndVerify(latest, archive);
+                        string staging = Path.Combine(work, "staging"); ValidateArchivePaths(archive, staging); ZipFile.ExtractToDirectory(archive, staging);
+                        string payload = Path.Combine(staging, "NovelTranslatorStudio"); ValidatePayload(payload, latest.Version);
+                        if (IsHealthy()) { RequestServerShutdown(); WaitForServerToStop(); }
+                        ReplaceApplicationFiles(payload);
+                    }
+                    finally { try { Directory.Delete(work, true); } catch { } }
                 });
                 RefreshState(); await OpenAsync();
             }
@@ -192,8 +195,20 @@ namespace AikoLauncher
         private static void ValidateArchiveVersion(string archivePath, string expected) { using (ZipArchive archive = ZipFile.OpenRead(archivePath)) { ZipArchiveEntry version = archive.GetEntry("NovelTranslatorStudio/VERSION"); if (version == null) throw new InvalidDataException("Gói cập nhật thiếu VERSION."); using (var reader = new StreamReader(version.Open(), Encoding.UTF8)) if (reader.ReadToEnd().Trim() != expected) throw new InvalidDataException("Phiên bản trong gói cập nhật không khớp."); } }
         private static bool IsHealthy() { try { var request = (HttpWebRequest)WebRequest.Create(AppUrl + "/api/health"); request.Timeout = 900; using (var response = (HttpWebResponse)request.GetResponse()) return response.StatusCode == HttpStatusCode.OK; } catch { return false; } }
         private void EnsureServer() { if (IsHealthy()) return; string python = Path.Combine(installRoot, "runtime", "python.exe"), app = Path.Combine(installRoot, "app.py"); ValidatePayload(installRoot, InstalledVersion()); var info = new ProcessStartInfo(python, "\"" + app + "\"") { WorkingDirectory = installRoot, UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden }; info.EnvironmentVariables["PYTHONUTF8"] = "1"; info.EnvironmentVariables["AIKO_NO_BROWSER"] = "1"; Process.Start(info); for (int i = 0; i < 60; i++) { Thread.Sleep(250); if (IsHealthy()) return; } throw new InvalidOperationException("Không khởi động được server Aiko."); }
-        private void StopAppServers() { string target = Path.Combine(installRoot, "app.py"); try { using (var searcher = new ManagementObjectSearcher("SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name = 'python.exe'")) foreach (ManagementObject item in searcher.Get()) { string command = Convert.ToString(item["CommandLine"]); if (command.IndexOf(target, StringComparison.OrdinalIgnoreCase) >= 0) try { Process.GetProcessById(Convert.ToInt32(item["ProcessId"])).Kill(); } catch { } } } catch { } }
-        private void StopLegacyLauncher() { string target = Path.Combine(installRoot, "Aiko App Translator.exe"); try { using (var searcher = new ManagementObjectSearcher("SELECT ProcessId, ExecutablePath FROM Win32_Process WHERE Name = 'Aiko App Translator.exe'")) foreach (ManagementObject item in searcher.Get()) if (string.Equals(Convert.ToString(item["ExecutablePath"]), target, StringComparison.OrdinalIgnoreCase)) try { Process.GetProcessById(Convert.ToInt32(item["ProcessId"])).Kill(); } catch { } } catch { } }
+        private static void RequestServerShutdown() { var request = (HttpWebRequest)WebRequest.Create(AppUrl + "/api/server/shutdown"); request.Method = "POST"; request.ContentLength = 0; request.Timeout = 3000; using (var response = (HttpWebResponse)request.GetResponse()) { } }
+        private static void WaitForServerToStop() { for (int i = 0; i < 40; i++) { if (!IsHealthy()) return; Thread.Sleep(250); } throw new TimeoutException("Server Aiko chưa tắt. Hãy dừng tác vụ đang chạy rồi thử lại."); }
+        private void ReplaceApplicationFiles(string payload)
+        {
+            string[] protectedNames = { ".runtime", "truyen", "data", "apikeys.txt", "r19_words.txt", "r19_word.txt" };
+            foreach (string source in Directory.GetFileSystemEntries(payload))
+            {
+                string name = Path.GetFileName(source);
+                if (Array.IndexOf(protectedNames, name) >= 0) continue;
+                string target = Path.Combine(installRoot, name);
+                if (Directory.Exists(target)) Directory.Delete(target, true); else if (File.Exists(target)) File.Delete(target);
+                if (Directory.Exists(source)) Directory.Move(source, target); else File.Move(source, target);
+            }
+        }
 
         public static int SelfTest() { try { if (CompareVersions("1.0.1", "1.0.0") <= 0) return 1; if (CompareVersions("v1.0.0", "1.0.0") != 0) return 2; if (!FormatNotes("## Mới\n- Sửa `lỗi`").Contains("• Sửa lỗi")) return 3; return 0; } catch { return 4; } }
     }

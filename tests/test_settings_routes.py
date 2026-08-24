@@ -123,6 +123,41 @@ class SettingsRouteTests(unittest.TestCase):
         self.assertEqual("started", scheduled[1])
         self.assertTrue(handler.responses[0][1]["ok"])
 
+    def test_server_shutdown_requires_loopback(self):
+        handler = _Handler(loopback=False)
+
+        self.assertTrue(
+            self._routes().handle_post(handler, "/api/server/shutdown", {})
+        )
+        self.assertEqual(403, handler.responses[0][0])
+
+    def test_server_shutdown_is_blocked_during_translation(self):
+        handler = _Handler()
+        routes = self._routes(active_translation=lambda: {"kind": "pipeline"})
+
+        self.assertTrue(routes.handle_post(handler, "/api/server/shutdown", {}))
+        self.assertEqual(409, handler.responses[0][0])
+
+    def test_server_shutdown_is_scheduled_when_idle(self):
+        scheduled = []
+        handler = _Handler()
+
+        class FakeTimer:
+            def __init__(self, delay, callback):
+                scheduled.append((delay, callback))
+
+            def start(self):
+                scheduled.append("started")
+
+        with patch("server.routes.settings.threading.Timer", FakeTimer):
+            self.assertTrue(
+                self._routes().handle_post(handler, "/api/server/shutdown", {})
+            )
+
+        self.assertEqual(0.2, scheduled[0][0])
+        self.assertEqual("started", scheduled[1])
+        self.assertTrue(handler.responses[0][1]["ok"])
+
     def test_unknown_route_is_left_for_next_dispatcher(self):
         routes = self._routes()
         self.assertFalse(routes.handle_get(_Handler(), "/api/health", {}))
