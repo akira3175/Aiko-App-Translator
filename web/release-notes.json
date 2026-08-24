@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "1.0.5",
+      "date": "2026-08-24",
+      "title": "Cập nhật ứng dụng an toàn hơn",
+      "summary": "Bản vá khắc phục lỗi file của Launcher bị khóa trong lúc cài đặt phiên bản mới và cải thiện khả năng khôi phục khi cập nhật thất bại.",
+      "highlights": [
+        "Updater giờ tự đóng Aiko Launcher trước khi thay thế file ứng dụng.",
+        "Khắc phục lỗi aiko-blue-logo.png đang được tiến trình khác sử dụng khi cập nhật.",
+        "Cải thiện rollback để không xóa nhầm file cũ khi một bước thay thế chưa hoàn tất."
+      ]
+    },
+    {
       "version": "1.0.4",
       "date": "2026-08-24",
       "title": "Áp dụng chính xác prompt tùy chỉnh",

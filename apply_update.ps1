@@ -43,6 +43,20 @@ function Start-Aiko {
     return Start-Process -FilePath $python -ArgumentList @("`"$app`"") -WorkingDirectory $root -WindowStyle Hidden -PassThru
 }
 
+function Stop-InstalledExecutable {
+    param([string]$Name)
+    $expected = [IO.Path]::GetFullPath((Join-Path $root $Name))
+    for ($attempt = 0; $attempt -lt 40; $attempt++) {
+        $processes = @(Get-CimInstance Win32_Process -Filter "Name = '$Name'" -ErrorAction SilentlyContinue | Where-Object {
+            $_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath) -eq $expected
+        })
+        if (-not $processes) { return }
+        $processes | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Start-Sleep -Milliseconds 250
+    }
+    throw "The installed process did not close: $Name"
+}
+
 New-Item -ItemType Directory -Force -Path $runtimeRoot, $updatesRoot | Out-Null
 $zip = Assert-ChildPath $ZipPath $updatesRoot
 "[$(Get-Date -Format s)] Starting update to $ExpectedVersion" | Set-Content -LiteralPath $logPath -Encoding UTF8
@@ -56,6 +70,8 @@ try {
     if (Get-Process -Id $ServerPid -ErrorAction SilentlyContinue) {
         throw "The previous app did not close within 30 seconds"
     }
+    Stop-InstalledExecutable "Aiko-Launcher.exe"
+    Stop-InstalledExecutable "Aiko App Translator.exe"
     Remove-SafeTree $stagingRoot $runtimeRoot
     Remove-SafeTree $backupRoot $runtimeRoot
     New-Item -ItemType Directory -Force -Path $stagingRoot, $backupRoot | Out-Null
@@ -70,23 +86,19 @@ try {
     $items = @(Get-ChildItem -LiteralPath $payload -Force)
     $legacyLauncher = Join-Path $root "Aiko App Translator.exe"
     if (Test-Path -LiteralPath $legacyLauncher) {
-        Get-CimInstance Win32_Process -Filter "Name = 'Aiko App Translator.exe'" -ErrorAction SilentlyContinue | Where-Object {
-            $_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath) -eq [IO.Path]::GetFullPath($legacyLauncher)
-        } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-        Start-Sleep -Milliseconds 300
-        $installedNames += "Aiko App Translator.exe"
         Move-Item -LiteralPath $legacyLauncher -Destination (Join-Path $backupRoot "Aiko App Translator.exe") -Force
+        $installedNames += "Aiko App Translator.exe"
     }
     Write-Host "Replacing application files. Your personal data will be preserved..." -ForegroundColor Cyan
     foreach ($item in $items) {
         if ($protected -contains $item.Name) { continue }
-        $installedNames += $item.Name
         $target = Assert-ChildPath (Join-Path $root $item.Name) $root
         $backup = Assert-ChildPath (Join-Path $backupRoot $item.Name) $backupRoot
         if (Test-Path -LiteralPath $target) {
             Move-Item -LiteralPath $target -Destination $backup -Force
         }
         Move-Item -LiteralPath $item.FullName -Destination $target -Force
+        $installedNames += $item.Name
     }
 
     $oldUp = Join-Path $backupRoot "up"

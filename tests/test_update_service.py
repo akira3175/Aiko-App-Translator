@@ -169,6 +169,37 @@ class UpdateServiceTests(unittest.TestCase):
                     lambda *_args: None,
                 )
 
+    def test_updater_stops_bundled_launcher_before_replacing_files(self):
+        script = (Path(__file__).resolve().parents[1] / "apply_update.ps1").read_text(
+            encoding="utf-8"
+        )
+
+        wait_for_server = script.index(
+            'throw "The previous app did not close within 30 seconds"'
+        )
+        stop_launcher = script.index(
+            'Stop-InstalledExecutable "Aiko-Launcher.exe"'
+        )
+        replace_files = script.index(
+            'Write-Host "Replacing application files.'
+        )
+
+        self.assertLess(wait_for_server, stop_launcher)
+        self.assertLess(stop_launcher, replace_files)
+
+    def test_updater_records_replaced_item_only_after_move_succeeds(self):
+        script = (Path(__file__).resolve().parents[1] / "apply_update.ps1").read_text(
+            encoding="utf-8"
+        )
+        loop = script.split("foreach ($item in $items)", 1)[1].split(
+            "$oldUp =", 1
+        )[0]
+
+        self.assertLess(
+            loop.index('Move-Item -LiteralPath $item.FullName -Destination $target -Force'),
+            loop.index('$installedNames += $item.Name'),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
