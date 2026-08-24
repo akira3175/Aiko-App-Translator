@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "1.0.4",
+      "date": "2026-08-24",
+      "title": "Áp dụng chính xác prompt tùy chỉnh",
+      "summary": "Bản vá bảo đảm prompt dịch và prompt hiệu đính tùy chỉnh theo từng truyện được sử dụng đúng trong quá trình xử lý.",
+      "highlights": [
+        "Sửa lỗi khiến prompt dịch và prompt hiệu đính tùy chỉnh theo từng truyện đôi khi không được áp dụng.",
+        "Prompt do bạn chọn hoặc tự viết trong phần Bộ nhớ truyện giờ sẽ được sử dụng chính xác khi dịch và hiệu đính."
+      ]
+    },
+    {
       "version": "1.0.3",
       "date": "2026-08-24",
       "title": "Cập nhật rõ ràng, mở truyện nhanh hơn",

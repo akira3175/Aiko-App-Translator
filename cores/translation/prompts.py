@@ -149,7 +149,7 @@ def _project_prompt():
     project_name = os.environ.get("NOVEL_PROJECT", "").strip()
     if not project_name:
         return DEFAULT_ROLE, DEFAULT_TASK
-    project_dir = Path(__file__).resolve().parents[1] / "truyen" / project_name
+    project_dir = Path(__file__).resolve().parents[2] / "truyen" / project_name
     try:
         data = load_context(project_dir)
     except (OSError, ValueError):
@@ -165,7 +165,7 @@ def project_polish_prompt():
     project_name = os.environ.get("NOVEL_PROJECT", "").strip()
     if not project_name:
         return DEFAULT_POLISH_ROLE, DEFAULT_POLISH_TASK
-    project_dir = Path(__file__).resolve().parents[1] / "truyen" / project_name
+    project_dir = Path(__file__).resolve().parents[2] / "truyen" / project_name
     try:
         data = load_context(project_dir)
     except (OSError, ValueError):
