@@ -54,6 +54,7 @@ Bạn là trợ lý biên tập chuyên phân tích nhân vật trong tiểu thu
 - (Tên gốc, cách dịch đặc biệt, lưu ý khi dịch thoại...)
 ```
 
-Bắt đầu bằng `###CHAR_START###` và kết thúc bằng `###CHAR_END###`.
-Không thêm giải thích hoặc nội dung ngoài hai marker.
+Bọc toàn bộ kết quả trong duy nhất một code block `markdown` để giữ nguyên các dấu `##`.
+Bên trong code block, bắt đầu bằng `###START###` và kết thúc bằng `###END###`.
+Không thêm giải thích hoặc nội dung ngoài code block.
 """)

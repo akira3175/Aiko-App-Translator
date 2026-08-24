@@ -1,10 +1,10 @@
 """AI extraction and timeline updates for pronoun memory."""
 
 import json
-import re
 import time
 
 from cores.pronouns.storage import load_pronouns, save_pronouns
+from cores.json_output import parse_complete_json_object
 
 
 def extract_pronouns_from_translation(
@@ -55,8 +55,9 @@ Lưu ý:
                 print("⚠️ [DEBUG] API trả về dữ liệu rỗng! (bị mất text)")
                 return {}
 
-            clean_text = re.sub(r"```json\s*|\s*```", "", raw_result_text).strip()
-            data = json.loads(clean_text)
+            data = parse_complete_json_object(raw_result_text)
+            if data is None:
+                raise json.JSONDecodeError("Không tìm thấy JSON object hoàn chỉnh", raw_result_text, 0)
             pronoun_records = {}
             for pair in data.get("character_pairs", []):
                 speaker = pair.get("speaker", "").strip()

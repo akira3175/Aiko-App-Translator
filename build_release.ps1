@@ -53,6 +53,13 @@ if (Test-Path $zipPath) {
 }
 New-Item -ItemType Directory -Force -Path $stageRoot | Out-Null
 
+& (Join-Path $projectRoot "build_launcher.ps1")
+if ($LASTEXITCODE -ne 0) {
+    throw "Build Aiko Launcher that bai"
+}
+Copy-Item -LiteralPath (Join-Path $releaseRoot "Aiko-Launcher.exe") -Destination $stageRoot
+Copy-Item -LiteralPath (Join-Path $releaseRoot "Assets") -Destination $stageRoot -Recurse
+
 Copy-Item -LiteralPath (Join-Path $projectRoot "app.py") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "start_app.bat") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "restart_app.ps1") -Destination $stageRoot
@@ -184,6 +191,23 @@ try {
 $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $hashPath = "$zipPath.sha256"
 "$zipHash  $([IO.Path]::GetFileName($zipPath))" | Set-Content -LiteralPath $hashPath -Encoding ASCII
+
+# Launcher and its artwork are release contents, not standalone release assets.
+# Keep only the portable ZIP and its checksum at the release root.
+foreach ($temporaryReleaseItem in @(
+    $stageRoot,
+    (Join-Path $releaseRoot "Aiko-Launcher.exe"),
+    (Join-Path $releaseRoot "Aiko-Launcher.exe.sha256"),
+    (Join-Path $releaseRoot "Assets")
+)) {
+    if (-not (Test-Path -LiteralPath $temporaryReleaseItem)) { continue }
+    $resolvedTemporary = (Resolve-Path -LiteralPath $temporaryReleaseItem).Path
+    if (-not $resolvedTemporary.StartsWith($resolvedRelease + [IO.Path]::DirectorySeparatorChar)) {
+        throw "Khong xoa file tam nam ngoai release: $resolvedTemporary"
+    }
+    Remove-Item -LiteralPath $resolvedTemporary -Recurse -Force
+}
+
 Write-Host ""
 Write-Host "Da tao: $zipPath" -ForegroundColor Green
 Write-Host "SHA-256: $hashPath" -ForegroundColor Green

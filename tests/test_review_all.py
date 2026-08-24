@@ -23,8 +23,8 @@ class ReviewAllTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "overall_score"):
             review_service.parse_review_json("{}")
 
-    def test_web_review_requests_end_marker_outside_json(self):
-        response = '{"overall_score": 9, "issues": [], "gender_ok": true, "address_ok": true, "summary": "Ổn"}\n###END###'
+    def test_web_review_uses_plain_json_without_end_marker_prompt(self):
+        response = '{"overall_score": 9, "issues": [], "gender_ok": true, "address_ok": true, "summary": "Ổn"}'
         captured = []
 
         def transport(prompt, **_kwargs):
@@ -43,8 +43,11 @@ class ReviewAllTests(unittest.TestCase):
         ):
             review_service.call_review_api("review prompt", "chatgpt-web")
 
-        self.assertIn("Sau dấu } kết thúc JSON", captured[0])
-        self.assertIn("Không đặt marker này bên trong", captured[0])
+        self.assertEqual("review prompt", captured[0])
+
+    def test_review_json_ignores_surrounding_prose(self):
+        response = 'Kết quả:\n{"overall_score": 9, "issues": [], "gender_ok": true, "address_ok": true, "summary": "Ổn"}\nHết.'
+        self.assertEqual(9, review_service.parse_review_json(response)["overall_score"])
 
     def test_all_four_engines_can_review(self):
         response = '{"overall_score": 9, "issues": [], "gender_ok": true, "address_ok": true, "summary": "Ổn"}'

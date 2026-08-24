@@ -1,20 +1,17 @@
 """Prompting, API retry, and result normalization for full review."""
 
 import json
-import re
 import time
 
 from cores.config import REVIEW_BG_CRITERIA
 from cores.gemini import switch_api_key
+from cores.json_output import parse_complete_json_object
 from cores.postprocess import build_translation_review_prompt
 from cores.config.runtime import option
 from cores.stages import generate_stage
 
 
 TRANSPORT_OVERRIDES = {}
-WEB_PROVIDERS = {"gemini-web", "chatgpt-web"}
-
-
 def build_review_prompt(
     chapter_id,
     chapter_number,
@@ -38,21 +35,9 @@ def build_review_prompt(
 
 def parse_review_json(text):
     """Extract a complete review object while tolerating web-rendered controls."""
-    clean = re.sub(r"```json\s*|\s*```", "", str(text or "")).replace(
-        "###END###", ""
-    ).strip()
-    start, end = clean.find("{"), clean.rfind("}")
-    if start < 0 or end < start:
+    result = parse_complete_json_object(text, strict=False)
+    if result is None:
         raise ValueError("không tìm thấy object JSON")
-    payload = clean[start : end + 1]
-    try:
-        result = json.loads(payload)
-    except json.JSONDecodeError as error:
-        if "Invalid control character" not in str(error):
-            raise
-        result = json.loads(payload, strict=False)
-    if not isinstance(result, dict):
-        raise ValueError("response review không phải object")
     if not isinstance(result.get("overall_score"), (int, float)):
         raise ValueError("overall_score bị thiếu hoặc không hợp lệ")
     if not isinstance(result.get("issues"), list):
@@ -63,6 +48,7 @@ def parse_review_json(text):
         raise ValueError("gender_ok/address_ok bị thiếu hoặc không hợp lệ")
     if not isinstance(result.get("summary"), str):
         raise ValueError("summary bị thiếu hoặc không hợp lệ")
+    result["summary"] = result["summary"].replace("###END###", "")
     return result
 
 
@@ -73,11 +59,6 @@ def call_review_api(prompt, provider):
         attempt += 1
         try:
             request_prompt = prompt
-            if provider in WEB_PROVIDERS:
-                request_prompt += (
-                    "\n\nSau dấu } kết thúc JSON, hãy ghi ###END### trên một dòng riêng. "
-                    "Không đặt marker này bên trong bất kỳ giá trị JSON nào."
-                )
             text = generate_stage(
                 "review",
                 request_prompt,

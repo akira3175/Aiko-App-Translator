@@ -4,6 +4,7 @@ import { extractCharacterBlock, mergeCharacterMarkdown, parseGlossaryResponse } 
 describe("memory task responses", () => {
   it("only accepts a valid character Markdown block", () => {
     expect(extractCharacterBlock("Giải thích không hợp lệ")).toBe("");
+    expect(extractCharacterBlock("###START###\n## Gray\n- **Giới tính**: Nữ\n###END###")).toContain("## Gray");
     expect(extractCharacterBlock("###CHAR_START###\n## Gray\n- **Giới tính**: Nữ\n###CHAR_END###")).toContain("## Gray");
   });
 

@@ -4,10 +4,10 @@ import os
 import shutil
 import subprocess
 
-from services.updating.downloader import download
+from services.updating.downloader import DownloadCancelled, download
 
 
-def prepare(
+def prepare_download(
     root,
     update_dir,
     asset_name,
@@ -16,40 +16,43 @@ def prepare(
     jobs,
     release_loader,
     archive_validator,
+    progress=None,
+    cancelled=None,
+    opener=None,
 ):
     if not (root / "runtime" / "python.exe").is_file():
-        raise ValueError("Tự động cập nhật chỉ dùng được trên bản portable")
+        raise ValueError("Automatic updates are only available in the portable build")
     if not updater_source.is_file():
-        raise ValueError("Thiếu apply_update.ps1 trong thư mục ứng dụng")
+        raise ValueError("apply_update.ps1 is missing from the application folder")
     if any(job.get("status") == "running" for job in jobs.values()):
-        raise ValueError("Hãy chờ hoặc dừng mọi tác vụ trước khi cập nhật")
+        raise ValueError("Stop or wait for all running tasks before updating")
     release = release_loader(True)
     if not release.get("update_available"):
-        raise ValueError("Không có phiên bản mới để cập nhật")
+        raise ValueError("No newer version is available")
     if not release.get("download_ready"):
-        raise ValueError("Release GitHub thiếu ZIP Windows hoặc SHA-256")
+        raise ValueError("The GitHub release is missing the Windows ZIP or SHA-256 digest")
 
     update_dir.mkdir(parents=True, exist_ok=True)
     destination = update_dir / asset_name
-    download(release, destination, current_version)
+    download_args = {"progress": progress, "cancelled": cancelled}
+    if opener is not None:
+        download_args["opener"] = opener
+    download(release, destination, current_version, **download_args)
+    if cancelled and cancelled():
+        destination.unlink(missing_ok=True)
+        raise DownloadCancelled("Update download cancelled")
     archive_validator(destination, release["latest_version"])
     updater = update_dir / "apply_update.ps1"
     shutil.copy2(updater_source, updater)
+    return {"destination": destination, "updater": updater, "version": release["latest_version"]}
+
+
+def launch(root, prepared):
     command = [
-        "powershell",
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        str(updater),
-        "-ZipPath",
-        str(destination),
-        "-AppRoot",
-        str(root),
-        "-ExpectedVersion",
-        release["latest_version"],
-        "-ServerPid",
-        str(os.getpid()),
+        "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+        str(prepared["updater"]), "-ZipPath", str(prepared["destination"]),
+        "-AppRoot", str(root), "-ExpectedVersion", prepared["version"],
+        "-ServerPid", str(os.getpid()),
     ]
     creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(
         subprocess, "CREATE_NEW_CONSOLE", 0
@@ -57,6 +60,14 @@ def prepare(
     subprocess.Popen(command, cwd=str(root), creationflags=creation_flags)
     return {
         "ok": True,
-        "version": release["latest_version"],
-        "message": "Đã tải và xác minh. App sẽ khởi động lại để cập nhật.",
+        "version": prepared["version"],
+        "message": "The update is ready. Aiko will restart to finish installing it.",
     }
+
+
+def prepare(root, update_dir, asset_name, updater_source, current_version, jobs, release_loader, archive_validator):
+    prepared = prepare_download(
+        root, update_dir, asset_name, updater_source, current_version, jobs,
+        release_loader, archive_validator,
+    )
+    return launch(root, prepared)

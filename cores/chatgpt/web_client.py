@@ -18,9 +18,21 @@ from cores.chatgpt.web_response import (
     response_text as _chatgpt_response_text,
     snapshot_conversation as _snapshot_chatgpt_conversation,
 )
+from cores.json_output import parse_complete_json_object
 
 
 END_MARKER_SETTLE_SECONDS = 3
+
+
+def _is_known_structured_response(text):
+    parsed = parse_complete_json_object(text)
+    if parsed is None:
+        return False
+    if isinstance(parsed.get("character_pairs"), list):
+        return True
+    return isinstance(parsed.get("overall_score"), (int, float)) and isinstance(
+        parsed.get("issues"), list
+    )
 
 
 def _settle_end_marker_response(
@@ -201,6 +213,21 @@ def generate_content(
                     )
                     print("✅ Streaming hoàn tất, đã đọc lại response cuối.")
                     return final_text
+
+                if _is_known_structured_response(current_text):
+                    print(
+                        "\n⏳ Đã nhận đủ JSON, đợi thêm 3 giây để response ổn định..."
+                    )
+                    final_text = _settle_end_marker_response(
+                        driver,
+                        response_turn,
+                        response_token,
+                        old_assistant_count,
+                        current_text,
+                    )
+                    if _is_known_structured_response(final_text):
+                        print("✅ Streaming hoàn tất, JSON hợp lệ.")
+                        return final_text
 
                 if current_text and current_text == last_text:
                     stable_count += 1

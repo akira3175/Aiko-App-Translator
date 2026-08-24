@@ -1,7 +1,8 @@
 """Shared output parsers for translation pipeline stages."""
 
-import json
 import re
+
+from cores.json_output import normalize_json_response, parse_complete_json_object
 
 
 def parse_title_content(text, stage):
@@ -25,11 +26,6 @@ def parse_title_content(text, stage):
 
 
 def parse_json_object(text):
-    clean = re.sub(r"```json\s*|\s*```", "", str(text or "")).strip()
-    start, end = clean.find("{"), clean.rfind("}")
-    if start < 0 or end < start:
-        return {"raw": clean}
-    try:
-        return json.loads(clean[start : end + 1])
-    except json.JSONDecodeError:
-        return {"raw": clean}
+    clean = normalize_json_response(text)
+    parsed = parse_complete_json_object(clean)
+    return parsed if parsed is not None else {"raw": clean}

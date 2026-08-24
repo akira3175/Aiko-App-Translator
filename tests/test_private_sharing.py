@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from cores.storage.project import load_json
-from services.cloudflare.sharing import close, remove_chapter, save
+from services.cloudflare.sharing import _chapter_html, close, remove_chapter, save
 
 
 class FakeR2Client:
@@ -21,6 +21,21 @@ class FakeR2Client:
 
 
 class PrivateSharingTests(unittest.TestCase):
+    def test_shared_chapter_preserves_markdown_emphasis(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output, images = _chapter_html(
+                Path(directory),
+                "Normal **Bold** *Italic* ***Both*** __Bold2__ _Italic2_",
+                "share-id",
+            )
+
+        self.assertEqual(images, [])
+        self.assertIn("<strong>Bold</strong>", output)
+        self.assertIn("<em>Italic</em>", output)
+        self.assertIn("<strong><em>Both</em></strong>", output)
+        self.assertIn("<strong>Bold2</strong>", output)
+        self.assertIn("<em>Italic2</em>", output)
+
     def test_save_remove_and_close_share(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory) / "Truyện thử"

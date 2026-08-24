@@ -13,6 +13,9 @@ class SettingsRoutes:
     providers_payload: object
     update_payload: object
     prepare_update: object
+    update_progress: object
+    cancel_update: object
+    install_update: object
     r19: object
     ai_logs: object
     clear_ai_logs: object
@@ -38,6 +41,9 @@ class SettingsRoutes:
                 )
             except (ValueError, OSError) as exc:
                 handler.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
+        if path == "/api/update/progress":
+            handler.json_response(self.update_progress())
             return True
         if path == "/api/launcher":
             if self.launcher is None:
@@ -123,6 +129,15 @@ class SettingsRoutes:
         if path == "/api/update":
             try:
                 result = self.prepare_update()
+                handler.json_response(result)
+            except (ValueError, OSError, zipfile.BadZipFile) as exc:
+                handler.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
+        if path == "/api/update/cancel":
+            return self._json_call(handler, self.cancel_update, (ValueError, OSError))
+        if path == "/api/update/install":
+            try:
+                result = self.install_update()
                 threading.Timer(0.8, handler.server.shutdown).start()
                 handler.json_response(result)
             except (ValueError, OSError, zipfile.BadZipFile) as exc:

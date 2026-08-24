@@ -32,6 +32,28 @@ class PronounMemoryTests(unittest.TestCase):
         self.assertEqual(record["chapter_id"], "v1_c2_s1")
         self.assertEqual(record["speaker_to_listener"], "cậu")
 
+    def test_extract_pronouns_accepts_legacy_end_marker(self):
+        result = extract_pronouns_from_translation(
+            "v1_c2_s1",
+            2,
+            "An gọi Bình là cậu.",
+            model="test-model",
+            generate=lambda _prompt: '{"character_pairs":[{"speaker":"An","listener":"Bình"}]}\n###END###',
+            sleep=lambda _seconds: None,
+        )
+        self.assertIn(("An", "Bình"), result)
+
+    def test_extract_pronouns_ignores_surrounding_prose(self):
+        result = extract_pronouns_from_translation(
+            "v1_c2_s1",
+            2,
+            "An gọi Bình là cậu.",
+            model="test-model",
+            generate=lambda _prompt: 'Kết quả:\n{"character_pairs":[{"speaker":"An","listener":"Bình"}]}\nHết.',
+            sleep=lambda _seconds: None,
+        )
+        self.assertIn(("An", "Bình"), result)
+
     def test_update_preserves_locked_pair(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "pronouns.json"

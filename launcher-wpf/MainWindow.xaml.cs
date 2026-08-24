@@ -30,13 +30,13 @@ namespace AikoLauncher
 
         private void Render(LauncherState state)
         {
-            VersionText.Text = state.Installed ? "AIKO " + state.InstalledVersion + (state.UpdateAvailable ? "  ·  CÓ BẢN " + state.LatestVersion : "  ·  MỚI NHẤT") : "BẢN MỚI NHẤT  " + (state.LatestVersion ?? "");
+            VersionText.Text = state.Installed ? "AIKO " + state.InstalledVersion + "  ·  PORTABLE" : "CHƯA TÌM THẤY AIKO";
             HeadlineText.Text = state.Headline;
             SummaryText.Text = state.Summary;
             NotesText.Text = state.Notes;
             StatusText.Text = state.Status;
             PathText.Text = state.InstallRoot;
-            PrimaryButton.Content = state.Busy ? "VUI LÒNG CHỜ…" : !state.Installed ? "CÀI ĐẶT AIKO" : state.UpdateAvailable ? "CẬP NHẬT NGAY" : "MỞ AIKO";
+            PrimaryButton.Content = state.Busy ? "VUI LÒNG CHỜ…" : !state.Installed ? "CHỌN THƯ MỤC AIKO" : "MỞ AIKO";
             PrimaryButton.IsEnabled = !state.Busy;
             double available = Math.Max(0, ActualWidth - 420 - 72 - 260 - 24);
             ProgressFill.Width = available * Math.Max(0, Math.Min(1, state.Progress));
@@ -50,7 +50,7 @@ namespace AikoLauncher
             ContentPanel.BeginAnimation(MarginProperty, slide);
         }
 
-        private async void PrimaryAction(object sender, RoutedEventArgs e) { await controller.PrimaryAsync(); }
+        private async void PrimaryAction(object sender, RoutedEventArgs e) { if (!controller.State.Installed) { SelectExisting(); return; } await controller.PrimaryAsync(); }
         private void DragWindow(object sender, MouseButtonEventArgs e) { if (e.LeftButton == MouseButtonState.Pressed) DragMove(); }
         private void MinimizeWindow(object sender, RoutedEventArgs e) { WindowState = WindowState.Minimized; }
         private void CloseWindow(object sender, RoutedEventArgs e) { Close(); }
@@ -65,9 +65,8 @@ namespace AikoLauncher
                 VerticalOffset = -4
             };
             AddItem(menu, "Chọn thư mục Aiko hiện có", SelectExisting);
-            AddItem(menu, "Kiểm tra cập nhật", async () => await controller.CheckAsync());
             AddItem(menu, "Khởi động lại Aiko", async () => await controller.RestartAsync());
-            AddItem(menu, "Tắt server", controller.StopServer);
+            AddItem(menu, "Tắt server", async () => await controller.StopServerAsync());
             AddItem(menu, "Tạo shortcut Desktop", controller.CreateShortcut);
             menu.IsOpen = true;
         }

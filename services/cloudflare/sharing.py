@@ -14,6 +14,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 
+from services.markdown_inline import inline_html
+
 from cores.storage.project import load_json, save_json
 
 
@@ -196,9 +198,7 @@ def _chapter_html(project_path: Path, text: str, share_id: str):
             url = html.escape(remote.group(1).strip(), quote=True)
             output.append(f'<figure><img src="{url}" alt="" loading="lazy"></figure>')
             continue
-        escaped = html.escape(raw_line)
-        escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
-        escaped = re.sub(r"(^|[^*])\*([^*]+?)\*", r"\1<em>\2</em>", escaped)
+        escaped = inline_html(raw_line)
         if escaped.startswith("### "):
             output.append(f"<h3>{escaped[4:]}</h3>")
         elif escaped.startswith("## "):

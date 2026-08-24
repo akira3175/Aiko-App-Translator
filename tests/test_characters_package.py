@@ -14,7 +14,7 @@ from cores.characters.storage import load_index, save_index
 
 class CharactersPackageTests(unittest.TestCase):
     def test_all_four_engines_generate_valid_character_blocks(self):
-        response = "###CHAR_START###\n## An\n- **Giới tính**: Nam\n###CHAR_END###"
+        response = "###START###\n## An\n- **Giới tính**: Nam\n###END###"
         for provider in ("gemini-api", "gemini-web", "openai-api", "chatgpt-web"):
             calls = []
 
@@ -53,6 +53,48 @@ class CharactersPackageTests(unittest.TestCase):
         block = extract_character_block(response)
         self.assertIn("## An", block)
         self.assertEqual(list(parse_characters(block)), ["An"])
+
+    def test_accepts_legacy_character_markers(self):
+        response = "###CHAR_START###\n## An\n- **Giới tính**: Nam\n###CHAR_END###"
+        self.assertIn("## An", extract_character_block(response))
+
+    def test_restores_headings_stripped_by_chatgpt_rendering(self):
+        response = """###START###
+An
+
+Thông tin cơ bản
+- **Giới tính**: Nam
+
+Ghi chú dịch thuật
+- Giữ nguyên tên An
+###END###"""
+        block = extract_character_block(response)
+        self.assertIn("## An", block)
+        self.assertIn("### Thông tin cơ bản", block)
+        self.assertEqual(list(parse_characters(block)), ["An"])
+
+    def test_restores_only_missing_heading_in_mixed_rendering(self):
+        response = """###START###
+## An
+
+### Thông tin cơ bản
+- **Giới tính**: Nam
+
+Bình
+
+Thông tin cơ bản
+* **Giới tính**: Nữ
+###END###"""
+        self.assertEqual(
+            list(parse_characters(extract_character_block(response))), ["An", "Bình"]
+        )
+
+    def test_merge_recognizes_asterisk_field_bullets(self):
+        existing = "## An\n- **Giới tính**: Nam\n- **Phe**: Cũ"
+        incoming = "## An\n* **Giới tính**: Nữ\n* **Phe**: Mới"
+        merged = merge_characters(existing, incoming)
+        self.assertIn("* **Phe**: Mới", merged)
+        self.assertNotIn("- **Phe**: Cũ", merged)
 
     def test_merge_preserves_fields_missing_from_new_block(self):
         existing = "## An\n- **Tên gốc**: 安\n- **Giới tính**: Nam"

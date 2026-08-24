@@ -2,9 +2,14 @@
 
 import hashlib
 import os
+import time
 import zipfile
 from pathlib import PurePosixPath
 from urllib.request import Request, urlopen
+
+
+class DownloadCancelled(Exception):
+    """Raised when the user cancels an update download."""
 
 
 def validate_archive(path, expected_version):
@@ -25,23 +30,24 @@ def validate_archive(path, expected_version):
                 or not item.parts
                 or item.parts[0] != "NovelTranslatorStudio"
             ):
-                raise ValueError("Gói cập nhật chứa đường dẫn không an toàn")
+                raise ValueError("The update archive contains an unsafe path")
             names.add(normalized.rstrip("/"))
         missing = required - names
         if missing:
-            raise ValueError(f"Gói cập nhật thiếu file: {', '.join(sorted(missing))}")
-        version = (
-            archive.read("NovelTranslatorStudio/VERSION")
-            .decode("utf-8-sig")
-            .strip()
-        )
+            raise ValueError(f"The update archive is missing: {', '.join(sorted(missing))}")
+        version = archive.read("NovelTranslatorStudio/VERSION").decode("utf-8-sig").strip()
     if version != expected_version:
-        raise ValueError(
-            f"Phiên bản trong ZIP là {version}, không phải {expected_version}"
-        )
+        raise ValueError(f"The ZIP contains version {version}, expected {expected_version}")
 
 
-def download(release, destination, current_version, opener=urlopen):
+def download(
+    release,
+    destination,
+    current_version,
+    opener=urlopen,
+    progress=None,
+    cancelled=None,
+):
     partial = destination.with_suffix(".zip.part")
     partial.unlink(missing_ok=True)
     request = Request(
@@ -52,19 +58,34 @@ def download(release, destination, current_version, opener=urlopen):
         },
     )
     digest = hashlib.sha256()
+    downloaded = 0
+    started = time.monotonic()
     try:
         with opener(request, timeout=60) as response, partial.open("wb") as output:
+            total = int(response.headers.get("Content-Length", "0") or 0)
             while True:
+                if cancelled and cancelled():
+                    raise DownloadCancelled("Update download cancelled")
                 chunk = response.read(1024 * 1024)
                 if not chunk:
                     break
                 digest.update(chunk)
                 output.write(chunk)
+                downloaded += len(chunk)
+                elapsed = max(time.monotonic() - started, 0.001)
+                speed = downloaded / elapsed
+                if progress:
+                    progress(
+                        downloaded=downloaded,
+                        total=total,
+                        speed=speed,
+                        eta=(total - downloaded) / speed if total and speed else None,
+                    )
     except Exception:
         partial.unlink(missing_ok=True)
         raise
     if digest.hexdigest() != release["sha256"]:
         partial.unlink(missing_ok=True)
-        raise ValueError("Checksum SHA-256 của bản cập nhật không khớp")
+        raise ValueError("Update SHA-256 checksum does not match")
     os.replace(partial, destination)
     return destination

@@ -31,7 +31,7 @@ async function loadChapters() {
     if(currentItem)$('#currentChapter').textContent=currentItem.title||prettyName(currentItem.name);
     sharingFeature.render();
     updateChapterNavigation();
-    if (!state.current && state.chapters.length) openChapter(state.chapters.find(x => !x.translated)?.name || state.chapters[0].name,project,revision);
+    if (!state.current && state.chapters.length) await openChapter(state.chapters.find(x => !x.translated)?.name || state.chapters[0].name,project,revision);
   } catch (error) { if(state.project===project&&state.projectRevision===revision)toast(error.message); }
 }
 
@@ -71,7 +71,9 @@ async function selectProject(name) {
   renderContext();
   state.currentImages=[]; renderMarkdownEditors();
   $('#projectPopover').classList.remove('open');
-  await Promise.all([loadChapters(), loadReviews(), loadContext(), loadCharacters(), loadPronouns(), publishingBooksFeature.load(), sharingFeature.load(), r19Feature.load()]); toast('Đã mở ' + name);
+  await loadChapters();
+  toast('Đã mở ' + name);
+  Promise.allSettled([loadReviews(), loadContext(), loadCharacters(), loadPronouns(), publishingBooksFeature.load(), sharingFeature.load(), r19Feature.load()]);
   if($('#aiLogDrawer').classList.contains('open'))aiLogFeature.load(true);
   $('#hakoPublicUrl').value=localStorage.getItem(`hako-public-url:${name}`)||'';
   hakoEditFeature.reset();

@@ -44,6 +44,9 @@ class SettingsRouteTests(unittest.TestCase):
             "providers_payload": lambda: [{"id": "gemini-api"}],
             "update_payload": lambda remote: {"checked": remote},
             "prepare_update": lambda: {"ok": True},
+            "update_progress": lambda: {"stage": "downloading"},
+            "cancel_update": lambda: {"ok": True},
+            "install_update": lambda: {"ok": True},
             "ai_logs": lambda _project, limit: {"limit": int(limit)},
             "clear_ai_logs": lambda _project: {"removed": 1},
             "open_app_browser": lambda: {"ok": True},
@@ -104,7 +107,7 @@ class SettingsRouteTests(unittest.TestCase):
         self.assertTrue(routes.handle_post(handler, "/api/launcher/open", {}))
         self.assertEqual(403, handler.responses[0][0])
 
-    def test_update_schedules_shutdown_after_success(self):
+    def test_update_install_schedules_shutdown_after_success(self):
         scheduled = []
         routes = self._routes()
         handler = _Handler()
@@ -117,7 +120,7 @@ class SettingsRouteTests(unittest.TestCase):
                 scheduled.append("started")
 
         with patch("server.routes.settings.threading.Timer", FakeTimer):
-            self.assertTrue(routes.handle_post(handler, "/api/update", {}))
+            self.assertTrue(routes.handle_post(handler, "/api/update/install", {}))
 
         self.assertEqual(0.8, scheduled[0][0])
         self.assertEqual("started", scheduled[1])

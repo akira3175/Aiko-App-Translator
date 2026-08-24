@@ -5,7 +5,7 @@
       <Grid.RowDefinitions><RowDefinition Height="58"/><RowDefinition Height="*"/><RowDefinition Height="112"/></Grid.RowDefinitions>
 
       <Grid Grid.RowSpan="2" Grid.ColumnSpan="2" ClipToBounds="True">
-        <Rectangle Fill="#0B2D63"/>
+        <Image Source="pack://siteoforigin:,,,/Assets/aiko-launcher-background.png" Stretch="UniformToFill" RenderTransformOrigin="0.5,0.5"><Image.RenderTransform><TransformGroup><ScaleTransform ScaleX="1.06" ScaleY="1.06"/><TranslateTransform X="-30"/></TransformGroup></Image.RenderTransform></Image>
         <Rectangle HorizontalAlignment="Right" Width="680"><Rectangle.Fill><LinearGradientBrush StartPoint="1,0" EndPoint="0,0"><GradientStop Color="#F0071738" Offset="0"/><GradientStop Color="#B5091A3D" Offset="0.62"/><GradientStop Color="#38091A3D" Offset="0.84"/><GradientStop Color="#00091A3D" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
       </Grid>
 
@@ -14,7 +14,7 @@
           <Rectangle HorizontalAlignment="Left" Width="390"><Rectangle.Fill><RadialGradientBrush GradientOrigin="0,0" Center="0,0" RadiusX="1" RadiusY="1"><GradientStop Color="#D807142F" Offset="0"/><GradientStop Color="#7207142F" Offset="0.48"/><GradientStop Color="#0007142F" Offset="1"/></RadialGradientBrush></Rectangle.Fill></Rectangle>
           <Rectangle HorizontalAlignment="Right" Width="300"><Rectangle.Fill><RadialGradientBrush GradientOrigin="1,0" Center="1,0" RadiusX="1" RadiusY="1"><GradientStop Color="#D807142F" Offset="0"/><GradientStop Color="#7207142F" Offset="0.48"/><GradientStop Color="#0007142F" Offset="1"/></RadialGradientBrush></Rectangle.Fill></Rectangle>
           <Grid Margin="22,0,10,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Border Width="34" Height="34" CornerRadius="10" Background="#2C8BDA"><TextBlock Text="A" Foreground="White" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><StackPanel Margin="11,0,0,0" VerticalAlignment="Center"><TextBlock Text="AIKO" FontFamily="Segoe UI" FontWeight="Bold" FontSize="14" Foreground="#F4FAFF"/><TextBlock Text="APP TRANSLATOR" FontSize="8" FontWeight="Bold" Foreground="#AFCBE8"/></StackPanel></StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Border Width="34" Height="34" CornerRadius="10" Background="#24FFFFFF"><Image Source="pack://siteoforigin:,,,/Assets/aiko-blue-logo.png" Stretch="Uniform" Margin="2"/></Border><StackPanel Margin="11,0,0,0" VerticalAlignment="Center"><TextBlock Text="AIKO" FontFamily="Segoe UI" FontWeight="Bold" FontSize="14" Foreground="#F4FAFF"/><TextBlock Text="APP TRANSLATOR" FontSize="8" FontWeight="Bold" Foreground="#AFCBE8"/></StackPanel></StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal"><Button Content="—" Foreground="#D9ECFF" Background="Transparent" Width="42" Height="38" Padding="0" BorderThickness="0" Click="MinimizeWindow"/><Button Content="×" Foreground="#D9ECFF" Background="Transparent" Width="42" Height="38" Padding="0" BorderThickness="0" Click="CloseWindow"/></StackPanel>
           </Grid>
         </Grid>
@@ -24,10 +24,10 @@
         <Rectangle VerticalAlignment="Bottom" Height="190"><Rectangle.Fill><LinearGradientBrush StartPoint="0,1" EndPoint="0,0"><GradientStop Color="#B20A1734" Offset="0"/><GradientStop Color="#000A1734" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
       </Grid>
 
-      <Grid Grid.Row="1" Grid.Column="1" Margin="36,34,42,20" x:Name="ContentPanel" Opacity="0">
+      <Grid Grid.Row="1" Grid.Column="1" Margin="24,34,24,20" x:Name="ContentPanel" Opacity="0">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border HorizontalAlignment="Left" Background="#2B7ED6FF" BorderBrush="#75C5FF" BorderThickness="1" CornerRadius="8" Padding="10,5"><TextBlock x:Name="VersionText" Text="ĐANG KIỂM TRA" FontSize="10" FontWeight="Bold" Foreground="#DDF3FF"/></Border>
-        <TextBlock Grid.Row="1" x:Name="HeadlineText" Text="Một nơi cho mọi bản dịch" FontSize="30" FontWeight="Bold" Foreground="#F5FAFF" TextWrapping="Wrap" Margin="0,20,0,8"/>
+        <TextBlock Grid.Row="1" x:Name="HeadlineText" Text="Một nơi cho mọi bản dịch" FontSize="26" FontWeight="Bold" Foreground="#F5FAFF" TextWrapping="NoWrap" Margin="0,20,0,8"/>
         <TextBlock Grid.Row="2" x:Name="SummaryText" Text="Aiko đang kiểm tra phiên bản mới nhất và chuẩn bị không gian làm việc của bạn." FontSize="14" LineHeight="22" Foreground="#C4DCF2" TextWrapping="Wrap" Margin="0,0,20,0"/>
         <ScrollViewer Grid.Row="3" Margin="0,26,20,0" VerticalScrollBarVisibility="Auto"><TextBlock x:Name="NotesText" FontSize="13" LineHeight="21" Foreground="#B9D6EF" TextWrapping="Wrap"/></ScrollViewer>
       </Grid>

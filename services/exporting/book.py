@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from PIL import Image, ImageOps
+from services.markdown_inline import inline_html, inline_runs
 
 
 def _plain_markdown(text: str) -> str:
@@ -20,7 +21,7 @@ def _plain_markdown(text: str) -> str:
     text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
     text = re.sub(r"^\s*#{1,6}\s+", "", text, flags=re.MULTILINE)
     text = re.sub(r"^\s*>\s?", "", text, flags=re.MULTILINE)
-    return re.sub(r"(?<!\\)[*_~`]", "", text)
+    return text
 
 
 def _blocks(section: dict):
@@ -71,14 +72,28 @@ def _image_asset(path: Path):
         return output.getvalue(), ".jpg", "image/jpeg", width, height
 
 
-def _paragraph(text: str, style: str | None = None, page_break=False):
+def _paragraph(text: str, style: str | None = None, page_break=False, formatted=False):
     properties = []
     if style:
         properties.append(f'<w:pStyle w:val="{style}"/>')
     if page_break:
         properties.append('<w:pageBreakBefore/>')
     ppr = f"<w:pPr>{''.join(properties)}</w:pPr>" if properties else ""
-    return f'<w:p>{ppr}<w:r><w:t xml:space="preserve">{html.escape(text)}</w:t></w:r></w:p>'
+    runs = []
+    source_runs = inline_runs(text) if formatted else [(text, False, False)]
+    for value, bold, italic in source_runs:
+        run_properties = ""
+        if bold or italic:
+            run_properties = (
+                "<w:rPr>"
+                + ("<w:b/>" if bold else "")
+                + ("<w:i/>" if italic else "")
+                + "</w:rPr>"
+            )
+        runs.append(
+            f'<w:r>{run_properties}<w:t xml:space="preserve">{html.escape(value)}</w:t></w:r>'
+        )
+    return f'<w:p>{ppr}{"".join(runs)}</w:p>'
 
 
 def _image_paragraph(rid: str, name: str, width: int, height: int, drawing_id: int):
@@ -94,7 +109,7 @@ def _docx(project_name: str, sections: list[dict]) -> bytes:
         paragraphs.append(_paragraph(section["title"], "Heading1", page_break=True))
         for block in _blocks(section):
             if block[0] == "text":
-                paragraphs.append(_paragraph(block[1]))
+                paragraphs.append(_paragraph(block[1], formatted=True))
                 continue
             rid = f"rId{len(images) + 2}"
             data, extension, mime_type, width, height = _image_asset(block[1])
@@ -130,7 +145,7 @@ def _epub(project_name: str, sections: list[dict]) -> bytes:
         epub_section = {**section, "body": _without_leading_title(section["body"], section["title"])}
         for block in _blocks(epub_section):
             if block[0] == "text":
-                blocks.append(f"<p>{html.escape(block[1])}</p>")
+                blocks.append(f"<p>{inline_html(block[1])}</p>")
             else:
                 key = str(block[1])
                 if key not in images:

@@ -24,6 +24,10 @@ if (-not (Test-Path -LiteralPath $compiler)) {
 $built = Join-Path $root "launcher-wpf\bin\Release\Aiko-Launcher.exe"
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $built)) { throw "Build Aiko Launcher WPF thất bại" }
 Copy-Item -LiteralPath $built -Destination $output -Force
+$assetOutput = Join-Path $release "Assets"
+New-Item -ItemType Directory -Force -Path $assetOutput | Out-Null
+Copy-Item -LiteralPath (Join-Path $root "launcher-wpf\bin\Release\Assets\aiko-launcher-background.png") -Destination $assetOutput -Force
+Copy-Item -LiteralPath (Join-Path $root "launcher-wpf\bin\Release\Assets\aiko-blue-logo.png") -Destination $assetOutput -Force
 
 & $output --self-test
 if ($LASTEXITCODE -ne 0) { throw "Aiko Launcher self-test thất bại: $LASTEXITCODE" }

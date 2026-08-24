@@ -408,6 +408,13 @@
 .app-browser-card strong { font-size: 15px; }
 .app-browser-card small { color: var(--muted); line-height: 1.45; }
 .update-actions { display: flex!important; grid-auto-flow: column; gap: 8px!important; }
+.update-progress { width: min(520px,100%); margin-top: 5px; }
+.update-progress[hidden] { display: none; }
+.update-progress-track { height: 7px; overflow: hidden; border-radius: 999px; background: var(--line); }
+.update-progress-track i { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--accent); transition: width .2s ease; }
+.update-progress.indeterminate .update-progress-track i { width: 35%; animation: update-slide 1.1s ease-in-out infinite; }
+.update-progress small { display: block; margin-top: 6px; font: 600 11px Consolas,"Courier New",monospace; }
+@keyframes update-slide { from { transform: translateX(-110%); } to { transform: translateX(300%); } }
 .update-label { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .1em; }
 .whats-new-modal { width: min(680px,calc(100vw - 28px)); overflow: hidden; }
 .whats-new-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }

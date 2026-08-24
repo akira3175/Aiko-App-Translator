@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -22,6 +23,7 @@ namespace AikoLauncher
             if (!created) { Shutdown(); return; }
             string requested = e.Args.FirstOrDefault(x => x.StartsWith("--install-root=", StringComparison.OrdinalIgnoreCase));
             requested = requested == null ? "" : requested.Substring("--install-root=".Length).Trim('"');
+            if (requested == "" && File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.py"))) requested = AppDomain.CurrentDomain.BaseDirectory;
             MainWindow = new MainWindow(requested);
             MainWindow.Show();
         }

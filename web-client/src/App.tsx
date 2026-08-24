@@ -182,16 +182,16 @@ Doc tep characters.md dinh kem neu co de tranh mau thuan va chi bo sung thong ti
 ---
 
 # Dinh dang dau ra
-> Bat dau bang dong \`###CHAR_START###\`
-> Ket thuc bang dong \`###CHAR_END###\`
+> Bat dau bang dong \`###START###\`
+> Ket thuc bang dong \`###END###\`
 > O giua: **toan bo** noi dung Markdown theo template tren cho tung nhan vat.
 > KHONG them bat ky giai thich hay text nao ngoai phan giua hai marker.`;
 }
 
 export function extractCharacterBlock(response: string) {
-  const cleaned = response.trim().replace(/^```(?:markdown|md)?\s*/i, "").replace(/\s*```$/, "").replace(/^\\(?=#+\s*(?:CHAR_START|CHAR_END))/gm, "");
-  const start = cleaned.match(/^\s*###\s*CHAR_START\s*###\s*$/im);
-  const end = cleaned.match(/^\s*###\s*CHAR_END\s*###\s*$/im);
+  const cleaned = response.trim().replace(/^```(?:markdown|md)?\s*/i, "").replace(/\s*```$/, "").replace(/^\\(?=#+\s*(?:(?:CHAR_)?START|(?:CHAR_)?END))/gm, "");
+  const start = cleaned.match(/^\s*###\s*(?:CHAR_)?START\s*###\s*$/im);
+  const end = cleaned.match(/^\s*###\s*(?:CHAR_)?END\s*###\s*$/im);
   if (start?.index !== undefined && end?.index !== undefined && end.index > start.index + start[0].length) return cleaned.slice(start.index + start[0].length, end.index).trim();
   return /^##\s+\S/m.test(cleaned) ? cleaned : "";
 }
@@ -773,7 +773,7 @@ export function App() {
         let lastError: unknown;
         for (let attempt = 0; attempt < 3 && !block; attempt += 1) {
           try {
-            const response = await generateWithApiKeys(keys, attempt, { model: DEFAULT_TASKS.translate.model, maxOutputTokens: null, systemInstruction: "", prompt: attempt ? `${prompt}\n\nLƯU Ý SỬA OUTPUT: Trả ít nhất một header \`## Tên nhân vật\` giữa \`###CHAR_START###\` và \`###CHAR_END###\`.` : prompt, document: body.trim() ? { name: "characters.md", mimeType: "text/markdown", content: `${CHARACTER_HEADER}${body}` } : undefined, signal: controller.signal });
+            const response = await generateWithApiKeys(keys, attempt, { model: DEFAULT_TASKS.translate.model, maxOutputTokens: null, systemInstruction: "", prompt: attempt ? `${prompt}\n\nLƯU Ý SỬA OUTPUT: Trả ít nhất một header \`## Tên nhân vật\` giữa \`###START###\` và \`###END###\`.` : prompt, document: body.trim() ? { name: "characters.md", mimeType: "text/markdown", content: `${CHARACTER_HEADER}${body}` } : undefined, signal: controller.signal });
             block = extractCharacterBlock(response);
             if (!Object.keys(characterBlocks(block)).length) block = "";
           } catch (reason) { lastError = reason; if (reason instanceof DOMException && reason.name === "AbortError") throw reason; }

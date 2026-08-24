@@ -55,13 +55,15 @@ def request_character_block(prompt, *, provider, max_retries):
         block = extract_character_block(response)
         if block and parse_characters(block):
             return block
-        marker_state = "có marker" if "CHAR_START" in response or "CHAR_END" in response else "thiếu marker"
+        has_marker = "START" in response or "END" in response
+        marker_state = "có marker nhưng thiếu header `## Tên nhân vật`" if has_marker else "thiếu marker"
         print(f"   Output không hợp lệ ({marker_state}, {len(response)} ký tự), lần {attempt}/{max_retries}.")
         if attempt < max_retries:
             request_prompt = prompt + """
 
 LƯU Ý SỬA OUTPUT: Trả lại ít nhất một header `## Tên nhân vật`, đặt toàn bộ
-nội dung giữa `###CHAR_START###` và `###CHAR_END###`. Không giải thích.
+nội dung giữa `###START###` và `###END###`, bọc trong một code block `markdown`.
+Giữ nguyên dấu `##` trước tên nhân vật và không giải thích.
 """
     raise ValueError(
         f"{provider} trả output không có hồ sơ nhân vật hợp lệ sau {max_retries} lần; tiến độ chưa được tăng"

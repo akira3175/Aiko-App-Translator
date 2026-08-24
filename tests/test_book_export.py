@@ -107,6 +107,41 @@ class BookExportTests(unittest.TestCase):
             self.assertTrue(filename.endswith(".docx"))
             self.assertIn("wordprocessingml", content_type)
 
+    def test_epub_and_docx_preserve_markdown_emphasis(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.project(root)
+            chapter = root / self.PROJECT / "translated" / "v1_c1_s1.md"
+            chapter.write_text(
+                chapter.read_text(encoding="utf-8")
+                + "\n\nNormal **Bold** *Italic* ***Both***",
+                encoding="utf-8",
+            )
+            options = {
+                "source": "translated",
+                "scope": "range",
+                "from": "v1_c1_s1.md",
+                "to": "v1_c1_s1.md",
+            }
+
+            epub, _content_type, _filename = self.export(
+                root, {**options, "format": "epub"}
+            )
+            with zipfile.ZipFile(io.BytesIO(epub)) as archive:
+                xhtml = archive.read("OEBPS/chapter-1.xhtml").decode("utf-8")
+                self.assertIn("<strong>Bold</strong>", xhtml)
+                self.assertIn("<em>Italic</em>", xhtml)
+                self.assertIn("<strong><em>Both</em></strong>", xhtml)
+
+            docx, _content_type, _filename = self.export(
+                root, {**options, "format": "docx"}
+            )
+            with zipfile.ZipFile(io.BytesIO(docx)) as archive:
+                document = archive.read("word/document.xml").decode("utf-8")
+                self.assertRegex(document, r"<w:r><w:rPr><w:b/></w:rPr><w:t[^>]*>Bold</w:t></w:r>")
+                self.assertRegex(document, r"<w:r><w:rPr><w:i/></w:rPr><w:t[^>]*>Italic</w:t></w:r>")
+                self.assertRegex(document, r"<w:r><w:rPr><w:b/><w:i/></w:rPr><w:t[^>]*>Both</w:t></w:r>")
+
 
 if __name__ == "__main__":
     unittest.main()

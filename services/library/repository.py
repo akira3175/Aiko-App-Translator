@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import re
+import threading
 import time
 from pathlib import Path
 from urllib.parse import quote
 
 from cores.storage.project import migrate_project
+
+
+_CHAPTER_CACHE = {}
+_CHAPTER_CACHE_LOCK = threading.RLock()
 
 
 def safe_project(library: Path, name: str) -> Path:
@@ -173,33 +178,54 @@ def chapter_key(name: str):
     return tuple(map(int, numbers)) if numbers else (10**9, name)
 
 
+def _file_stamp(path: Path):
+    stat = path.stat()
+    return stat.st_mtime_ns, stat.st_size
+
+
 def chapters(library: Path, project_name: str):
     raw, translated = project_folders(library, project_name)
     raw.mkdir(parents=True, exist_ok=True)
     translated.mkdir(parents=True, exist_ok=True)
+    raw_files = {path.name: path for path in raw.glob("*.md")}
+    translated_files = {path.name: path for path in translated.glob("*.md")}
     names = sorted(
-        {path.name for path in raw.glob("*.md")}
-        | {path.name for path in translated.glob("*.md")},
+        set(raw_files) | set(translated_files),
         key=chapter_key,
     )
+    signature = tuple(
+        (
+            name,
+            _file_stamp(raw_files[name]) if name in raw_files else None,
+            _file_stamp(translated_files[name]) if name in translated_files else None,
+        )
+        for name in names
+    )
+    cache_key = str(raw.parent.resolve())
+    with _CHAPTER_CACHE_LOCK:
+        cached = _CHAPTER_CACHE.get(cache_key)
+        if cached and cached[0] == signature:
+            return [dict(item) for item in cached[1]]
     project_text = "\n".join(
-        read_live_utf8(raw / name) for name in names if (raw / name).exists()
+        read_live_utf8(raw_files[name]) for name in names if name in raw_files
     )
     character_based = cjk_character_ratio(project_text) > 0.5
     items = []
     for name in names:
-        title_path = translated / name if (translated / name).exists() else raw / name
-        metric_path = raw / name if (raw / name).exists() else translated / name
+        title_path = translated_files.get(name, raw_files.get(name))
+        metric_path = raw_files.get(name, translated_files.get(name))
         metric = text_metric(metric_path, character_based=character_based)
         items.append(
             {
                 "name": name,
                 "id": Path(name).stem,
                 "title": chapter_title(title_path),
-                "raw": (raw / name).exists(),
-                "translated": (translated / name).exists(),
+                "raw": name in raw_files,
+                "translated": name in translated_files,
                 "words": metric["count"],
                 "word_unit": metric["unit"],
             }
         )
+    with _CHAPTER_CACHE_LOCK:
+        _CHAPTER_CACHE[cache_key] = (signature, [dict(item) for item in items])
     return items

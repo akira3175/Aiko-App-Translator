@@ -99,7 +99,7 @@ class UpdateServiceTests(unittest.TestCase):
             with zipfile.ZipFile(archive_path, "w") as archive:
                 archive.writestr("NovelTranslatorStudio/../outside.txt", "bad")
 
-            with self.assertRaisesRegex(ValueError, "không an toàn"):
+            with self.assertRaisesRegex(ValueError, "unsafe path"):
                 downloader.validate_archive(archive_path, "1.2.0")
 
     def test_download_checks_sha256_before_promoting_partial_file(self):
@@ -120,10 +120,44 @@ class UpdateServiceTests(unittest.TestCase):
             self.assertEqual(content, destination.read_bytes())
             self.assertFalse(destination.with_suffix(".zip.part").exists())
 
+    def test_download_reports_bytes_total_speed_and_eta(self):
+        content = b"portable archive"
+        updates = []
+        with tempfile.TemporaryDirectory() as directory:
+            downloader.download(
+                {
+                    "download_url": "https://example.com/app.zip",
+                    "sha256": hashlib.sha256(content).hexdigest(),
+                },
+                Path(directory) / "app.zip",
+                "1.1.0",
+                opener=lambda *_args, **_kwargs: _Response(content),
+                progress=lambda **values: updates.append(values),
+            )
+
+        self.assertEqual(len(content), updates[-1]["downloaded"])
+        self.assertEqual(len(content), updates[-1]["total"])
+        self.assertGreater(updates[-1]["speed"], 0)
+        self.assertEqual(0, updates[-1]["eta"])
+
+    def test_cancelled_download_removes_partial_file(self):
+        content = b"portable archive"
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "app.zip"
+            with self.assertRaises(downloader.DownloadCancelled):
+                downloader.download(
+                    {"download_url": "https://example.com/app.zip", "sha256": "0" * 64},
+                    destination,
+                    "1.1.0",
+                    opener=lambda *_args, **_kwargs: _Response(content),
+                    cancelled=lambda: True,
+                )
+            self.assertFalse(destination.with_suffix(".zip.part").exists())
+
     def test_installer_requires_portable_runtime_before_network(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            with self.assertRaisesRegex(ValueError, "bản portable"):
+            with self.assertRaisesRegex(ValueError, "portable build"):
                 installer.prepare(
                     root,
                     root / "updates",

@@ -1,6 +1,20 @@
 {
   "versions": [
     {
+      "version": "1.0.3",
+      "date": "2026-08-24",
+      "title": "Cập nhật rõ ràng, mở truyện nhanh hơn",
+      "summary": "Bản cập nhật cải thiện Launcher, quá trình cập nhật, tốc độ chuyển truyện và khả năng giữ định dạng khi xuất sách.",
+      "highlights": [
+        "Có thêm Aiko Launcher để mở ứng dụng, khởi động lại hoặc tắt server thuận tiện hơn.",
+        "Cải thiện cập nhật ứng dụng: hiển thị dung lượng đã tải, phần trăm, tốc độ và thời gian còn lại.",
+        "Có thể hủy tải bản cập nhật trước khi bắt đầu cài đặt.",
+        "Khắc phục lỗi font tiếng Việt trong cửa sổ cập nhật.",
+        "Mở và chuyển đổi giữa các truyện nhanh hơn, đặc biệt với dự án có hàng nghìn chương.",
+        "EPUB và DOCX giờ giữ nguyên chữ in đậm, in nghiêng và đậm-nghiêng."
+      ]
+    },
+    {
       "version": "1.0.2",
       "date": "2026-08-23",
       "title": "Aiko ổn định và dễ sử dụng hơn",
