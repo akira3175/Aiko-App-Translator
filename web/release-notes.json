@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "1.0.6",
+      "date": "2026-08-25",
+      "title": "Cải thiện độ chính xác khi dịch và kiểm tra bản dịch",
+      "summary": "ChatGPT Web giờ nhận đầy đủ tài liệu tham chiếu của chương trong quá trình dịch.",
+      "highlights": [
+        "Chức năng kiểm tra toàn bộ và kiểm tra nền giờ sử dụng hồ sơ nhân vật liên quan.",
+        "Cải thiện khả năng kiểm tra tên nhân vật, giới tính, cách xưng hô và tính nhất quán với bản dịch.",
+        "Ghi nhận tài liệu đã sử dụng trong nhật ký kiểm tra để hỗ trợ đối chiếu khi cần."
+      ]
+    },
+    {
       "version": "1.0.5",
       "date": "2026-08-24",
       "title": "Cập nhật ứng dụng an toàn hơn",

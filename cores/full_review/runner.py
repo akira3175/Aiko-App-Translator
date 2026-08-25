@@ -9,6 +9,8 @@ from cores.full_review.service import (
     process_review_result,
 )
 from cores.full_review.storage import save_manual_check, save_review
+from cores.stages import build_reference_documents
+from cores.translation.prompts import with_character_document_instruction
 
 
 def review_worker_count(provider, workers):
@@ -44,7 +46,18 @@ def run_review_items(
             content,
             context_text,
         )
-        result = call_review_api(prompt, provider)
+        documents = build_reference_documents(
+            {
+                "title": raw_title,
+                "content": raw_content,
+                "title_translation": title,
+                "translation": content,
+            },
+            include_translation=True,
+        )
+        if any(document["name"] == "characters.md" for document in documents):
+            prompt = with_character_document_instruction(prompt)
+        result = call_review_api(prompt, provider, documents)
         return global_order, chapter_id, chapter_number, result
 
     def collect_result(future):

@@ -51,7 +51,7 @@ class StageReferenceTests(unittest.TestCase):
         self.assertEqual(calls[0]["pronoun_document"], "pronouns")
         self.assertEqual(len(calls[0]["extra_parts"]), 2)
 
-    def test_chatgpt_web_does_not_embed_documents_in_translation_prompt(self):
+    def test_chatgpt_web_embeds_documents_in_translation_prompt(self):
         prompts = []
         provider = ChatGptWebProvider(
             lambda prompt, **kwargs: prompts.append(prompt) or "ok"
@@ -65,7 +65,8 @@ class StageReferenceTests(unittest.TestCase):
                 attachments=({"name": "characters.md", "content": "Alice"},),
             )
         )
-        self.assertEqual(prompts[0], "prompt")
+        self.assertIn("## Reference file: characters.md", prompts[0])
+        self.assertIn("Alice", prompts[0])
 
     def test_chatgpt_web_keeps_documents_for_polish_prompt(self):
         prompts = []

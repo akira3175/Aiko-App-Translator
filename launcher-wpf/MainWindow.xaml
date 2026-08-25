@@ -29,7 +29,7 @@
         <Border HorizontalAlignment="Left" Background="#2B7ED6FF" BorderBrush="#75C5FF" BorderThickness="1" CornerRadius="8" Padding="10,5"><TextBlock x:Name="VersionText" Text="ĐANG KIỂM TRA" FontSize="10" FontWeight="Bold" Foreground="#DDF3FF"/></Border>
         <TextBlock Grid.Row="1" x:Name="HeadlineText" Text="Một nơi cho mọi bản dịch" FontSize="26" FontWeight="Bold" Foreground="#F5FAFF" TextWrapping="NoWrap" Margin="0,20,0,8"/>
         <TextBlock Grid.Row="2" x:Name="SummaryText" Text="Aiko đang kiểm tra phiên bản mới nhất và chuẩn bị không gian làm việc của bạn." FontSize="14" LineHeight="22" Foreground="#C4DCF2" TextWrapping="Wrap" Margin="0,0,20,0"/>
-        <ScrollViewer Grid.Row="3" Margin="0,26,20,0" VerticalScrollBarVisibility="Auto"><TextBlock x:Name="NotesText" FontSize="13" LineHeight="21" Foreground="#B9D6EF" TextWrapping="Wrap"/></ScrollViewer>
+        <ScrollViewer Grid.Row="3" Margin="0,26,20,0" VerticalScrollBarVisibility="Auto"><ScrollViewer.Resources><Style TargetType="ScrollBar" BasedOn="{StaticResource AikoScrollBar}"/></ScrollViewer.Resources><TextBlock x:Name="NotesText" FontSize="13" LineHeight="21" Foreground="#B9D6EF" TextWrapping="Wrap"/></ScrollViewer>
       </Grid>
 
       <Border Grid.Row="2" Grid.ColumnSpan="2" Background="#EF07142F" BorderBrush="#3B5F89" BorderThickness="0,1,0,0">

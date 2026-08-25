@@ -6,6 +6,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from cores.stages import build_reference_documents
 from cores.storage.project import load_json, save_json
 
 
@@ -86,13 +87,24 @@ def run_background_review(
         chapter_id, chapter_number, raw_title, raw_content, title, content,
         context_text, runtime.REVIEW_BG_CRITERIA,
     )
+    documents = build_reference_documents(
+        {
+            "title": raw_title,
+            "content": raw_content,
+            "title_translation": title,
+            "translation": content,
+        },
+        include_translation=True,
+    )
+    if any(item["name"] == "characters.md" for item in documents):
+        prompt = runtime.with_character_document_instruction(prompt)
     provider = runtime.provider("review")
     model, _thinking = runtime.model_and_thinking("review")
 
     try:
         while True:
             try:
-                text, provider, model = runtime.generate("review", prompt)
+                text, provider, model = runtime.generate("review", prompt, documents)
                 break
             except Exception as exc:
                 error = str(exc)
@@ -118,7 +130,8 @@ def run_background_review(
                     continue
                 raise
         runtime.log_api_call(
-            chapter_id, "review", f"{provider}:{model}", prompt, text, ok=True
+            chapter_id, "review", f"{provider}:{model}", prompt, text, ok=True,
+            attachments=list(documents),
         )
         # Parse JSON — xử lý cả markdown code block
         clean = re.sub(r"```json\s*|\s*```", "", text).strip()
@@ -166,7 +179,8 @@ def run_background_review(
 
     except Exception as e:
         runtime.log_api_call(
-            chapter_id, "review", f"{provider}:{model}", prompt, str(e), ok=False
+            chapter_id, "review", f"{provider}:{model}", prompt, str(e), ok=False,
+            attachments=list(documents),
         )
         if review_token is not None:
             with runtime._review_lock:

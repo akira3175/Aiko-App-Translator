@@ -9,9 +9,7 @@ class ChatGptWebProvider(ProviderAdapter):
 
     def generate(self, request):
         options = dict(request.options)
-        prompt = request.prompt
-        if request.stage != "translate":
-            prompt = prompt_with_attachments(prompt, request.attachments)
+        prompt = prompt_with_attachments(request.prompt, request.attachments)
         text = self._generate(
             prompt,
             chatgpt_model=request.model,

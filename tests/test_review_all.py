@@ -51,6 +51,7 @@ class ReviewAllTests(unittest.TestCase):
 
     def test_all_four_engines_can_review(self):
         response = '{"overall_score": 9, "issues": [], "gender_ok": true, "address_ok": true, "summary": "Ổn"}'
+        document = {"name": "characters.md", "content": "## Alice"}
         for provider in ("gemini-api", "gemini-web", "openai-api", "chatgpt-web"):
             calls = []
 
@@ -74,10 +75,11 @@ class ReviewAllTests(unittest.TestCase):
                     side_effect=lambda key, default=None: values.get(key, default),
                 ),
             ):
-                result = review_service.call_review_api("prompt", provider)
+                result = review_service.call_review_api("prompt", provider, (document,))
 
             self.assertEqual(result["overall_score"], 9)
             self.assertEqual(len(calls), 1)
+            self.assertIn("Alice", str(calls[0]))
 
     def test_web_review_is_serial_but_api_review_can_be_parallel(self):
         self.assertEqual(review_worker_count("gemini-web", 10), 1)
@@ -94,7 +96,7 @@ class ReviewAllTests(unittest.TestCase):
         first_batch_started = threading.Event()
         release_first_batch = threading.Event()
 
-        def call_api(_prompt, _provider):
+        def call_api(_prompt, _provider, _attachments=()):
             started.append(len(started) + 1)
             if len(started) >= 2:
                 first_batch_started.set()
@@ -109,6 +111,8 @@ class ReviewAllTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory, patch.object(
             review_runner, "call_review_api", side_effect=call_api
+        ), patch.object(
+            review_runner, "build_reference_documents", return_value=()
         ), patch.object(review_runner.time, "sleep"):
             root = Path(directory)
             thread = threading.Thread(

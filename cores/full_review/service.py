@@ -52,7 +52,7 @@ def parse_review_json(text):
     return result
 
 
-def call_review_api(prompt, provider):
+def call_review_api(prompt, provider, attachments=()):
     """Call the configured provider until a valid review JSON object is returned."""
     attempt = 0
     while True:
@@ -65,6 +65,7 @@ def call_review_api(prompt, provider):
                 provider=provider,
                 get_option=option,
                 overrides=TRANSPORT_OVERRIDES,
+                attachments=attachments,
             )[0].text.strip()
             if not text:
                 print(f"  ⚠️ Response rỗng, thử lại (lần {attempt})...")
