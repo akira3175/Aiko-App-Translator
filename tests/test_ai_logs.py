@@ -17,6 +17,8 @@ class AiLogTests(unittest.TestCase):
         self.assertIn('id="aiLogDrawer"', html)
         self.assertIn("createAiLogFeature", script)
         self.assertIn("/api/ai-logs?project=", feature)
+        self.assertIn("setInterval(()=>load(true),30000)", feature)
+        self.assertNotIn("setInterval(()=>load(true),3000)", feature)
         self.assertIn("attachment-", feature)
         self.assertIn("@media(max-width:650px)", styles)
 

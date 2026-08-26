@@ -47,7 +47,7 @@ export function createAiLogFeature({api,copyPlainText,escapeHtml,getProject,toas
   const open=()=>{
     $('#aiLogDrawer').classList.add('open');$('#aiLogScrim').classList.add('open');
     $('#aiLogDrawer').setAttribute('aria-hidden','false');$('#aiLogToggle').setAttribute('aria-expanded','true');
-    load();clearInterval(refreshTimer);refreshTimer=setInterval(()=>load(true),3000);
+    load();clearInterval(refreshTimer);refreshTimer=setInterval(()=>load(true),30000);
   };
   const close=()=>{
     $('#aiLogDrawer').classList.remove('open');$('#aiLogScrim').classList.remove('open');

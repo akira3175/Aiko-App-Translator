@@ -46,6 +46,7 @@ SETTING_DEFAULTS = {
     "context_model": "gemini-3.5-flash",
     "gemini_api_thinking": "high",
     "gemini_api_max_output_tokens": "",
+    "gemini_api_streaming": "off",
     "gemini_web_model": "pro",
     "gemini_thinking": "extended",
     "link_chatgpt": "https://chatgpt.com/",
@@ -112,6 +113,7 @@ SETTING_LABELS = {
     "context_model": "Model tạo context",
     "gemini_api_thinking": "Cấp độ suy nghĩ",
     "gemini_api_max_output_tokens": "Token đầu ra tối đa",
+    "gemini_api_streaming": "Streaming thử nghiệm",
     "gemini_web_model": "Model Gemini Web (flash/pro/thinking)",
     "gemini_thinking": "Mức thinking Gemini Web",
     "link_chatgpt": "Đường dẫn cuộc chat ChatGPT",
@@ -189,6 +191,7 @@ SETTING_META = {
         ["low", "Low"], ["medium", "Medium"], ["high", "High"],
     ], "description": "Model không hỗ trợ một mức cụ thể có thể trả lỗi; khi đó chọn Tự động."},
     "gemini_api_max_output_tokens": {"group": "gemini-api", "inputmode": "numeric", "description": "Để trống để dùng giới hạn của model."},
+    "gemini_api_streaming": {"group": "gemini-api", "type": "select", "options": [["off", "Tắt"], ["on", "Bật"]], "description": "Hiển thị bản dịch trực tiếp trong editor qua Gemini Interactions. Một số tùy chọn API có thể không được áp dụng."},
     "gemini_web_model": {"group": "gemini-web"},
     "gemini_thinking": {"group": "gemini-web"},
     "link_chatgpt": {"group": "chatgpt-web"},
@@ -232,5 +235,4 @@ OPTIONAL_SETTINGS = set(SETTING_DEFAULTS) - {
     "gpt_api_endpoint", "gpt_api_translate_model",
     "gpt_api_translate_effort", "gpt_api_polish_effort",
 }
-HIDDEN_SETTINGS = {"r19_model"}
-
+HIDDEN_SETTINGS = {"r19_model", "review_model", "context_model"}

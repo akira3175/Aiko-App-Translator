@@ -1,6 +1,7 @@
 """Configured Gemini API client and persistent key rotation."""
 
 from google import genai
+from google.genai import types
 
 from cores.storage.data_paths import (
     GEMINI_API_KEYS_FILE,
@@ -12,7 +13,18 @@ from cores.gemini.runtime import GeminiRuntime, load_api_keys
 
 ensure_user_data_migrated()
 API_KEYS = load_api_keys(GEMINI_API_KEYS_FILE)
-runtime = GeminiRuntime(API_KEYS, GEMINI_API_KEY_STATE_FILE, genai.Client)
+
+
+def create_client(**kwargs):
+    return genai.Client(
+        **kwargs,
+        http_options=types.HttpOptions(
+            retry_options=types.HttpRetryOptions(attempts=1),
+        ),
+    )
+
+
+runtime = GeminiRuntime(API_KEYS, GEMINI_API_KEY_STATE_FILE, create_client)
 print(f"🔑 Bắt đầu với API key số {runtime.current_key_index + 1}/{len(API_KEYS)}")
 
 

@@ -25,11 +25,21 @@ CHARACTERS = """# Hồ Sơ Nhân Vật
 class TranslationCharacterTests(unittest.TestCase):
     def test_interactions_keeps_running_after_high_demand_error(self):
         error = RuntimeError("currently experiencing high demand")
-        with patch.object(interactions, "run_single_translation", side_effect=error), patch.object(
+        with patch.object(interactions, "run_single_translation", side_effect=[error, 1]), patch.object(
             interactions, "stop_requested", return_value=False
         ), patch.object(interactions.time, "sleep") as sleep:
-            self.assertEqual(interactions._run_translation_with_retry(), 0)
-        self.assertEqual(sleep.call_count, 15)
+            self.assertEqual(interactions._run_translation_with_retry(), 1)
+        self.assertEqual(sleep.call_count, 5)
+
+    def test_interactions_does_not_retry_non_transient_error(self):
+        with patch.object(
+            interactions, "run_single_translation", side_effect=ValueError("bad payload")
+        ), patch.object(interactions, "stop_requested", return_value=False), patch.object(
+            interactions.time, "sleep"
+        ) as sleep:
+            with self.assertRaisesRegex(ValueError, "bad payload"):
+                interactions._run_translation_with_retry()
+        sleep.assert_not_called()
 
     def test_interactions_delegates_to_shared_postprocess_pipeline(self):
         chapter = {
@@ -109,21 +119,40 @@ class TranslationCharacterTests(unittest.TestCase):
     def test_interactions_sends_markdown_snapshot_as_text(self):
         captured = {}
 
+        class Socket:
+            def settimeout(self, timeout):
+                captured["idle_timeout"] = timeout
+
         class Response:
+            fp = type("Fp", (), {
+                "raw": type("Raw", (), {"_sock": Socket()})()
+            })()
             def __enter__(self): return self
             def __exit__(self, *_args): return False
             def __iter__(self):
                 yield b'data: {"event_type":"interaction.completed","interaction":{"status":"completed"}}\n'
 
         def opener(request, timeout):
+            captured["timeout"] = timeout
             captured.update(json.loads(request.data.decode("utf-8")))
             return Response()
 
-        stream_interaction(
-            api_key="key", model="model", prompt="prompt", opener=opener,
-            document={"name": "characters.md", "content": "# Alice", "mime_type": "text/markdown"},
-        )
+        with patch("builtins.print") as output:
+            stream_interaction(
+                api_key="key", model="model", prompt="prompt", opener=opener,
+                document={"name": "characters.md", "content": "# Alice", "mime_type": "text/markdown"},
+            )
         self.assertEqual(captured["input"][1]["type"], "text")
+        self.assertEqual(captured["timeout"], 30)
+        self.assertEqual(captured["idle_timeout"], 300)
+        output.assert_any_call(
+            "📤 Đang gửi prompt (6 ký tự) tới Gemini...",
+            flush=True,
+        )
+        output.assert_any_call(
+            "📤 Đã gửi prompt (6 ký tự). Đang chờ Gemini phản hồi...",
+            flush=True,
+        )
 
     def test_gpt_client_encodes_inline_file_for_responses_api(self):
         captured = {}
@@ -140,12 +169,16 @@ class TranslationCharacterTests(unittest.TestCase):
         values = {"gpt_api_key": "key", "gpt_api_endpoint": "https://api.openai.com/v1/responses", "gpt_api_temperature": ""}
         with patch.object(openai_client, "option", side_effect=lambda name, default="": values.get(name, default)), patch.object(
             openai_client, "urlopen", side_effect=opener
-        ):
+        ), patch("builtins.print") as output:
             result = openai_client.call_gpt_api(
                 "prompt", model="model", reasoning_effort="medium", stage="dịch",
                 document={"name": "characters.md", "mime_type": "text/markdown", "content": "# Alice"},
             )
         self.assertEqual(result, "done")
+        output.assert_called_once_with(
+            "📤 Đã gửi prompt (6 ký tự). Đang chờ OpenAI phản hồi...",
+            flush=True,
+        )
         encoded = captured["input"][0]["content"][1]["file_data"].split(",", 1)[1]
         self.assertEqual(base64.b64decode(encoded).decode("utf-8"), "# Alice")
 

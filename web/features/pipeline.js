@@ -1,7 +1,7 @@
 const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
 
-export function createPipelineFeature({api,editorRuntime,editorViews,escapeHtml,loadChapters,loadProjects,openChapter,projectMemoryFeature,publishingBooksFeature,saveChapter,selectProject,settingsFeature,showView,state,toast,updateCounts}) {
+export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorViews,escapeHtml,loadChapters,loadProjects,openChapter,projectMemoryFeature,publishingBooksFeature,saveChapter,selectProject,settingsFeature,showView,state,toast,updateCounts}) {
   let activeJobKind=null;
   let novelStreamSequence=0;
   let novelStreamLine=null;
@@ -12,7 +12,14 @@ export function createPipelineFeature({api,editorRuntime,editorViews,escapeHtml,
   let novelStreamApplying=false;
   let manualPromptRequest=0;
   let lastLiveDataRefresh=0;
+  let consoleFollowOutput=true;
   const {loadCharacters,loadContext,loadReviews,requireProject}=projectMemoryFeature;
+
+  const consoleOutput=$('#consoleOutput');
+  consoleOutput?.addEventListener('scroll',()=>{
+    const distanceFromBottom=consoleOutput.scrollHeight-consoleOutput.clientHeight-consoleOutput.scrollTop;
+    consoleFollowOutput=distanceFromBottom<=24;
+  });
 
   function replaceStreamValue(value) {
     const editor=editorViews.target;
@@ -71,9 +78,13 @@ export function createPipelineFeature({api,editorRuntime,editorViews,escapeHtml,
     const events=(job.stream_events||[]).filter(event=>Number(event.sequence)>novelStreamSequence);
     let marker=null;
     let changed=false;
+    let reviewsChanged=false;
+    let aiLogsChanged=false;
     let workspaceShown=novelStreamSequence>0;
     for(const event of events){
       novelStreamSequence=Math.max(novelStreamSequence,Number(event.sequence)||0);
+      if(event.type==='review_saved'){reviewsChanged=true;continue;}
+      if(event.type==='ai_log_updated'){aiLogsChanged=true;continue;}
       if(!event.chapter)continue;
       if(state.current!==event.chapter){
         if(!state.chapters.some(chapter=>chapter.name===event.chapter))continue;
@@ -100,6 +111,8 @@ export function createPipelineFeature({api,editorRuntime,editorViews,escapeHtml,
       state.dirty=false;
       updateCounts();
     }
+    if(reviewsChanged)await loadReviews($('#reviewSource').value||'');
+    if(aiLogsChanged&&$('#aiLogDrawer').classList.contains('open'))await aiLogFeature.load(true);
   }
   
   function queueNovelStreamEvent(event) {
@@ -191,8 +204,14 @@ export function createPipelineFeature({api,editorRuntime,editorViews,escapeHtml,
   }
   function updateConsoleOutput(text) {
     const output=$('#consoleOutput');
+    const previousTop=output.scrollTop;
+    const distanceFromBottom=output.scrollHeight-output.clientHeight-previousTop;
+    const shouldFollow=consoleFollowOutput&&distanceFromBottom<=24;
     output.textContent=text;
-    requestAnimationFrame(()=>{output.scrollTop=output.scrollHeight;});
+    requestAnimationFrame(()=>{
+      if(shouldFollow)output.scrollTop=output.scrollHeight;
+      else output.scrollTop=previousTop;
+    });
   }
   function chapterTargetKey(name) {
     const match=String(name||'').match(/^v(\d+)_c(\d+)_s\d+\.md$/i);
@@ -286,6 +305,7 @@ export function createPipelineFeature({api,editorRuntime,editorViews,escapeHtml,
     if(pendingTask==='pipeline'){
       const saved=settingsFeature.getValue;
       config.translate_provider=saved('pipeline_translate_provider')||'gemini-api';
+      config.gemini_api_streaming=saved('gemini_api_streaming')||'off';
       config.polish_provider=saved('pipeline_polish_provider')||'gemini-api';
       config.pronouns_provider=saved('pipeline_pronouns_provider')||'gemini-api';
       config.review_provider=saved('pipeline_review_provider')||'gemini-api';
@@ -373,7 +393,8 @@ export function createPipelineFeature({api,editorRuntime,editorViews,escapeHtml,
     setTaskStopControls(translation,true);
     if (!state.project) { button.disabled=false; button.textContent='Chạy tác vụ'; return toast('Hãy chọn truyện trước'); }
     if(!options.stayOnView)showView('pipeline');
-    try { await api('/api/run/'+kind+'?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({config:{skip_login_prompt:true,...config}})}); if(kind==='interactions')openNovelEventStream(kind); pollJob(kind,button,options); } catch(error){ button.disabled=false; button.textContent='Chạy lại'; options.onComplete?.({status:'error',output:error.message}); toast(error.message); }
+    const streaming=kind==='interactions'||(kind==='pipeline'&&config.translate_provider==='gemini-api'&&config.gemini_api_streaming==='on');
+    try { await api('/api/run/'+kind+'?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({config:{skip_login_prompt:true,...config}})}); if(streaming)openNovelEventStream(kind); pollJob(kind,button,options); } catch(error){ button.disabled=false; button.textContent='Chạy lại'; options.onComplete?.({status:'error',output:error.message}); toast(error.message); }
   }
   async function pollJob(kind, button, options={}) {
     try { const job=await api('/api/job/'+kind); if(!novelStreamSource)await applyNovelStreamEvents(job); updateConsoleOutput(job.output || 'Đang xử lý…'); options.onUpdate?.(job); if(job.status==='running'){const now=Date.now();if(now-lastLiveDataRefresh>=1200){lastLiveDataRefresh=now;if(['pipeline','interactions','manual'].includes(kind))await loadChapters();if(kind==='review')await loadReviews($('#reviewSource').value||'');}return setTimeout(()=>pollJob(kind,button,options),500);} activeJobKind=null; button.disabled=false; button.textContent=job.status==='done'?'Chạy lại':'Thử lại'; toast(job.status==='done'?'Tác vụ đã hoàn tất':job.status==='cancelled'?'Đã dừng tác vụ':'Tác vụ gặp lỗi'); await loadChapters(); if(kind==='review')await loadReviews(); if(kind==='context')await loadContext(); if(kind==='characters')await loadCharacters(); options.onComplete?.(job); } catch(error){ button.disabled=false; options.onComplete?.({status:'error',output:error.message}); toast(error.message); }
@@ -469,7 +490,7 @@ export function createPipelineFeature({api,editorRuntime,editorViews,escapeHtml,
     updateConsoleOutput(`Đang dịch lại ${state.current} bằng ${engine.toUpperCase()}…`);
     try {
       await api('/api/retranslate?project='+encodeURIComponent(state.project), {method:'POST', body:JSON.stringify({engine,chapter:state.current})});
-      if(engine==='interactions')openNovelEventStream('retranslate');
+      if(engine==='interactions'||(engine==='gemini-api'&&settingsFeature.getValue('gemini_api_streaming')==='on'))openNovelEventStream('retranslate');
       pollRetranslate();
     } catch(error) { toast(error.message); }
   }

@@ -103,7 +103,7 @@ const hakoEditFeature=createHakoEditFeature({api,escapeHtml,getProject:()=>state
 const updateFeature=createUpdateFeature({api,escapeHtml,hasUnsavedChanges:()=>state.dirty||state.characterDirty,toast});
 const settingsFeature=createSettingsFeature({api,escapeHtml,refreshUpdate:updateFeature.load,showView,toast});
 const sharingFeature=createSharingFeature({api,copyPlainText,escapeHtml,getChapters:()=>state.chapters,getProject:()=>state.project,openSettings:()=>settingsFeature.openGroup('sharing'),toast});
-pipelineFeature=createPipelineFeature({api,editorRuntime,editorViews,escapeHtml,loadChapters,loadProjects,openChapter,projectMemoryFeature,publishingBooksFeature,saveChapter,selectProject,settingsFeature,showView,state,toast,updateCounts});
+pipelineFeature=createPipelineFeature({aiLogFeature,api,editorRuntime,editorViews,escapeHtml,loadChapters,loadProjects,openChapter,projectMemoryFeature,publishingBooksFeature,saveChapter,selectProject,settingsFeature,showView,state,toast,updateCounts});
 
 function renderChapterList(filter='') {
   const query=filter.trim().toLocaleLowerCase('vi');

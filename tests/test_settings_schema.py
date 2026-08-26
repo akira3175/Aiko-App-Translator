@@ -22,11 +22,16 @@ class SettingsSchemaTests(unittest.TestCase):
         defaults = settings_schema.SETTING_DEFAULTS
         self.assertEqual("gemini-api", defaults["pipeline_translate_provider"])
         self.assertEqual("gemini-3.5-flash", defaults["pipeline_translate_model"])
+        self.assertEqual("off", defaults["gemini_api_streaming"])
         self.assertEqual("off", defaults["lan_enabled"])
         self.assertEqual(
             settings_schema.DEFAULT_R19_MODEL,
             defaults["r19_model"],
         )
+
+    def test_redundant_legacy_models_are_hidden(self):
+        self.assertIn("review_model", settings_schema.HIDDEN_SETTINGS)
+        self.assertIn("context_model", settings_schema.HIDDEN_SETTINGS)
 
 
 if __name__ == "__main__":

@@ -30,6 +30,10 @@ select { font: inherit; }
 }
 
 .nav-item { border-radius: var(--control-radius); transition: background .16s ease,color .16s ease,transform .1s ease; }
+.sidebar nav .nav-item,
+.sidebar-fixed-navigation .nav-item {
+  min-height: 44px;
+}
 .nav-item.active { box-shadow: inset 3px 0 0 var(--accent); }
 
 .nav-item:focus-visible,
@@ -66,4 +70,181 @@ select { font: inherit; }
   .primary,
   .secondary,
   .nav-item { transition: none; }
+}
+
+/* Translation workspace: compact controls keep the manuscript as the focal point. */
+.topbar {
+  height: 76px;
+  padding-inline: 32px;
+}
+
+.topbar h1 {
+  font-size: 22px;
+  letter-spacing: -.025em;
+}
+
+.top-actions { gap: 10px; }
+
+.top-actions .save-state { margin-right: 8px; }
+
+.top-actions .utility-action,
+.workspace-toolbar .utility-action {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.top-actions .utility-action:hover,
+.workspace-toolbar .utility-action:hover {
+  border-color: var(--line);
+  background: color-mix(in srgb,var(--surface) 72%,transparent);
+  color: var(--ink);
+}
+
+#workspaceView.active {
+  height: calc(100dvh - 76px);
+  min-height: 0;
+  padding: 14px 32px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+body.focus #workspaceView.active {
+  height: 100dvh;
+}
+
+.workspace-toolbar {
+  min-height: 50px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.workspace-toolbar .chapter-select {
+  width: clamp(250px,24vw,390px);
+  min-width: 0;
+  min-height: 46px;
+  padding: 7px 12px;
+}
+
+.workspace-toolbar .chapter-select strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.workspace-toolbar .segmented {
+  margin-left: auto;
+  padding: 3px;
+}
+
+.workspace-toolbar .segmented button {
+  min-height: 36px;
+  padding: 7px 12px;
+  font-weight: 600;
+}
+
+.workspace-toolbar .workspace-action {
+  min-height: 40px;
+  padding: 8px 13px;
+  white-space: nowrap;
+}
+
+.workspace-toolbar .chapter-nav,
+html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav,
+html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav:hover {
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  overflow: visible;
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: none;
+  font-size: 20px;
+}
+
+html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav,
+html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav:hover {
+  flex-basis: 56px;
+  width: 56px;
+  border-color: transparent;
+  background: transparent;
+}
+
+html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav > span {
+  display: none;
+}
+
+html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav::before {
+  display: block;
+  width: 52px;
+  height: 40px;
+  background-image: url("/assets/anime/aiko-chapter-arrow-compact.png");
+}
+
+html[data-anime-illustrations="on"] .workspace-toolbar #nextChapter::before {
+  transform: scaleX(-1);
+}
+
+html[data-anime-illustrations="on"] .workspace-toolbar #previousChapter:not(:disabled):hover::before {
+  transform: translateX(-2px);
+}
+
+html[data-anime-illustrations="on"] .workspace-toolbar #nextChapter:not(:disabled):hover::before {
+  transform: scaleX(-1) translateX(-2px);
+}
+
+.editor-grid {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  gap: 14px;
+}
+
+body.focus #workspaceView.active .editor-grid {
+  height: auto;
+}
+
+.editor-panel { box-shadow: none; }
+
+.panel-head {
+  height: 48px;
+  padding-inline: 20px;
+}
+
+#workspaceView .editor-panel textarea,
+#workspaceView .editor-panel .CodeMirror,
+#workspaceView .markdown-preview {
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+.workspace-review {
+  top: 116px;
+  height: calc(100dvh - 136px);
+}
+
+@media (max-width: 1280px) {
+  .top-actions .save-state { display: none; }
+  .workspace-toolbar .workspace-action { padding-inline: 10px; }
+}
+
+@media (max-width: 900px) {
+  .topbar { height: 68px; padding-inline: 18px; }
+  #workspaceView.active { height: auto; min-height: calc(100dvh - 68px); padding: 14px 18px 18px; }
+  .workspace-toolbar { flex-wrap: wrap; }
+  .workspace-toolbar .chapter-select { flex: 1; width: auto; }
+  .workspace-toolbar .segmented { order: 3; width: 100%; margin-left: 0; }
+  .editor-grid { height: auto; }
+}
+
+@media (max-width: 560px) {
+  #workspaceView.active { padding-inline: 13px; }
+  .top-actions .utility-action,
+  #polishButton,
+  #retranslateButton { display: none; }
+  .workspace-toolbar .workspace-action { flex: 1; }
 }

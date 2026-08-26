@@ -172,22 +172,33 @@ def postprocess_interactions(chapter, chapter_number, context_text="", pronoun_c
 
 
 def _run_translation_with_retry():
-    try:
-        return run_single_translation(
-            translate_interactions,
-            RAW_DIR,
-            TRANSLATED_DIR,
-            CONTEXT_JSON,
-            postprocess=postprocess_interactions,
-        ) or 0
-    except Exception as exc:
-        print(f"⚠️ Lỗi khi dịch: {exc}")
-        print("⏳ Gemini đang bận hoặc gặp lỗi; chờ 15s rồi thử lại...")
-        for _ in range(15):
-            if stop_requested():
-                return 0
-            time.sleep(1)
-        return 0
+    while not stop_requested():
+        try:
+            return run_single_translation(
+                translate_interactions,
+                RAW_DIR,
+                TRANSLATED_DIR,
+                CONTEXT_JSON,
+                postprocess=postprocess_interactions,
+            ) or 0
+        except Exception as exc:
+            message = str(exc)
+            retryable = any(
+                marker in message.lower()
+                for marker in (
+                    "408", "429", "500", "502", "503", "504",
+                    "high demand", "timed out", "timeout", "temporarily unavailable",
+                )
+            )
+            if not retryable:
+                raise
+            print(f"⚠️ Lỗi tạm thời khi dịch: {message}")
+            print("⏳ Thử lại sau 5 giây...")
+            for _ in range(5):
+                if stop_requested():
+                    return 0
+                time.sleep(1)
+    return 0
 
 
 def main():

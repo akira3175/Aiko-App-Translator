@@ -4,6 +4,9 @@ import sys
 import tempfile
 import threading
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from unittest.mock import patch
 from pathlib import Path
 
 from cores.api_logging import log_api_call
@@ -53,6 +56,21 @@ class ApiLoggingTests(unittest.TestCase):
                 log_api_call(directory, lock, chapter_id, "review", "model", "p", "r")
             path = next(Path(directory).glob("*.jsonl"))
             self.assertEqual(len(path.read_text(encoding="utf-8").splitlines()), 2)
+
+    def test_emits_small_web_event_after_log_is_persisted(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            "os.environ", {"NOVEL_WEB_MODE": "1"}
+        ):
+            output = StringIO()
+            with redirect_stdout(output):
+                log_api_call(
+                    directory, threading.Lock(), "v1_c1_s1", "review", "model", "secret prompt", "secret response"
+                )
+        event = output.getvalue()
+        self.assertIn('"type":"ai_log_updated"', event)
+        self.assertIn('"chapter":"v1_c1_s1"', event)
+        self.assertNotIn("secret prompt", event)
+        self.assertNotIn("secret response", event)
 
 
 if __name__ == "__main__":

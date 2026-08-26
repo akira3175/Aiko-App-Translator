@@ -124,6 +124,8 @@ class ConfigurationService:
                     raise ValueError("Cấp độ suy nghĩ Gemini API không hợp lệ")
                 if key == "lan_enabled" and value not in {"off", "on"}:
                     raise ValueError("Chế độ truy cập LAN không hợp lệ")
+                if key == "gemini_api_streaming" and value not in {"off", "on"}:
+                    raise ValueError("Chế độ streaming Gemini API không hợp lệ")
                 if key == "lan_pin" and value and not re.fullmatch(
                     r"\d{6,12}", value
                 ):

@@ -90,11 +90,17 @@ class JobRunner:
             **task_config,
             **self.task_options(project_name),
         }
+        streaming = kind == "interactions" or (
+            kind == "pipeline"
+            and str(effective_config.get("translate_provider", "")).lower() == "gemini-api"
+            and str(effective_config.get("gemini_api_streaming", "off")).lower() == "on"
+        )
+        script = self.pipelines["interactions"] if streaming else self.pipelines[kind]
         stop_file = self.task_stop_file(kind)
         stop_file.parent.mkdir(exist_ok=True)
         stop_file.unlink(missing_ok=True)
         self.jobs[kind] = self._running_job(
-            project_name, translation_claim, kind == "interactions", "Đang khởi động…"
+            project_name, translation_claim, streaming, "Đang khởi động…"
         )
         if kind == "polish":
             self.jobs[kind]["chapter"] = str(task_config.get("target_chapter", ""))
@@ -104,7 +110,7 @@ class JobRunner:
         try:
             process = self._start_process(
                 kind,
-                self.pipelines[kind],
+                script,
                 project_name,
                 effective_config,
                 translation_claim,
@@ -138,13 +144,17 @@ class JobRunner:
             "target_chapter": chapter_name,
         }
         engine = str(engine)
-        pipeline_kind = "interactions" if engine == "interactions" else "pipeline"
+        streaming = engine == "interactions" or (
+            engine == "gemini-api"
+            and str(config.get("gemini_api_streaming", "off")).lower() == "on"
+        )
+        pipeline_kind = "interactions" if streaming else "pipeline"
         if engine in {"gemini-api", "gemini-web", "openai-api", "chatgpt-web"}:
             config["translate_provider"] = engine
         self.jobs[job_key] = self._running_job(
             project_name,
             translation_claim,
-            engine == "interactions",
+            streaming,
             f"Retranslating {chapter_name} with {engine.upper()}...",
         )
         try:

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" id="themeColor" content="#101412">
   <link rel="icon" type="image/png" sizes="any" href="/assets/anime/aiko-portrait-logo-v2.png">
-  <script>try{const themes=['quiet-light','dark-modern','synthwave-84','solarized-dark','monokai-dimmed','sakura-night','tokyo-night','abyss','kimbie-dark','aiko-anime'];const colors={'quiet-light':'#f5f5f5','dark-modern':'#101412','synthwave-84':'#21182d','solarized-dark':'#002b36','monokai-dimmed':'#1e1f1c','sakura-night':'#101625','tokyo-night':'#1a1b26','abyss':'#000c18','kimbie-dark':'#221a0f','aiko-anime':'#0f1218'};const saved=localStorage.getItem('novel-theme');const theme=themes.includes(saved)?saved:'dark-modern';document.documentElement.dataset.theme=theme;document.documentElement.dataset.animeIllustrations=localStorage.getItem('novel-anime-illustrations')==='off'?'off':'on';document.documentElement.dataset.brushCursor=localStorage.getItem('novel-brush-cursor')==='off'?'off':'on';document.getElementById('themeColor').content=colors[theme]}catch(_error){}</script>
+  <script>try{const themes=['quiet-light','dark-modern','github-dark','one-dark-pro','synthwave-84','solarized-dark','monokai-dimmed','sakura-night','tokyo-night','abyss','kimbie-dark','everforest-dark-medium','night-owl','catppuccin-mocha','aiko-anime'];const colors={'quiet-light':'#f5f5f5','dark-modern':'#101412','github-dark':'#0d1117','one-dark-pro':'#282c34','synthwave-84':'#21182d','solarized-dark':'#002b36','monokai-dimmed':'#1e1f1c','sakura-night':'#101625','tokyo-night':'#1a1b26','abyss':'#000c18','kimbie-dark':'#221a0f','everforest-dark-medium':'#2d353b','night-owl':'#011627','catppuccin-mocha':'#1e1e2e','aiko-anime':'#0f1218'};const saved=localStorage.getItem('novel-theme');const theme=themes.includes(saved)?saved:'dark-modern';document.documentElement.dataset.theme=theme;document.documentElement.dataset.animeIllustrations=localStorage.getItem('novel-anime-illustrations')==='off'?'off':'on';document.documentElement.dataset.brushCursor=localStorage.getItem('novel-brush-cursor')==='off'?'off':'on';document.getElementById('themeColor').content=colors[theme]}catch(_error){}</script>
   <title>Novel Translator Studio</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/project.css">
@@ -39,16 +39,16 @@
       <header class="topbar">
         <button class="icon-button menu-button" id="menuButton" aria-label="Mở menu">≡</button>
         <div><p class="eyebrow" id="viewEyebrow">BÀN DỊCH</p><h1 id="viewTitle">Không gian dịch</h1></div>
-        <div class="top-actions"><div class="save-state" id="saveState"><i></i><span>Đã đồng bộ</span></div><button class="secondary" id="aiLogToggle" type="button" aria-controls="aiLogDrawer" aria-expanded="false">Nhật ký AI</button><button class="secondary" id="polishButton" type="button">Hiệu đính</button><button class="secondary" id="retranslateButton">Dịch lại</button><button class="primary" id="saveButton">Lưu bản dịch</button></div>
+        <div class="top-actions"><div class="save-state" id="saveState"><i></i><span>Đã đồng bộ</span></div><button class="secondary utility-action" id="aiLogToggle" type="button" aria-controls="aiLogDrawer" aria-expanded="false">Nhật ký AI</button><button class="secondary" id="polishButton" type="button">Hiệu đính</button><button class="secondary" id="retranslateButton">Dịch lại</button><button class="primary" id="saveButton">Lưu bản dịch</button></div>
       </header>
 
       <section class="view active" id="workspaceView">
         <div class="workspace-toolbar">
-          <button class="secondary chapter-nav" id="previousChapter" type="button" aria-label="Mở chương trước" title="Chương trước">← <span>Chương trước</span></button>
+          <button class="secondary chapter-nav" id="previousChapter" type="button" aria-label="Mở chương trước" title="Chương trước"><span aria-hidden="true">←</span></button>
           <button class="chapter-select" id="chapterSelect"><span><small>Đang chỉnh sửa</small><strong id="currentChapter">Chọn một chương</strong></span><span>⌄</span></button>
-          <button class="secondary chapter-nav" id="nextChapter" type="button" aria-label="Mở chương tiếp theo" title="Chương tiếp theo"><span>Chương tiếp</span> →</button>
+          <button class="secondary chapter-nav" id="nextChapter" type="button" aria-label="Mở chương tiếp theo" title="Chương tiếp theo"><span aria-hidden="true">→</span></button>
           <div class="segmented"><button class="active" data-mode="split">Song song</button><button data-mode="source">Bản gốc</button><button data-mode="target">Bản dịch</button></div>
-          <button class="secondary" id="reviewToggle">Xem review</button><button class="secondary" id="copyTargetPreview">Sao chép xem trước</button><button class="secondary" id="focusButton">Chế độ tập trung</button>
+          <button class="secondary workspace-action" id="reviewToggle">Xem review</button><button class="secondary workspace-action utility-action" id="copyTargetPreview" title="Sao chép bản xem trước">Sao chép</button><button class="secondary workspace-action utility-action" id="focusButton">Tập trung</button>
         </div>
         <div class="mobile-mode-switch segmented" role="group" aria-label="Chế độ không gian dịch"><button data-mode="split">Chia đôi</button><button data-mode="source">Bản gốc</button><button class="active" data-mode="target">Bản dịch</button></div>
         <div class="editor-grid" id="editorGrid">

@@ -100,7 +100,7 @@ class GeminiRuntime:
                     self._sleep(30)
                 elif status is not None and 500 <= status <= 599:
                     print(error)
-                    print("⏳ Thử lại sau 15 giây...")
-                    self._sleep(15)
+                    print("⏳ Gemini tạm thời không khả dụng; thử lại sau 5 giây...")
+                    self._sleep(5)
                 else:
                     raise

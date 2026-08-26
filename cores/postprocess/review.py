@@ -6,6 +6,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from cores.job_events import emit_job_event
 from cores.stages import build_reference_documents
 from cores.storage.project import load_json, save_json
 
@@ -176,6 +177,7 @@ def run_background_review(
             if review_token is not None:
                 runtime._latest_review_tokens.pop(chapter_id, None)
         print(f"[REVIEW BG] ✅ Đã lưu review chương {chapter_id} vào {runtime.REVIEW_JSON}")
+        emit_job_event("review_saved", chapter=chapter_id)
 
     except Exception as e:
         runtime.log_api_call(

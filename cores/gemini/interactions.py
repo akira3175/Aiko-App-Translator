@@ -8,6 +8,9 @@ from urllib.request import Request, urlopen
 
 
 INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
+INTERACTIONS_CONNECT_TIMEOUT_SECONDS = 30
+# Gemini may remain silent while thinking before emitting the next SSE event.
+INTERACTIONS_IDLE_TIMEOUT_SECONDS = 300
 SUPPORTED_DOCUMENT_MIME_TYPES = {"application/pdf", "text/csv"}
 
 
@@ -24,6 +27,14 @@ def _interaction_reference_part(item):
         }
     name = item.get("name") or "reference"
     return {"type": "text", "text": f"## Reference file: {name}\n\n{content}"}
+
+
+def _set_stream_idle_timeout(response):
+    socket = getattr(
+        getattr(getattr(response, "fp", None), "raw", None), "_sock", None
+    )
+    if socket is not None:
+        socket.settimeout(INTERACTIONS_IDLE_TIMEOUT_SECONDS)
 
 
 def stream_interaction(
@@ -70,7 +81,17 @@ def stream_interaction(
     chunks = []
     completed = False
     try:
-        response = opener(request, timeout=600)
+        print(
+            f"📤 Đang gửi prompt ({len(prompt)} ký tự) tới Gemini...",
+            flush=True,
+        )
+        response = opener(request, timeout=INTERACTIONS_CONNECT_TIMEOUT_SECONDS)
+        _set_stream_idle_timeout(response)
+        print(
+            f"📤 Đã gửi prompt ({len(prompt)} ký tự). "
+            "Đang chờ Gemini phản hồi...",
+            flush=True,
+        )
         with response:
             for raw_line in response:
                 if stop_requested():

@@ -55,6 +55,11 @@ def generate_content(
     else:
         contents = [prompt]
 
+    print(
+        f"📤 Đã gửi prompt ({len(prompt)} ký tự). "
+        "Đang chờ Gemini phản hồi...",
+        flush=True,
+    )
     response = client.models.generate_content(
         model=model,
         contents=contents,

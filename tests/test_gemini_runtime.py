@@ -5,9 +5,19 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 from cores.gemini.runtime import GeminiRuntime, load_api_keys
+from cores.gemini.client import create_client
 
 
 class GeminiRuntimeTests(unittest.TestCase):
+    def test_client_disables_hidden_retries_without_server_deadline(self):
+        client = create_client(api_key="test-key")
+        try:
+            options = client._api_client._http_options
+            self.assertIsNone(options.timeout)
+            self.assertEqual(options.retry_options.attempts, 1)
+        finally:
+            client.close()
+
     def test_load_api_keys_ignores_blank_lines(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "keys.txt"
@@ -76,14 +86,19 @@ class GeminiRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result, "result")
         self.assertEqual(calls, [{"api_key": "first"}] * 4)
-        self.assertEqual(sleeps, [15, 15, 15])
+        self.assertEqual(sleeps, [5, 5, 5])
         self.assertEqual(
             output.getvalue().count(
                 "raw API response from Gemini"
             ),
             3,
         )
-        self.assertEqual(output.getvalue().count("Thử lại sau 15 giây"), 3)
+        self.assertEqual(
+            output.getvalue().count(
+                "Gemini tạm thời không khả dụng; thử lại sau 5 giây"
+            ),
+            3,
+        )
 
     def test_generate_rotates_key_and_retries_429_forever(self):
         calls = []

@@ -91,6 +91,11 @@ def call_gpt_api(prompt, *, model, reasoning_effort, stage, document=None, docum
             },
         )
         try:
+            print(
+                f"📤 Đã gửi prompt ({len(prompt)} ký tự). "
+                "Đang chờ OpenAI phản hồi...",
+                flush=True,
+            )
             with urlopen(request, timeout=timeout) as response:
                 data = json.loads(response.read().decode("utf-8"))
             text = _response_text(data)

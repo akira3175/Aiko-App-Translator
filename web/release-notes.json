@@ -1,6 +1,24 @@
 {
   "versions": [
     {
+      "version": "1.1.0",
+      "date": "2026-08-27",
+      "title": "Giao diện mới, dịch trực tiếp và trải nghiệm mượt mà hơn",
+      "summary": "Bản cập nhật mở rộng khả năng tùy biến giao diện, bổ sung streaming Gemini API và cải thiện độ ổn định trong suốt quá trình dịch.",
+      "highlights": [
+        "Thêm 5 giao diện mới: GitHub Theme, One Dark Pro, Everforest Dark Medium, Night Owl và Catppuccin Mocha.",
+        "Đổi tên Aiko Anime thành Aiko Midnight; có thể bật hoặc tắt minh họa Aiko độc lập trên mọi giao diện.",
+        "Làm mới bộ icon anime, cải thiện độ cân chỉnh và khả năng hiển thị trên nền tối.",
+        "Tối ưu Không gian dịch gọn gàng hơn, dành nhiều diện tích cho bản thảo và thích ứng tốt hơn với màn hình nhỏ.",
+        "Thêm tùy chọn Streaming thử nghiệm cho Gemini API, cho phép xem bản dịch xuất hiện trực tiếp trong editor.",
+        "Cải thiện trạng thái tiến trình AI: hiển thị thời điểm từng thông báo và cho biết khi prompt đã được gửi, đang chờ phản hồi.",
+        "Review và Nhật ký AI được cập nhật nhanh hơn trong lúc pipeline đang chạy.",
+        "Console không còn tự kéo xuống dưới khi người dùng đang đọc nội dung cũ.",
+        "Tăng độ ổn định khi Gemini quá tải hoặc gặp lỗi tạm thời; ứng dụng tự chờ và thử lại.",
+        "Giảm các lần gọi và làm mới không cần thiết để giao diện hoạt động nhẹ hơn."
+      ]
+    },
+    {
       "version": "1.0.6",
       "date": "2026-08-25",
       "title": "Cải thiện độ chính xác khi dịch và kiểm tra bản dịch",

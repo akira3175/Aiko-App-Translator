@@ -125,10 +125,39 @@ class UiPreferencesTests(unittest.TestCase):
         self.assertIn('aria-label="Mở chương trước"', html)
         self.assertIn('aria-label="Mở chương tiếp theo"', html)
 
-    def test_aiko_anime_theme_is_optional_and_has_a_transparent_asset(self):
+    def test_sidebar_navigation_height_is_stable_with_anime_icons(self):
+        web = Path(__file__).resolve().parents[1] / "web"
+        refinement_css = (web / "ui-refinement.css").read_text(encoding="utf-8")
+        compact_css = (web / "sidebar-compact.css").read_text(encoding="utf-8")
+        self.assertIn(
+            ".sidebar nav .nav-item,\n.sidebar-fixed-navigation .nav-item {\n  min-height: 44px;\n}",
+            refinement_css,
+        )
+        self.assertIn("min-height: 36px", compact_css)
+
+    def test_standard_themes_are_available(self):
+        web = Path(__file__).resolve().parents[1] / "web"
+        html = (web / "index.html").read_text(encoding="utf-8")
+        script = (web / "features" / "app-shell.js").read_text(encoding="utf-8")
+        themes = (web / "themes.css").read_text(encoding="utf-8")
+        for theme_id in (
+            "github-dark",
+            "one-dark-pro",
+            "everforest-dark-medium",
+            "night-owl",
+            "catppuccin-mocha",
+        ):
+            self.assertIn(f"'{theme_id}'", html)
+            self.assertIn(f"id:'{theme_id}'", script)
+            self.assertIn(f'html[data-theme="{theme_id}"]', themes)
+            self.assertIn(f'data-theme-option="{theme_id}"', themes)
+        self.assertIn("themes.includes(saved)?saved:'dark-modern'", html)
+
+    def test_anime_illustrations_are_optional_for_every_theme(self):
         web = Path(__file__).resolve().parents[1] / "web"
         script = (web / "features" / "app-shell.js").read_text(encoding="utf-8")
         themes = (web / "themes.css").read_text(encoding="utf-8")
+        refinement = (web / "ui-refinement.css").read_text(encoding="utf-8")
         asset = web / "assets" / "anime" / "aiko-blue-mascot.png"
         logo = web / "assets" / "anime" / "aiko-portrait-logo-v2.png"
         cursor = web / "assets" / "anime" / "aiko-quill-cursor-48.png"
@@ -140,9 +169,13 @@ class UiPreferencesTests(unittest.TestCase):
             "settings",
         ]
         self.assertIn("aiko-anime", script)
+        self.assertIn("name:'Aiko Midnight'", script)
+        self.assertNotIn("name:'Aiko Anime'", script)
         self.assertIn("novel-anime-illustrations", script)
         self.assertIn('data-anime-illustrations="on"', themes)
         self.assertIn('data-anime-illustrations="on"] .chapter-nav', themes)
+        self.assertNotIn('data-theme="aiko-anime"][data-anime-illustrations="on"]', themes)
+        self.assertNotIn('data-theme="aiko-anime"][data-anime-illustrations="on"]', refinement)
         self.assertIn("/assets/anime/aiko-blue-mascot.png", themes)
         self.assertTrue(asset.is_file())
         self.assertTrue(logo.is_file())
@@ -158,6 +191,10 @@ class UiPreferencesTests(unittest.TestCase):
         self.assertIn("firstElementChild?.classList.contains('review-loading')", project_memory)
         for name in nav_icons:
             self.assertTrue((web / "assets" / "anime" / f"nav-{name}-96.png").is_file())
+        self.assertIn('data-view="chapters"]>.nav-icon{background-position:-6px center', themes)
+        self.assertIn('data-view="settings"]>.nav-icon{filter:brightness(1.28)', themes)
+        self.assertIn('data-feature-icon="chapters"]{background-position:-8px center', themes)
+        self.assertIn('data-feature-icon="settings"]{filter:brightness(1.28)', themes)
         self.assertIn("novel-brush-cursor", script)
         self.assertIn('data-brush-cursor="on"', themes)
         self.assertIn("--anime-nav-icon", themes)

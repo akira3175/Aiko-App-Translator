@@ -7,6 +7,7 @@ import os
 import subprocess
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 
@@ -122,12 +123,31 @@ def isolated_process_kwargs():
     return {"start_new_session": True}
 
 
+def timestamp_process_line(line: str, *, now=None) -> str:
+    if not line.strip():
+        return line
+    stamp = (now or datetime.now()).strftime("%H:%M:%S")
+    return f"[{stamp}] {line}"
+
+
+def _without_timestamp(line: str) -> str:
+    if (
+        len(line) >= 11
+        and line[0] == "["
+        and line[3] == ":"
+        and line[6] == ":"
+        and line[9:11] == "] "
+    ):
+        return line[11:]
+    return line
+
+
 def merge_process_output(output: str, line: str) -> str:
     """Replace the latest live counter instead of adding one console line per tick."""
     current = line.rstrip("\r\n")
-    if current.startswith(STREAM_PROGRESS_PREFIXES):
+    if _without_timestamp(current).startswith(STREAM_PROGRESS_PREFIXES):
         lines = output.rstrip("\r\n").splitlines()
-        if lines and lines[-1].startswith(STREAM_PROGRESS_PREFIXES):
+        if lines and _without_timestamp(lines[-1]).startswith(STREAM_PROGRESS_PREFIXES):
             lines[-1] = current
         else:
             lines.append(current)
@@ -167,7 +187,7 @@ def stream_process_output(process: subprocess.Popen, job_key: str) -> str:
                     continue
                 except (ValueError, TypeError, json.JSONDecodeError):
                     pass
-            output = merge_process_output(output, line)
+            output = merge_process_output(output, timestamp_process_line(line))
             current = jobs.get(job_key)
             if current is not None:
                 current["output"] = output.rstrip()

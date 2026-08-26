@@ -1,8 +1,11 @@
 import tempfile
 import unittest
 import importlib
+from contextlib import redirect_stdout
+from io import StringIO
+from unittest.mock import patch
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from cores.translation import runner as translation_runner
 from cores.postprocess import runtime as configured_runtime
@@ -68,6 +71,13 @@ class BackgroundReviewTests(unittest.TestCase):
         generate, switch, _build = self._run([RuntimeError("503 unavailable"), '{"overall_score": 8, "issues": [], "summary": "Ổn"}'])
         self.assertEqual(generate.call_count, 2)
         switch.assert_not_called()
+
+    def test_success_emits_review_saved_web_event(self):
+        output = StringIO()
+        with patch.dict("os.environ", {"NOVEL_WEB_MODE": "1"}), redirect_stdout(output):
+            self._run(['{"overall_score": 10, "issues": [], "summary": "ổn"}'])
+        self.assertIn('"type":"review_saved"', output.getvalue())
+        self.assertIn('"chapter":"v1_c1_s1"', output.getvalue())
 
     def test_custom_criteria_and_language_neutral_role_are_in_prompt(self):
         with patch.object(configured_runtime, "REVIEW_BG_CRITERIA", "TIÊU CHÍ RIÊNG CỦA USER"):

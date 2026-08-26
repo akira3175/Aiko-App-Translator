@@ -23,6 +23,8 @@ class JobRunnerTests(unittest.TestCase):
         self.translated.mkdir()
         self.pipeline = self.root / "pipeline.py"
         self.pipeline.write_text("", encoding="utf-8")
+        self.interactions = self.root / "interactions.py"
+        self.interactions.write_text("", encoding="utf-8")
         self.jobs = {}
         self.processes = {}
         self.events = {}
@@ -43,7 +45,7 @@ class JobRunnerTests(unittest.TestCase):
             root=self.root,
             pipelines={
                 "pipeline": self.pipeline,
-                "interactions": self.pipeline,
+                "interactions": self.interactions,
                 "manual": self.pipeline,
             },
             jobs=self.jobs,
@@ -88,6 +90,25 @@ class JobRunnerTests(unittest.TestCase):
         config = json.loads(self.started[0][1]["env"]["NOVEL_WEB_CONFIG"])
         self.assertNotIn("manual_result", config)
         self.assertTrue(config["manual_result_ready"])
+
+    def test_gemini_api_streaming_routes_pipeline_to_interactions(self):
+        streaming_states = []
+        runner = self.runner(
+            stream=lambda _process, key: streaming_states.append(
+                self.jobs[key]["streaming"]
+            ) or "completed"
+        )
+
+        runner.run(
+            "pipeline",
+            "Demo",
+            {"translate_provider": "gemini-api", "gemini_api_streaming": "on"},
+            "claim-stream",
+        )
+
+        command = self.started[0][0][0]
+        self.assertEqual(str(self.interactions), command[2])
+        self.assertEqual([True], streaming_states)
 
     def test_retranslate_restores_backup_when_process_fails(self):
         chapter = "c1.md"

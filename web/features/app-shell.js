@@ -15,6 +15,8 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
   const appThemes=[
     {id:'quiet-light',name:'Quiet Light',description:'Sáng, nhẹ mắt',color:'#f5f5f5'},
     {id:'dark-modern',name:'Dark Modern',description:'Tối mặc định',color:'#101412'},
+    {id:'github-dark',name:'GitHub Theme',description:'Dark Default chính thức',color:'#0d1117'},
+    {id:'one-dark-pro',name:'One Dark Pro',description:'Atom cổ điển',color:'#282c34'},
     {id:'synthwave-84',name:"SynthWave '84",description:'Neon hoài cổ',color:'#21182d'},
     {id:'solarized-dark',name:'Solarized Dark',description:'Tương phản dịu',color:'#002b36'},
     {id:'monokai-dimmed',name:'Monokai Dimmed',description:'Ấm và tập trung',color:'#1e1f1c'},
@@ -22,7 +24,10 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
     {id:'tokyo-night',name:'Tokyo Night',description:'Xanh tím Tokyo',color:'#1a1b26'},
     {id:'abyss',name:'Abyss',description:'Xanh vực sâu',color:'#000c18'},
     {id:'kimbie-dark',name:'Kimbie Dark',description:'Nâu hổ phách',color:'#221a0f'},
-    {id:'aiko-anime',name:'Aiko Anime',description:'Midnight Slate',color:'#0f1218'},
+    {id:'everforest-dark-medium',name:'Everforest Dark Medium',description:'Rừng xanh dịu mắt',color:'#2d353b'},
+    {id:'night-owl',name:'Night Owl',description:'Xanh đêm sắc nét',color:'#011627'},
+    {id:'catppuccin-mocha',name:'Catppuccin Mocha',description:'Mocha tím pastel',color:'#1e1e2e'},
+    {id:'aiko-anime',name:'Aiko Midnight',description:'Midnight Slate',color:'#0f1218'},
   ];
   const views = { workspace: ['BÀN DỊCH','Không gian dịch'], chapters: ['THƯ VIỆN','Kho chương'], sharing: ['R2 PRIVATE','Chia sẻ & đọc truyện'], hakoEdit: ['XUẤT BẢN','Edit chương Hako'], pipeline: ['TỰ ĐỘNG HÓA','Quy trình AI'], terminology: ['BỘ NHỚ','Thuật ngữ'], characters: ['BỘ NHỚ','Hồ sơ nhân vật'], pronouns: ['BỘ NHỚ','Xưng hô'], r19: ['BỘ LỌC TOÀN CỤC','Quản lý Dịch R19'], help: ['TRỢ GIÚP','Hướng dẫn sử dụng'], settings: ['HỆ THỐNG','Cài đặt'] };
   const featureDefinitions=[

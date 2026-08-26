@@ -16,7 +16,9 @@ class _Models:
 class GeminiApiClientTests(unittest.TestCase):
     def test_builds_chat_parts_and_explicit_token_limit(self):
         client = type("Client", (), {"models": _Models()})()
-        with patch("cores.gemini.api_client.option", return_value=""):
+        with patch("cores.gemini.api_client.option", return_value=""), patch(
+            "builtins.print"
+        ) as output:
             result = generate_content(
                 client,
                 "prompt",
@@ -34,6 +36,10 @@ class GeminiApiClientTests(unittest.TestCase):
             client.models.request["contents"][0]["parts"],
         )
         self.assertEqual(123, client.models.request["config"].max_output_tokens)
+        output.assert_called_once_with(
+            "📤 Đã gửi prompt (6 ký tự). Đang chờ Gemini phản hồi...",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
