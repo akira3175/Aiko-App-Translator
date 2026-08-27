@@ -7,8 +7,14 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from cores.job_events import emit_job_event
-from cores.stages import build_reference_documents
 from cores.storage.project import load_json, save_json
+
+
+def build_reference_documents(*args, **kwargs):
+    """Import lazily so clean context entrypoints do not cycle through postprocess."""
+    from cores.stages.references import build_reference_documents as build
+
+    return build(*args, **kwargs)
 
 
 def build_translation_review_prompt(

@@ -1,6 +1,15 @@
 {
   "versions": [
     {
+      "version": "1.1.2",
+      "date": "2026-08-27",
+      "title": "Khắc phục lỗi khởi động Tạo Context",
+      "summary": "Bản vá khôi phục khả năng chạy tác vụ Tạo Context.",
+      "highlights": [
+        "Khắc phục lỗi khiến tác vụ Tạo Context không thể khởi động trên một số máy."
+      ]
+    },
+    {
       "version": "1.1.1",
       "date": "2026-08-27",
       "title": "Khắc phục cấu hình model trong Quy trình dịch",
