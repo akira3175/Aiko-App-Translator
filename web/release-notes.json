@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "1.1.1",
+      "date": "2026-08-27",
+      "title": "Khắc phục cấu hình model trong Quy trình dịch",
+      "summary": "Bản vá giúp việc thay đổi model hoạt động chính xác hơn và hiển thị rõ model thực tế đang được sử dụng.",
+      "highlights": [
+        "Khắc phục lỗi không thể thay đổi hoặc lưu model cho một số công đoạn trong Quy trình dịch.",
+        "Model Review và Tạo Context giờ được lưu chính xác, không còn bị đặt lại ngoài ý muốn.",
+        "Hồ sơ nhân vật giờ sử dụng đúng model Gemini API đã cấu hình.",
+        "Console hiển thị rõ công đoạn, provider và model thực tế đang được sử dụng."
+      ]
+    },
+    {
       "version": "1.1.0",
       "date": "2026-08-27",
       "title": "Giao diện mới, dịch trực tiếp và trải nghiệm mượt mà hơn",

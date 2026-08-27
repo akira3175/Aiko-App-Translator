@@ -11,6 +11,7 @@ from cores.postprocess import run_background_review, runtime as configured_runti
 
 runtime_module = importlib.import_module("cores.postprocess.runtime")
 polish_module = importlib.import_module("cores.postprocess.polish")
+stage_runtime = importlib.import_module("cores.stages.runtime")
 
 
 CHAPTER = {
@@ -23,6 +24,30 @@ CHAPTER = {
 
 
 class StagePipelineTests(unittest.TestCase):
+    def test_generation_logs_effective_stage_provider_and_model(self):
+        values = {
+            "translate_stage_model": "gemini-test",
+            "translate_stage_thinking": "high",
+        }
+        response = Mock()
+        with patch.object(
+            stage_runtime,
+            "generate_for_stage",
+            return_value=response,
+        ), patch("builtins.print") as output:
+            result, provider, model = stage_runtime.generate_stage(
+                "translate",
+                "prompt",
+                provider="gemini-api",
+                get_option=lambda key, default=None: values.get(key, default),
+            )
+        self.assertIs(result, response)
+        self.assertEqual((provider, model), ("gemini-api", "gemini-test"))
+        output.assert_called_once_with(
+            "[AI] Dịch · Gemini API · gemini-test",
+            flush=True,
+        )
+
     def test_stage_model_and_thinking_are_independent(self):
         values = {
             "translate_stage_model": "translate-only",

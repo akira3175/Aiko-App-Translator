@@ -23,6 +23,24 @@ CHARACTERS = """# Hồ Sơ Nhân Vật
 
 
 class TranslationCharacterTests(unittest.TestCase):
+    def test_interactions_logs_effective_streaming_model(self):
+        previous_stage = interactions._stage
+        interactions._stage = "translation"
+        try:
+            with patch.object(
+                interactions, "stream_interaction", return_value="result"
+            ), patch.object(interactions, "_finish_workspace_stream"), patch(
+                "builtins.print"
+            ) as output:
+                result = interactions.call_interactions("prompt", "gemini-stream")
+        finally:
+            interactions._stage = previous_stage
+        self.assertEqual(result, "result")
+        output.assert_called_once_with(
+            "[AI] Dịch · Gemini API Streaming · gemini-stream",
+            flush=True,
+        )
+
     def test_interactions_keeps_running_after_high_demand_error(self):
         error = RuntimeError("currently experiencing high demand")
         with patch.object(interactions, "run_single_translation", side_effect=[error, 1]), patch.object(

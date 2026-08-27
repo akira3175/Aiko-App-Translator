@@ -67,7 +67,7 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
     const providerDefaults={
       'gemini-api':{
         translate:['translate_model','gemini_api_thinking'],polish:['polish_model','gemini_api_thinking'],
-        pronouns:['pronoun_model','gemini_api_thinking'],review:['review_bg_model','gemini_api_thinking'],context:['context_model','gemini_api_thinking'],characters:['character_model','gemini_api_thinking'],
+        pronouns:['pronoun_model','gemini_api_thinking'],review:['review_bg_model','gemini_api_thinking'],context:['context_model','gemini_api_thinking'],characters:['translate_model','gemini_api_thinking'],
       },
       'gemini-web':{
         translate:['gemini_web_model','gemini_thinking'],polish:['gemini_web_model','gemini_thinking'],

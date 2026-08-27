@@ -38,6 +38,21 @@ MODEL_DEFAULTS = {
 
 TRANSPORT_OVERRIDES = {}
 
+STAGE_LABELS = {
+    "translate": "Dịch",
+    "polish": "Hiệu đính",
+    "pronouns": "Xưng hô",
+    "review": "Review",
+    "context": "Context",
+    "characters": "Hồ sơ nhân vật",
+}
+PROVIDER_LABELS = {
+    "gemini-api": "Gemini API",
+    "gemini-web": "Gemini Web",
+    "openai-api": "OpenAI API",
+    "chatgpt-web": "ChatGPT Web",
+}
+
 
 def stage_provider(stage, *, get_option=option, default="gemini-api"):
     return str(get_option(f"{stage}_provider", default)).strip().lower()
@@ -94,6 +109,11 @@ def generate_stage(
     provider = provider or stage_provider(stage, get_option=get_option)
     model, thinking = stage_model_and_thinking(
         stage, provider, get_option=get_option
+    )
+    print(
+        f"[AI] {STAGE_LABELS.get(stage, stage)} · "
+        f"{PROVIDER_LABELS.get(provider, provider)} · {model}",
+        flush=True,
     )
     response = generate_for_stage(
         provider,

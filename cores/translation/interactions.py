@@ -117,7 +117,10 @@ def call_interactions(
     global _stream_text
     if _stage in {"translation", "polish"}:
         _stream_text = ""
-    print(f"[INTERACTIONS BETA] Streaming từ {model}...")
+    stage_label = {"translation": "Dịch", "polish": "Hiệu đính"}.get(
+        _stage, _stage or "AI"
+    )
+    print(f"[AI] {stage_label} · Gemini API Streaming · {model}", flush=True)
     text = stream_interaction(
         api_key=current_gemini_api_key(),
         model=model,

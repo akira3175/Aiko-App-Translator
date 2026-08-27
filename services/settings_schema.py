@@ -235,4 +235,4 @@ OPTIONAL_SETTINGS = set(SETTING_DEFAULTS) - {
     "gpt_api_endpoint", "gpt_api_translate_model",
     "gpt_api_translate_effort", "gpt_api_polish_effort",
 }
-HIDDEN_SETTINGS = {"r19_model", "review_model", "context_model"}
+HIDDEN_SETTINGS = {"r19_model"}

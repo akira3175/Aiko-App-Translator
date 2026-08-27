@@ -47,6 +47,15 @@ class FrontendRuntimeTests(unittest.TestCase):
         self.assertIn("if(shouldFollow)output.scrollTop=output.scrollHeight", script)
         self.assertIn("else output.scrollTop=previousTop", script)
 
+    def test_pipeline_model_sources_reference_available_settings(self):
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "web" / "features" / "settings.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("context:['context_model','gemini_api_thinking']", script)
+        self.assertIn("characters:['translate_model','gemini_api_thinking']", script)
+        self.assertNotIn("characters:['character_model'", script)
+
     def test_focus_mode_fills_viewport_and_restores_short_label(self):
         root = Path(__file__).resolve().parents[1]
         editor_script = (root / "web" / "features" / "editor.js").read_text(

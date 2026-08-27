@@ -29,9 +29,9 @@ class SettingsSchemaTests(unittest.TestCase):
             defaults["r19_model"],
         )
 
-    def test_redundant_legacy_models_are_hidden(self):
-        self.assertIn("review_model", settings_schema.HIDDEN_SETTINGS)
-        self.assertIn("context_model", settings_schema.HIDDEN_SETTINGS)
+    def test_pipeline_source_models_remain_available_to_the_frontend(self):
+        self.assertNotIn("review_model", settings_schema.HIDDEN_SETTINGS)
+        self.assertNotIn("context_model", settings_schema.HIDDEN_SETTINGS)
 
 
 if __name__ == "__main__":
