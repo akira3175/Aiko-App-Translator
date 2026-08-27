@@ -4,7 +4,7 @@ import os
 import time
 from pathlib import Path
 
-from cores.postprocess.snapshots import build_characters_snapshot, build_pronouns_snapshot
+from cores.postprocess.snapshots import build_characters_snapshot
 
 
 def polish_translation(
@@ -35,7 +35,6 @@ def polish_translation(
         f"với {provider}:{effective_model}..."
     )
     tmp_characters = None
-    tmp_pronouns = None
     try:
         relevant_text = "\n".join(
             [raw_title, raw_content, title_cur, content_cur, pronoun_context]
@@ -47,7 +46,6 @@ def polish_translation(
                 runtime.int_option("character_snapshot_limit", 20, minimum=1), 50
             ),
         )
-        tmp_pronouns = build_pronouns_snapshot(pronouns_file, n_chapters=50)
         attachments = []
         if tmp_characters:
             attachments.append(
@@ -57,15 +55,6 @@ def polish_translation(
                     "content": Path(tmp_characters).read_text(encoding="utf-8"),
                 }
             )
-        if tmp_pronouns:
-            attachments.append(
-                {
-                    "name": "pronouns_snapshot.json",
-                    "mime_type": "application/json",
-                    "content": Path(tmp_pronouns).read_text(encoding="utf-8"),
-                }
-            )
-
         role, task = runtime.project_polish_prompt()
         prompt = runtime.wrap_r19_prompt(f"""# Vai trò hiệu đính
 {role}
@@ -154,7 +143,7 @@ Chỉ trả về:
                 print(f"[POLISH] Chờ {delay}s rồi thử lại...")
                 time.sleep(delay)
     finally:
-        for path in (tmp_characters, tmp_pronouns):
+        for path in (tmp_characters,):
             if path and os.path.exists(path):
                 try:
                     os.unlink(path)

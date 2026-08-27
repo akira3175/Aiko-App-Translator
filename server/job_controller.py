@@ -178,6 +178,7 @@ class JobController:
         if engine not in {
             "gemini-api",
             "gemini-web",
+            "google-ai-studio-web",
             "openai-api",
             "chatgpt-web",
             "interactions",

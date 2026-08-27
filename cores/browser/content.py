@@ -15,6 +15,7 @@ from cores.config import (
     WEB_THINKING_LEVEL,
 )
 from cores.gemini.web_client import generate_content as generate_gemini_content
+from cores.google_ai_studio.web_client import generate_content as generate_ai_studio_content
 from cores.config.runtime import bool_option, option, web_mode
 
 
@@ -101,4 +102,28 @@ def generate_content_with_chatgpt(
         chatgpt_model=chatgpt_model,
         chatgpt_thinking=chatgpt_thinking,
         chat_url=chat_url,
+    )
+
+
+def setup_ai_studio_browser():
+    browser_runtime.get_chatgpt_driver().get(
+        "https://aistudio.google.com/prompts/new_chat"
+    )
+
+
+def close_ai_studio_driver():
+    browser_runtime.close_chatgpt()
+
+
+def generate_content_with_ai_studio(
+    prompt, max_retries=3, ai_studio_model="gemini-flash-latest",
+    ai_studio_thinking="high", ai_studio_references=(),
+):
+    return generate_ai_studio_content(
+        prompt,
+        get_driver=browser_runtime.get_chatgpt_driver,
+        max_retries=max_retries,
+        ai_studio_model=ai_studio_model,
+        ai_studio_thinking=ai_studio_thinking,
+        reference_documents=ai_studio_references,
     )

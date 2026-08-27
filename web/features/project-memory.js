@@ -1,7 +1,7 @@
 const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
 
-export function createProjectMemoryFeature({api,escapeHtml,executePipeline,markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast}) {
+export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSetting,markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast}) {
   let pronounEditIndex=null;
   let reviewLoadingChapter=null;
 
@@ -370,6 +370,10 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,markd
       sleep:0,
       workspace_review:true,
       target_chapter:chapter,
+      review_provider:getSetting('pipeline_review_provider')||'gemini-api',
+      review_stage_model:getSetting('pipeline_review_model'),
+      review_stage_thinking:getSetting('pipeline_review_thinking'),
+      open_browser_setup:true,
     },{
       stayOnView:true,
       onComplete:()=>{

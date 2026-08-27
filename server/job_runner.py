@@ -149,7 +149,7 @@ class JobRunner:
             and str(config.get("gemini_api_streaming", "off")).lower() == "on"
         )
         pipeline_kind = "interactions" if streaming else "pipeline"
-        if engine in {"gemini-api", "gemini-web", "openai-api", "chatgpt-web"}:
+        if engine in {"gemini-api", "gemini-web", "google-ai-studio-web", "openai-api", "chatgpt-web"}:
             config["translate_provider"] = engine
         self.jobs[job_key] = self._running_job(
             project_name,

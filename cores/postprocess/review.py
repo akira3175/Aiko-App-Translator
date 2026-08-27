@@ -209,7 +209,7 @@ def enqueue_background_review(runtime, chapter, chapter_number, context_text="")
     provider = runtime.provider("review")
     model, _thinking = runtime.model_and_thinking("review")
     print(f"[PIPELINE] Đã xếp review nền {chapter_id} ({provider}:{model}).")
-    if provider in {"gemini-web", "chatgpt-web"}:
+    if provider in {"gemini-web", "chatgpt-web", "google-ai-studio-web"}:
         run_background_review(
             runtime,
             chapter_id,

@@ -14,6 +14,8 @@ class ProviderRegistryTests(unittest.TestCase):
         providers = {item["id"]: item for item in provider_payload()}
         self.assertIn("translate", providers["gemini-api"]["capabilities"]["stages"])
         self.assertIn("review", providers["openai-api"]["capabilities"]["stages"])
+        self.assertIn("translate", providers["google-ai-studio-web"]["capabilities"]["stages"])
+        self.assertTrue(providers["google-ai-studio-web"]["capabilities"]["browser"])
         self.assertIn("polish", providers["gemini-web"]["capabilities"]["stages"])
         self.assertIn("pronouns", providers["gemini-web"]["capabilities"]["stages"])
         self.assertIn("review", providers["gemini-web"]["capabilities"]["stages"])
@@ -51,7 +53,7 @@ class ProviderRegistryTests(unittest.TestCase):
 
     def test_all_provider_stage_combinations_use_shared_transport_contract(self):
         stages = ("translate", "polish", "pronouns", "review")
-        for provider in ("gemini-api", "gemini-web", "openai-api", "chatgpt-web"):
+        for provider in ("gemini-api", "gemini-web", "google-ai-studio-web", "openai-api", "chatgpt-web"):
             calls = []
 
             def transport(prompt, **kwargs):

@@ -69,6 +69,27 @@ class StagePipelineTests(unittest.TestCase):
                 ("polish-only", "high"),
             )
 
+    def test_ai_studio_uses_lite_defaults_for_pronouns_and_review(self):
+        get_option = lambda _key, default=None: default
+        self.assertEqual(
+            stage_runtime.stage_model_and_thinking(
+                "pronouns", "google-ai-studio-web", get_option=get_option
+            ),
+            ("gemini-flash-lite-latest", "high"),
+        )
+        self.assertEqual(
+            stage_runtime.stage_model_and_thinking(
+                "review", "google-ai-studio-web", get_option=get_option
+            ),
+            ("gemini-flash-lite-latest", "high"),
+        )
+        self.assertEqual(
+            stage_runtime.stage_model_and_thinking(
+                "translate", "google-ai-studio-web", get_option=get_option
+            ),
+            ("gemini-flash-latest", "high"),
+        )
+
     def test_gemini_web_polish_uses_web_generator(self):
         response = "###TITLE###\nMới\n###CONTENT###\nBản mới\n###END###"
         generate = Mock(return_value=response)
@@ -77,7 +98,7 @@ class StagePipelineTests(unittest.TestCase):
             translation_stage.TRANSPORT_OVERRIDES, {"gemini-web": generate}, clear=True
         ), patch.object(configured_runtime, "log_api_call"), patch.object(
             polish_module, "build_characters_snapshot", return_value=None
-        ), patch.object(polish_module, "build_pronouns_snapshot", return_value=None):
+        ):
             result = configured_runtime.polish_translation(
                 dict(CHAPTER), 1, "context", "pronouns", pronouns_file=None
             )
@@ -121,7 +142,7 @@ class StagePipelineTests(unittest.TestCase):
             translation_stage.TRANSPORT_OVERRIDES, {"chatgpt-web": generate}, clear=True
         ), patch.object(configured_runtime, "log_api_call"), patch.object(
             polish_module, "build_characters_snapshot", return_value=None
-        ), patch.object(polish_module, "build_pronouns_snapshot", return_value=None):
+        ):
             result = configured_runtime.polish_translation(
                 dict(CHAPTER), 1, "context", "pronouns", pronouns_file=None
             )

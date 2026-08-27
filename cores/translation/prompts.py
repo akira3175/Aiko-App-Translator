@@ -81,7 +81,7 @@ DEFAULT_POLISH_TASK = """Nhiệm vụ là BIÊN TẬP LẠI bản dịch hiện 
 
 2. CHỈNH XƯNG HÔ:
    - Tra characters.md để biết giới tính, tuổi tác và vai trò của từng nhân vật.
-   - Tra bộ nhớ xưng hô liên quan hoặc pronouns_snapshot.json để giữ cách xưng hô nhất quán với các chương trước.
+   - Tra bộ nhớ xưng hô liên quan để giữ cách xưng hô nhất quán với các chương trước.
    - Trong HỘI THOẠI: xưng hô linh hoạt theo cảm xúc, không cứng nhắc.
    - Trong DẪN TRUYỆN: nhất quán theo bộ nhớ xưng hô.
    - Ưu tiên ngữ cảnh hiện tại nếu xung đột với bộ nhớ.

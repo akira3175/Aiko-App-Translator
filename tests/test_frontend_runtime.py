@@ -36,6 +36,17 @@ class FrontendRuntimeTests(unittest.TestCase):
         self.assertNotIn("const button=$('#save')", settings_script)
         self.assertNotIn("const button=$('#reset')", settings_script)
 
+    def test_editor_review_uses_the_configured_review_provider(self):
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "web" / "features" / "project-memory.js").read_text(
+            encoding="utf-8"
+        )
+        app = (root / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("review_provider:getSetting('pipeline_review_provider')", script)
+        self.assertIn("review_stage_model:getSetting('pipeline_review_model')", script)
+        self.assertIn("review_stage_thinking:getSetting('pipeline_review_thinking')", script)
+        self.assertIn("getSetting:key=>settingsFeature.getValue(key)", app)
+
     def test_console_only_follows_output_when_reader_is_near_bottom(self):
         root = Path(__file__).resolve().parents[1]
         script = (root / "web" / "features" / "pipeline.js").read_text(
@@ -55,6 +66,9 @@ class FrontendRuntimeTests(unittest.TestCase):
         self.assertIn("context:['context_model','gemini_api_thinking']", script)
         self.assertIn("characters:['translate_model','gemini_api_thinking']", script)
         self.assertNotIn("characters:['character_model'", script)
+        self.assertIn("pronouns:['ai_studio_pronoun_model','ai_studio_thinking']", script)
+        self.assertIn("review:['ai_studio_review_model','ai_studio_thinking']", script)
+        self.assertIn("default:sourceModel?.default||''", script)
 
     def test_focus_mode_fills_viewport_and_restores_short_label(self):
         root = Path(__file__).resolve().parents[1]

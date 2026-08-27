@@ -16,21 +16,13 @@ class StageReferenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             characters = root / "characters.md"
-            pronouns = root / "pronouns.json"
             characters.write_text("# Characters", encoding="utf-8")
-            pronouns.write_text(json.dumps({"A---B": {}}), encoding="utf-8")
             with patch.object(
                 references, "build_characters_snapshot", return_value=str(characters)
-            ), patch.object(
-                references, "build_pronouns_snapshot", return_value=str(pronouns)
             ):
                 documents = references.build_reference_documents({})
-            self.assertEqual(
-                [item["name"] for item in documents],
-                ["characters.md", "pronouns_snapshot.json"],
-            )
+            self.assertEqual([item["name"] for item in documents], ["characters.md"])
             self.assertFalse(characters.exists())
-            self.assertFalse(pronouns.exists())
 
     def test_gemini_api_maps_documents_to_native_reference_parts(self):
         calls = []

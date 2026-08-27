@@ -1,6 +1,21 @@
 {
   "versions": [
     {
+      "version": "1.2.0",
+      "date": "2026-08-28",
+      "title": "Google AI Studio Web và model Gemini mới nhất",
+      "summary": "Bổ sung engine Google AI Studio Web, tùy chọn model và Thinking linh hoạt hơn.",
+      "highlights": [
+        "Thêm engine thứ 5: Google AI Studio Web.",
+        "Hỗ trợ chọn model AI Studio bằng tên model trên URL.",
+        "Hỗ trợ chọn mức Thinking: Low, Medium hoặc High.",
+        "Tự động sử dụng model Gemini mới nhất: gemini-flash-latest cho dịch và hiệu đính; gemini-flash-lite-latest cho review và xuất xưng hô.",
+        "Mỗi công đoạn hiển thị đúng model mặc định của engine đã chọn.",
+        "Sửa nút Review lại không hoạt động đúng theo engine đã chọn.",
+        "Tăng độ ổn định khi AI Studio xử lý nội dung dài."
+      ]
+    },
+    {
       "version": "1.1.2",
       "date": "2026-08-27",
       "title": "Khắc phục lỗi khởi động Tạo Context",

@@ -3,10 +3,13 @@
 from cores.browser import (
     close_chatgpt_driver,
     close_gemini_driver,
+    close_ai_studio_driver,
     generate_content_with_chatgpt,
     generate_content_with_selenium,
+    generate_content_with_ai_studio,
     setup_chatgpt_browser,
     setup_gemini_browser,
+    setup_ai_studio_browser,
 )
 from cores.gemini import call_gemini
 from providers.openai_client import call_gpt_api
@@ -16,14 +19,15 @@ from cores.stages.transport import generate_for_stage
 
 MODEL_DEFAULTS = {
     "gemini-api": {
-        "translate": ("translate_model", "gemini-3.5-flash"),
-        "polish": ("polish_model", "gemini-3-flash-preview"),
-        "pronouns": ("pronoun_model", "gemini-3.1-flash-lite-preview"),
-        "review": ("review_bg_model", "gemini-3.1-flash-lite-preview"),
-        "context": ("context_model", "gemini-3.5-flash"),
-        "characters": ("character_model", "gemini-3.5-flash"),
+        "translate": ("translate_model", "gemini-flash-latest"),
+        "polish": ("polish_model", "gemini-flash-latest"),
+        "pronouns": ("pronoun_model", "gemini-flash-lite-latest"),
+        "review": ("review_bg_model", "gemini-flash-lite-latest"),
+        "context": ("context_model", "gemini-flash-latest"),
+        "characters": ("character_model", "gemini-flash-latest"),
     },
     "gemini-web": {},
+    "google-ai-studio-web": {},
     "openai-api": {
         "translate": ("gpt_api_translate_model", "gpt-5.6-luna"),
         "polish": ("gpt_api_polish_model", "gpt-5.6-terra"),
@@ -49,6 +53,7 @@ STAGE_LABELS = {
 PROVIDER_LABELS = {
     "gemini-api": "Gemini API",
     "gemini-web": "Gemini Web",
+    "google-ai-studio-web": "Google AI Studio Web",
     "openai-api": "OpenAI API",
     "chatgpt-web": "ChatGPT Web",
 }
@@ -71,6 +76,15 @@ def stage_model_and_thinking(stage, provider, *, get_option=option):
         return (
             model or str(get_option("gemini_web_model", "pro")),
             thinking or str(get_option("gemini_thinking", "extended")),
+        )
+    if provider == "google-ai-studio-web":
+        model_key, model_default = {
+            "pronouns": ("ai_studio_pronoun_model", "gemini-flash-lite-latest"),
+            "review": ("ai_studio_review_model", "gemini-flash-lite-latest"),
+        }.get(stage, ("ai_studio_model", "gemini-flash-latest"))
+        return (
+            model or str(get_option(model_key, model_default)),
+            thinking or str(get_option("ai_studio_thinking", "high")),
         )
     if provider == "openai-api":
         key, default = MODEL_DEFAULTS[provider][stage]
@@ -96,6 +110,7 @@ def stage_transports(overrides=None):
     transports = {
         "gemini-api": call_gemini,
         "gemini-web": generate_content_with_selenium,
+        "google-ai-studio-web": generate_content_with_ai_studio,
         "openai-api": call_gpt_api,
         "chatgpt-web": generate_content_with_chatgpt,
     }
@@ -130,6 +145,8 @@ def generate_stage(
 def browser_lifecycle(provider):
     if provider == "gemini-web":
         return setup_gemini_browser, close_gemini_driver
+    if provider == "google-ai-studio-web":
+        return setup_ai_studio_browser, close_ai_studio_driver
     if provider == "chatgpt-web":
         return setup_chatgpt_browser, close_chatgpt_driver
     return None, None

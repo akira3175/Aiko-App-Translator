@@ -4,6 +4,7 @@ from providers.base import ProviderCapabilities
 from providers.chatgpt_web import ChatGptWebProvider
 from providers.gemini_api import GeminiApiProvider
 from providers.gemini_web import GeminiWebProvider
+from providers.google_ai_studio_web import GoogleAiStudioWebProvider
 from providers.openai_api import OpenAiApiProvider
 
 
@@ -19,6 +20,13 @@ PROVIDERS = {
         "label": "Gemini Web",
         "capabilities": ProviderCapabilities(
             ("translate", "polish", "pronouns", "review", "glossary", "characters"), browser=True, batch=True, thinking=True,
+        ),
+    },
+    "google-ai-studio-web": {
+        "label": "Google AI Studio Web",
+        "capabilities": ProviderCapabilities(
+            ("translate", "polish", "pronouns", "review", "glossary", "characters"),
+            browser=True, batch=True, attachments=True, thinking=True,
         ),
     },
     "openai-api": {
@@ -40,6 +48,7 @@ PROVIDERS = {
 PROVIDER_CLASSES = {
     "gemini-api": GeminiApiProvider,
     "gemini-web": GeminiWebProvider,
+    "google-ai-studio-web": GoogleAiStudioWebProvider,
     "openai-api": OpenAiApiProvider,
     "chatgpt-web": ChatGptWebProvider,
 }
@@ -103,13 +112,13 @@ def pipeline_config(config):
     }
     if models["translate"]:
         key = {
-            "gemini-api": "translate_model", "gemini-web": "gemini_web_model",
+            "gemini-api": "translate_model", "gemini-web": "gemini_web_model", "google-ai-studio-web": "ai_studio_model",
             "openai-api": "gpt_api_translate_model", "chatgpt-web": "chatgpt_model",
         }[translate]
         result[key] = models["translate"]
     if thinking["translate"]:
         key = {
-            "gemini-api": "gemini_api_thinking", "gemini-web": "gemini_thinking",
+            "gemini-api": "gemini_api_thinking", "gemini-web": "gemini_thinking", "google-ai-studio-web": "ai_studio_thinking",
             "openai-api": "gpt_api_translate_effort", "chatgpt-web": "chatgpt_thinking",
         }[translate]
         result[key] = thinking["translate"]

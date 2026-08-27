@@ -21,9 +21,14 @@ class SettingsSchemaTests(unittest.TestCase):
     def test_important_defaults_are_preserved(self):
         defaults = settings_schema.SETTING_DEFAULTS
         self.assertEqual("gemini-api", defaults["pipeline_translate_provider"])
-        self.assertEqual("gemini-3.5-flash", defaults["pipeline_translate_model"])
+        self.assertEqual("gemini-flash-latest", defaults["pipeline_translate_model"])
+        self.assertEqual("gemini-flash-latest", defaults["pipeline_polish_model"])
+        self.assertEqual("gemini-flash-lite-latest", defaults["pipeline_pronouns_model"])
+        self.assertEqual("gemini-flash-lite-latest", defaults["pipeline_review_model"])
         self.assertEqual("off", defaults["gemini_api_streaming"])
         self.assertEqual("off", defaults["lan_enabled"])
+        self.assertEqual("gemini-flash-lite-latest", defaults["ai_studio_pronoun_model"])
+        self.assertEqual("gemini-flash-lite-latest", defaults["ai_studio_review_model"])
         self.assertEqual(
             settings_schema.DEFAULT_R19_MODEL,
             defaults["r19_model"],

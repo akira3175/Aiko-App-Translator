@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from cores.config import CHARACTERS_MD, PRONOUNS_JSON
-from cores.postprocess.snapshots import build_characters_snapshot, build_pronouns_snapshot
+from cores.postprocess.snapshots import build_characters_snapshot
 
 
 def _read_and_remove(path, name, mime_type):
@@ -37,10 +37,7 @@ def build_reference_documents(
     character_path = build_characters_snapshot(
         characters_file, "\n".join(str(item or "") for item in relevant), max_characters=20
     )
-    pronoun_path = build_pronouns_snapshot(pronouns_file, n_chapters=50)
     documents = (
         _read_and_remove(character_path, "characters.md", "text/markdown"),
-        _read_and_remove(pronoun_path, "pronouns_snapshot.json", "application/json"),
     )
     return tuple(document for document in documents if document)
-

@@ -6,13 +6,14 @@ const settingsGroups={
   pipeline:['Quy trình dịch','Chọn engine, model và mức suy nghĩ cho từng công đoạn.'],
   'gemini-api':['Gemini API','Model và thông số sinh nội dung khi dịch, hậu dịch và review qua API.'],
   'gemini-web':['Gemini Web','Gem, model và mức suy nghĩ khi tự động hóa trình duyệt Gemini.'],
+  'google-ai-studio-web':['Google AI Studio Web','Chọn model qua URL và Thinking level trong Run settings của AI Studio.'],
   'chatgpt-web':['ChatGPT Web','Model và mức suy nghĩ khi tự động hóa trình duyệt ChatGPT.'],
   'gpt-api':['OpenAI API','Khóa, model và thông số cho các công đoạn dùng OpenAI API.'],
   publishing:['Xuất bản','Tài khoản Hako và kho ảnh Cloudflare R2.'],
   sharing:['Chia sẻ','Bucket R2 private và Worker phục vụ bản đọc chia sẻ.'],
   general:['Chung','Hành vi chung của workspace và quy trình hậu xử lý.'],
 };
-const PROVIDER_LABELS={'gemini-api':'Gemini API','gemini-web':'Gemini Web','openai-api':'OpenAI API','chatgpt-web':'ChatGPT Web'};
+const PROVIDER_LABELS={'gemini-api':'Gemini API','gemini-web':'Gemini Web','google-ai-studio-web':'Google AI Studio Web','openai-api':'OpenAI API','chatgpt-web':'ChatGPT Web'};
 const PIPELINE_OWNED_SETTING_KEYS=new Set([
   'translate_model','polish_model','pronoun_model','review_bg_model','gemini_api_thinking',
   'gemini_web_model','gemini_thinking',
@@ -73,6 +74,10 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
         translate:['gemini_web_model','gemini_thinking'],polish:['gemini_web_model','gemini_thinking'],
         pronouns:['gemini_web_model','gemini_thinking'],review:['gemini_web_model','gemini_thinking'],context:['gemini_web_model','gemini_thinking'],characters:['gemini_web_model','gemini_thinking'],
       },
+      'google-ai-studio-web':{
+        translate:['ai_studio_model','ai_studio_thinking'],polish:['ai_studio_model','ai_studio_thinking'],
+        pronouns:['ai_studio_pronoun_model','ai_studio_thinking'],review:['ai_studio_review_model','ai_studio_thinking'],context:['ai_studio_model','ai_studio_thinking'],characters:['ai_studio_model','ai_studio_thinking'],
+      },
       'openai-api':{
         translate:['gpt_api_translate_model','gpt_api_translate_effort'],polish:['gpt_api_polish_model','gpt_api_polish_effort'],
         pronouns:['gpt_api_pronoun_model','gpt_api_polish_effort'],review:['gpt_api_review_model','gpt_api_review_effort'],context:['gpt_api_translate_model','gpt_api_translate_effort'],characters:['gpt_api_translate_model','gpt_api_translate_effort'],
@@ -82,14 +87,19 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
         pronouns:['chatgpt_model','chatgpt_thinking'],review:['chatgpt_model','chatgpt_thinking'],context:['chatgpt_model','chatgpt_thinking'],characters:['chatgpt_model','chatgpt_thinking'],
       },
     };
-    const engineOptions=(stage,value)=>[['gemini-api','Gemini API'],['gemini-web','Gemini Web'],['openai-api','OpenAI API'],['chatgpt-web','ChatGPT Web']].map(([key,label])=>{
+    const engineOptions=(stage,value)=>[['gemini-api','Gemini API'],['gemini-web','Gemini Web'],['google-ai-studio-web','Google AI Studio Web'],['openai-api','OpenAI API'],['chatgpt-web','ChatGPT Web']].map(([key,label])=>{
       const supported=Boolean(providerDefaults[key][stage]);
       return `<option value="${key}" ${key===value?'selected':''} ${supported?'':'disabled'}>${label}${supported?'':' (chưa hỗ trợ)'}</option>`;
     }).join('');
     const pipelineStage=(label,stage)=>{
       const provider=settingItem(`pipeline_${stage}_provider`);
-      const model={...settingItem(`pipeline_${stage}_model`),description:`Model riêng cho ${label.toLowerCase()}.`};
-      const thinking={...settingItem(`pipeline_${stage}_thinking`),description:provider.value==='openai-api'?'Reasoning riêng cho công đoạn này.':'Thinking riêng cho công đoạn này.'};
+      const sourceKeys=providerDefaults[provider.value][stage];
+      const sourceModel=settingItem(sourceKeys[0]);
+      const sourceThinking=settingItem(sourceKeys[1]);
+      const modelValue=settingItem(`pipeline_${stage}_model`);
+      const thinkingValue=settingItem(`pipeline_${stage}_thinking`);
+      const model={...modelValue,default:sourceModel?.default||'',overridden:modelValue.value!==(sourceModel?.default||''),description:`Model riêng cho ${label.toLowerCase()}.`};
+      const thinking={...thinkingValue,default:sourceThinking?.default||'',overridden:thinkingValue.value!==(sourceThinking?.default||''),description:provider.value==='openai-api'?'Reasoning riêng cho công đoạn này.':'Thinking riêng cho công đoạn này.'};
       return `<details class="pipeline-stage-setting" data-pipeline-stage="${stage}" ${stage==='translate'?'open':''}><summary><strong>${label}</strong><span>${PROVIDER_LABELS[provider.value]||provider.value}</span></summary><div class="pipeline-stage-body"><label class="python-setting"><span>Engine</span><select data-python-setting="${provider.key}" data-stage-engine="${stage}">${engineOptions(stage,provider.value)}</select><small>Engine dùng riêng cho công đoạn này.</small></label>${renderSetting(model)}${renderSetting(thinking)}</div></details>`;
     };
     $('#pythonSettingsFields').innerHTML=activeGroup==='pipeline'

@@ -89,7 +89,7 @@ async function copyPlainText(text){
 let pipelineFeature;
 const editorFeature=createEditorFeature({api,escapeHtml,positionPopover,saveChapter,state,toast});
 const {markdownToHtml,refreshFind,renderMarkdownEditors,runtime:editorRuntime,setEditorValue,updateCounts,updateLineNumbers,value:editorValue,views:editorViews}=editorFeature;
-const projectMemoryFeature=createProjectMemoryFeature({api,escapeHtml,executePipeline:(...args)=>pipelineFeature.execute(...args),markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast});
+const projectMemoryFeature=createProjectMemoryFeature({api,escapeHtml,executePipeline:(...args)=>pipelineFeature.execute(...args),getSetting:key=>settingsFeature.getValue(key),markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast});
 const {loadCharacters,loadContext,loadPronouns,loadReviews,renderContext,renderWorkspaceReview,requireProject,saveCharacters,saveGlossaryChanges}=projectMemoryFeature;
 const aiLogFeature=createAiLogFeature({api,copyPlainText,escapeHtml,getProject:()=>state.project,toast});
 const apiKeyFeature=createApiKeyFeature({api,escapeHtml,toast});

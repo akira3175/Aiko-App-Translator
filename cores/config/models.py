@@ -4,9 +4,9 @@ from cores.config.runtime import int_option, option
 
 
 FIX_MAX_RETRY = int_option("fix_max_retry", 3, minimum=1)
-POLISH_MODEL = str(option("polish_model", "gemini-3-flash-preview"))
-REVIEW_BG_MODEL = str(option("review_bg_model", "gemini-3.1-flash-lite-preview"))
-PRONOUN_MODEL = str(option("pronoun_model", "gemini-3.1-flash-lite-preview"))
+POLISH_MODEL = str(option("polish_model", "gemini-flash-latest"))
+REVIEW_BG_MODEL = str(option("review_bg_model", "gemini-flash-lite-latest"))
+PRONOUN_MODEL = str(option("pronoun_model", "gemini-flash-lite-latest"))
 
 DEFAULT_REVIEW_BG_CRITERIA = """1. Thiếu nội dung: chỉ báo khi một ý, hành động, hội thoại hoặc sự kiện trong bản gốc thực sự biến mất khỏi bản dịch; không báo lỗi khi bản dịch diễn đạt cô đọng nhưng vẫn đủ nghĩa.
 2. Dịch sai nội dung: báo khi ý nghĩa thay đổi rõ rệt, nhầm nhân vật, sự kiện hoặc quan hệ nguyên nhân-kết quả.

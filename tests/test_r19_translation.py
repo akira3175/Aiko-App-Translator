@@ -98,8 +98,6 @@ class R19TranslationTests(unittest.TestCase):
             postprocess_runtime_module, "option", side_effect=lambda key, default=None: values.get(key, default)
         ), patch.object(
             postprocess_polish_module, "build_characters_snapshot", return_value=None
-        ), patch.object(
-            postprocess_polish_module, "build_pronouns_snapshot", return_value=None
         ), patch.dict(
             translation_stage.TRANSPORT_OVERRIDES,
             {"openai-api": lambda prompt, **_kwargs: captured.append(prompt)

@@ -274,13 +274,13 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
       return;
     }
     const reviewProvider=kind==='review'?(settingsFeature.getValue('pipeline_review_provider')||'gemini-api'):'';
-    const webReview=reviewProvider==='gemini-web'||reviewProvider==='chatgpt-web';
+    const webReview=['gemini-web','chatgpt-web','google-ai-studio-web'].includes(reviewProvider);
     const taskFields=webReview?(schema.fields||[]).filter(([id])=>id!=='workers'):(schema.fields||[]);
     let fields=taskFields.map(([id,label,type,value,options])=>type==='checkbox'
       ? `<label class="task-check"><input data-task-field="${id}" type="checkbox" ${value?'checked':''}><span>${label}</span></label>`
       : type==='select'?`<label class="task-field"><span>${label}</span><select data-task-field="${id}">${options.map(([key,text])=>`<option value="${key}" ${key===value?'selected':''}>${text}</option>`).join('')}</select></label>`
       : `<label class="task-field"><span>${label}</span>${type==='textarea'?`<textarea data-task-field="${id}" rows="9">${escapeHtml(value)}</textarea>`:`<input data-task-field="${id}" type="${type}" value="${value}" ${type==='number'?'min="0"':''}>`}</label>`).join('');
-    if(webReview)fields+=`<small class="pipeline-settings-hint">${reviewProvider==='gemini-web'?'Gemini Web':'ChatGPT Web'} xử lý tuần tự từng chương nên không dùng số luồng song song.</small>`;
+    if(webReview)fields+=`<small class="pipeline-settings-hint">${reviewProvider==='gemini-web'?'Gemini Web':reviewProvider==='chatgpt-web'?'ChatGPT Web':'Google AI Studio Web'} xử lý tuần tự từng chương nên không dùng số luồng song song.</small>`;
     if(kind==='pipeline'){
       fields=`<label class="task-field"><span>Số chương muốn chạy</span><input data-task-field="max_chapters" type="number" min="1" step="1" value="1" placeholder="Tất cả"><small>Để trống để chạy đến hết.</small></label><div class="pipeline-options"><label class="task-check"><input data-task-field="enable_polish" type="checkbox" checked><span>Hiệu đính bản dịch</span></label><label class="task-check"><input data-task-field="enable_pronouns" type="checkbox" checked><span>Xuất xưng hô</span></label><label class="task-check"><input data-task-field="enable_review" type="checkbox" checked><span>Review sau khi dịch</span></label></div><small class="pipeline-settings-hint">Engine và model được quản lý trong Cài đặt > Quy trình dịch.</small>`;
     } else if(multiChapterTasks.has(kind))fields=`<label class="task-field"><span>Số chương muốn chạy</span><input data-task-field="max_chapters" type="number" min="1" step="1" value="1" placeholder="Tất cả"><small>Để trống để chạy đến hết.</small></label>${fields}`;
@@ -334,7 +334,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     if(pendingTask==='review'){
       const saved=settingsFeature.getValue;
       config.review_provider=saved('pipeline_review_provider')||'gemini-api';
-      if(config.review_provider==='gemini-web'||config.review_provider==='chatgpt-web')config.workers=1;
+      if(['gemini-web','chatgpt-web','google-ai-studio-web'].includes(config.review_provider))config.workers=1;
       config.review_stage_model=saved('pipeline_review_model');
       config.review_stage_thinking=saved('pipeline_review_thinking');
       config.open_browser_setup=true;

@@ -14,7 +14,7 @@ from cores.translation.prompts import with_character_document_instruction
 
 
 def review_worker_count(provider, workers):
-    return 1 if provider in {"gemini-web", "chatgpt-web"} else workers
+    return 1 if provider in {"gemini-web", "chatgpt-web", "google-ai-studio-web"} else workers
 
 
 def run_review_items(
