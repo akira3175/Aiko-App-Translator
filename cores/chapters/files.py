@@ -160,7 +160,18 @@ def _without_kaomoji(text):
             unicodedata.category(character)[0] in {"P", "S"}
             for character in body
         )
-        return " " if symbol_count >= 2 else match.group(0)
+        face_characters = [
+            character
+            for character in body
+            if not character.isspace()
+            and unicodedata.category(character)[0] not in {"P", "S"}
+        ]
+        mirrored_face = (
+            symbol_count >= 1
+            and 1 <= len(face_characters) <= 4
+            and len(set(face_characters)) == 1
+        )
+        return " " if symbol_count >= 2 or mirrored_face else match.group(0)
 
     return KAOMOJI_RE.sub(replace, str(text or ""))
 

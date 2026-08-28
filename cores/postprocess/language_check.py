@@ -4,6 +4,7 @@ import os
 import time
 
 from cores.storage.project import load_json, save_json
+from cores.stages.outputs import parse_title_content
 
 
 def save_manual_check_id(chapter_id, file_path):
@@ -53,16 +54,16 @@ Nội dung dịch hiện tại:
 
 ###CONTENT###
 <nội dung dịch hoàn chỉnh>
+
+###END###
 """)
         try:
             chapter_id_fix = chapter.get("id", f"chapter_{chapter_number}")
             text, provider, effective_model = runtime.generate("polish", prompt)
-            if "###TITLE###" in text and "###CONTENT###" in text:
-                parts = text.split("###CONTENT###")
-                chapter["title_translation"] = (
-                    parts[0].replace("###TITLE###", "").strip()
-                )
-                chapter["translation"] = parts[1].strip()
+            if "###END###" in text:
+                title_out, content_out = parse_title_content(text, "Dịch lại")
+                chapter["title_translation"] = title_out
+                chapter["translation"] = content_out
                 runtime.log_api_call(chapter_id_fix, "fix", f"{provider}:{effective_model}", prompt, text, ok=True)
                 attempt += 1
             else:

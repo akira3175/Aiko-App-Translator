@@ -3,10 +3,13 @@ import unittest
 from cores.google_ai_studio.web_client import (
     _prompt_url,
     _copy_response_as_markdown,
+    _generation_running,
+    _is_complete_response,
     _is_ui_chrome,
     _paste_parts,
     _select_thinking_level,
     _set_prompt,
+    _strip_ui_chrome,
     _turn_text,
 )
 from providers import ProviderRequest
@@ -41,6 +44,17 @@ class _MultipleNodeTurn:
         return [content, controls]
 
 
+class _ThinkingAndAnswerTurn:
+    text = "Thinking\nModel"
+
+    def find_elements(self, _by, _selector):
+        thinking = _Element()
+        thinking.text = "Thinking\n" + ("suy luận dài " * 40)
+        answer = _Element()
+        answer.text = "###TITLE###\nTiêu đề\n###CONTENT###\nNội dung\n###END###"
+        return [thinking, answer]
+
+
 class _Driver:
     def __init__(self):
         self.args = None
@@ -70,12 +84,23 @@ class _PasteInput:
 
 
 class _Button(_Element):
-    def __init__(self, text="", aria=""):
+    def __init__(self, text="", aria="", title=""):
         self.text = text
         self.aria = aria
+        self.title = title
 
     def get_attribute(self, name):
-        return self.aria if name == "aria-label" else ""
+        if name == "aria-label":
+            return self.aria
+        return self.title if name == "title" else ""
+
+
+class _ButtonDriver:
+    def __init__(self, buttons):
+        self.buttons = buttons
+
+    def find_elements(self, _by, _selector):
+        return self.buttons
 
 
 class _CopyTurn:
@@ -128,6 +153,60 @@ class GoogleAiStudioWebTests(unittest.TestCase):
         self.assertTrue(_is_ui_chrome("thumb_up\nthumb_down"))
         self.assertFalse(_is_ui_chrome('{"summary": "ok"}'))
 
+    def test_structured_answer_beats_long_thinking_node(self):
+        result = _turn_text(_ThinkingAndAnswerTurn())
+        self.assertIn("###TITLE###", result)
+        self.assertNotIn("suy luận dài", result)
+
+    def test_strips_ai_studio_ui_labels(self):
+        self.assertEqual(
+            _strip_ui_chrome("Model 2:48 PM\nThinking\nthumb_up\nNội dung\ncontent_copy"),
+            "Nội dung",
+        )
+        self.assertTrue(_is_ui_chrome("Thinking\nExpand to view model thoughts"))
+
+    def test_generation_running_accepts_accessible_stop_label(self):
+        driver = _ButtonDriver([_Button(aria="Stop generating")])
+        self.assertTrue(_generation_running(driver))
+        self.assertFalse(_generation_running(_ButtonDriver([_Button("Run")])))
+
+    def test_translation_requires_all_output_markers(self):
+        complete = "###TITLE###\nT\n###CONTENT###\nC\n###END###"
+        self.assertTrue(_is_complete_response(complete, "translate"))
+        self.assertFalse(
+            _is_complete_response("###TITLE###\nT\n###CONTENT###\nC", "translate")
+        )
+        self.assertFalse(_is_complete_response("En train de réfléchir…", "translate"))
+
+    def test_json_stages_require_complete_expected_shape(self):
+        self.assertTrue(
+            _is_complete_response('{"character_pairs": []}', "pronouns")
+        )
+        self.assertFalse(
+            _is_complete_response('{"character_pairs": [', "pronouns")
+        )
+        self.assertTrue(
+            _is_complete_response(
+                '{"overall_score": 9, "issues": [], "summary": "Ổn"}',
+                "review",
+            )
+        )
+        self.assertFalse(_is_complete_response('{"overall_score": 9}', "review"))
+
+    def test_marker_stages_require_complete_blocks(self):
+        self.assertTrue(
+            _is_complete_response("###START###\na = b\n###END###", "context")
+        )
+        self.assertTrue(
+            _is_complete_response(
+                "###CHAR_START###\n## An\n- Nam\n###CHAR_END###",
+                "characters",
+            )
+        )
+        self.assertFalse(
+            _is_complete_response("###START###\n## An", "characters")
+        )
+
     def test_copy_as_markdown_preserves_unicode_and_restores_clipboard(self):
         clipboard = _Clipboard("nội dung clipboard cũ")
         driver = _CopyDriver(clipboard)
@@ -166,6 +245,7 @@ class GoogleAiStudioWebTests(unittest.TestCase):
         )
         self.assertEqual("prompt", calls[0][0])
         self.assertEqual("characters.md", calls[0][1]["ai_studio_references"][0]["name"])
+        self.assertEqual("translate", calls[0][1]["ai_studio_stage"])
         self.assertEqual(response.text, "ok")
 
 

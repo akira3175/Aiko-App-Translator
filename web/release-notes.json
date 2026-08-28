@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "1.2.1",
+      "date": "2026-08-28",
+      "title": "Dịch lại bản còn sót ngôn ngữ ổn định hơn",
+      "summary": "Cải thiện khả năng hoàn thiện bản dịch khi vẫn còn sót ngôn ngữ raw.",
+      "highlights": [
+        "Cải thiện bước tự động dịch lại khi bản dịch còn sót tiếng Trung, Hàn hoặc Thái.",
+        "Yêu cầu kết quả trả về đầy đủ để tránh lưu nội dung bị thiếu hoặc chưa hoàn tất."
+      ]
+    },
+    {
       "version": "1.2.0",
       "date": "2026-08-28",
       "title": "Google AI Studio Web và model Gemini mới nhất",

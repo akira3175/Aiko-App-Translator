@@ -1,10 +1,12 @@
 """Send one prompt through Google AI Studio and return the new model turn."""
 
+import re
 import time
 from urllib.parse import urlencode
 from uuid import uuid4
 
 import pyperclip
+from cores.json_output import parse_complete_json_object
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -16,6 +18,24 @@ AI_STUDIO_URL = "https://aistudio.google.com/prompts/new_chat"
 DEFAULT_MODEL = "gemini-flash-latest"
 DEFAULT_THINKING = "high"
 THINKING_LEVELS = {"low", "medium", "high"}
+
+_UI_ONLY_LINES = {
+    "thinking",
+    "expand to view model thoughts",
+    "collapse model thoughts",
+    "chevron_right",
+    "chevron_left",
+    "expand_more",
+    "expand_less",
+    "thumb_up",
+    "thumb_down",
+    "more_vert",
+    "content_copy",
+}
+_MODEL_TIME_RE = re.compile(
+    r"^model(?:\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?)?$",
+    flags=re.IGNORECASE,
+)
 
 
 def _prompt_url(model):
@@ -38,19 +58,86 @@ def _model_turns(driver):
     return list(_visible(driver.find_elements(By.CSS_SELECTOR, "ms-chat-turn.text-chunk-host")))
 
 
-def _turn_text(turn):
-    nodes = list(_visible(turn.find_elements(By.CSS_SELECTOR, "ms-cmark-node.cmark-node")))
-    texts = [(node.text or "").strip() for node in nodes]
-    return (max(texts, key=len, default="") or (turn.text or "").strip()).strip()
+def _strip_ui_chrome(text):
+    lines = []
+    for raw_line in str(text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            if lines and lines[-1] != "":
+                lines.append("")
+            continue
+        if line.lower() in _UI_ONLY_LINES or _MODEL_TIME_RE.fullmatch(line):
+            continue
+        lines.append(raw_line.rstrip())
+    while lines and not lines[-1].strip():
+        lines.pop()
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    return "\n".join(lines).strip()
 
 
 def _is_ui_chrome(text):
-    lines = {
-        line.strip().lower()
-        for line in str(text or "").splitlines()
-        if line.strip()
-    }
-    return bool(lines) and lines <= {"thumb_up", "thumb_down"}
+    return not bool(_strip_ui_chrome(text))
+
+
+def _structured_score(text):
+    value = str(text or "")
+    score = 0
+    if "###TITLE###" in value:
+        score += 10
+    if "###CONTENT###" in value:
+        score += 10
+    if "###END###" in value:
+        score += 3
+    if "###START###" in value or "###CHAR_START###" in value:
+        score += 10
+    if value.lstrip().startswith(("{", "[")):
+        score += 2
+    return score
+
+
+def _is_complete_response(text, stage):
+    value = _strip_ui_chrome(text)
+    if not value:
+        return False
+    stage = str(stage or "").strip().lower()
+    if stage in {"translate", "polish"}:
+        return all(
+            marker in value
+            for marker in ("###TITLE###", "###CONTENT###", "###END###")
+        )
+    if stage in {"context", "glossary"}:
+        return "###START###" in value and "###END###" in value
+    if stage == "characters":
+        has_start = "###START###" in value or "###CHAR_START###" in value
+        has_end = "###END###" in value or "###CHAR_END###" in value
+        return has_start and has_end and "## " in value
+    parsed = parse_complete_json_object(value, strict=False)
+    if stage == "pronouns":
+        return isinstance(parsed, dict) and isinstance(
+            parsed.get("character_pairs"), list
+        )
+    if stage == "review":
+        return (
+            isinstance(parsed, dict)
+            and isinstance(parsed.get("overall_score"), (int, float))
+            and isinstance(parsed.get("issues"), list)
+        )
+    return True
+
+
+def _turn_text(turn):
+    candidates = []
+    for node in _visible(turn.find_elements(By.CSS_SELECTOR, "ms-cmark-node.cmark-node")):
+        cleaned = _strip_ui_chrome(node.text or "")
+        if cleaned:
+            candidates.append(cleaned)
+    if candidates:
+        return max(
+            candidates,
+            key=lambda value: (_structured_score(value), len(value)),
+        ).strip()
+    return _strip_ui_chrome(turn.text or "")
 
 
 def _copy_response_as_markdown(driver, turn, clipboard=None):
@@ -84,7 +171,7 @@ def _copy_response_as_markdown(driver, turn, clipboard=None):
                 value if (value := clipboard.paste()) != sentinel else False
             )
         )
-        return str(copied or "").strip()
+        return _strip_ui_chrome(str(copied or ""))
     except Exception:
         return ""
     finally:
@@ -139,6 +226,19 @@ def _run_button(driver):
     return None
 
 
+def _generation_running(driver):
+    for button in _visible(driver.find_elements(By.CSS_SELECTOR, "button")):
+        parts = [
+            (button.text or "").strip(),
+            (button.get_attribute("aria-label") or "").strip(),
+            (button.get_attribute("title") or "").strip(),
+        ]
+        label = " ".join(part for part in parts if part).lower()
+        if label == "stop" or label.startswith("stop ") or "stop generating" in label:
+            return True
+    return False
+
+
 def _select_thinking_level(driver, level):
     selected_level = str(level or DEFAULT_THINKING).strip().lower()
     if selected_level == "current":
@@ -184,6 +284,7 @@ def generate_content(
     ai_studio_model=DEFAULT_MODEL,
     ai_studio_thinking=DEFAULT_THINKING,
     reference_documents=(),
+    stage="",
 ):
     last_error = None
     for attempt in range(max_retries):
@@ -219,19 +320,21 @@ def generate_content(
                     if "internal error" in turn_body:
                         raise RuntimeError("Google AI Studio báo lỗi nội bộ")
                     current_text = _turn_text(turn)
-                    running = any(
-                        (button.text or "").strip().splitlines()[:1] == ["Stop"]
-                        for button in _visible(driver.find_elements(By.CSS_SELECTOR, "button"))
-                    )
-                    if current_text and current_text == last_text and not running:
+                    running = _generation_running(driver)
+                    if not current_text or _is_ui_chrome(current_text):
+                        stable_count = 0
+                        last_text = ""
+                        time.sleep(1)
+                        continue
+                    if current_text == last_text and not running:
                         stable_count += 1
-                        if stable_count >= 2:
+                        if stable_count >= 3:
                             markdown = _copy_response_as_markdown(driver, turn)
-                            result = markdown or current_text
-                            if _is_ui_chrome(result):
-                                raise RuntimeError(
-                                    "Google AI Studio chỉ trả về nút giao diện, không có nội dung"
-                                )
+                            result = _strip_ui_chrome(markdown or current_text)
+                            if not _is_complete_response(result, stage):
+                                stable_count = 0
+                                time.sleep(1)
+                                continue
                             return result
                     else:
                         stable_count = 0

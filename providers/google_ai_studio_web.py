@@ -13,6 +13,7 @@ class GoogleAiStudioWebProvider(ProviderAdapter):
             ai_studio_model=request.model,
             ai_studio_thinking=request.thinking,
             ai_studio_references=request.attachments,
+            ai_studio_stage=request.stage,
             **request.options,
         )
         return ProviderResponse(str(text or ""), self.id, request.model)

@@ -36,7 +36,9 @@ class ChapterFilesTests(unittest.TestCase):
     def test_ignores_kaomoji_without_hiding_real_source_text(self):
         self.assertFalse(has_foreign("(　-`ω-)✧ (╬￣皿￣) (•́ω•̀ ٥)"))
         self.assertFalse(has_foreign("Được rồi (╬￣皿￣)!"))
+        self.assertFalse(has_foreign("Được rồi (눈‸눈)!"))
         self.assertTrue(has_foreign("(中文)"))
+        self.assertTrue(has_foreign("(한국어!)"))
         self.assertTrue(has_foreign("Nội dung 中文 (╬￣皿￣)"))
 
     def test_save_restores_images_and_export_stops_before_target(self):
