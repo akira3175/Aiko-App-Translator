@@ -33,6 +33,30 @@ class ProviderRegistryTests(unittest.TestCase):
         self.assertEqual(config["resolved_pipeline"], "stage")
         self.assertEqual(config["stage_providers"]["pronouns"], "off")
 
+    def test_standalone_polish_uses_saved_pipeline_settings(self):
+        config = pipeline_config({
+            "pipeline_polish_provider": "google-ai-studio-web",
+            "pipeline_polish_model": "polish-model",
+            "pipeline_polish_thinking": "high",
+        })
+
+        self.assertEqual(
+            "google-ai-studio-web", config["stage_providers"]["polish"]
+        )
+        self.assertEqual("polish-model", config["polish_stage_model"])
+        self.assertEqual("high", config["polish_stage_thinking"])
+
+    def test_explicit_polish_settings_override_saved_pipeline_settings(self):
+        config = pipeline_config({
+            "pipeline_polish_provider": "google-ai-studio-web",
+            "pipeline_polish_model": "saved-model",
+            "polish_provider": "openai-api",
+            "polish_stage_model": "explicit-model",
+        })
+
+        self.assertEqual("openai-api", config["stage_providers"]["polish"])
+        self.assertEqual("explicit-model", config["polish_stage_model"])
+
     def test_chatgpt_web_can_mix_with_other_stage_providers(self):
         config = pipeline_config({
             "translate_provider": "chatgpt-web",

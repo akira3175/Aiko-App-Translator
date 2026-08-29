@@ -91,7 +91,7 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
   }
 
   function applyAnimeIllustrationPreference(){
-    const enabled=localStorage.getItem('novel-anime-illustrations')!=='off';
+    const enabled=localStorage.getItem('novel-anime-illustrations')==='on';
     document.documentElement.dataset.animeIllustrations=enabled?'on':'off';
     if($('#animeIllustrations'))$('#animeIllustrations').checked=enabled;
   }

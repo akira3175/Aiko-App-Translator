@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "1.2.2",
+      "date": "2026-08-29",
+      "title": "Hiệu đính đúng cấu hình đã chọn",
+      "summary": "Khắc phục cấu hình hiệu đính và tinh chỉnh trải nghiệm mặc định.",
+      "highlights": [
+        "Sửa lỗi Hiệu đính không sử dụng đúng nhà cung cấp và model đã chọn trong Cài đặt.",
+        "Minh họa Aiko giờ mặc định tắt trên lần sử dụng đầu tiên; người dùng vẫn có thể bật lại trong Cài đặt."
+      ]
+    },
+    {
       "version": "1.2.1",
       "date": "2026-08-28",
       "title": "Dịch lại bản còn sót ngôn ngữ ổn định hơn",

@@ -93,6 +93,17 @@ def _stage_provider(config, stage, default):
 def pipeline_config(config):
     """Resolve stage choices to a verified compatibility runner and legacy settings."""
     result = dict(config or {})
+    for stage in ("translate", "polish", "pronouns", "review"):
+        aliases = {
+            f"{stage}_provider": f"pipeline_{stage}_provider",
+            f"{stage}_stage_model": f"pipeline_{stage}_model",
+            f"{stage}_stage_thinking": f"pipeline_{stage}_thinking",
+        }
+        for runtime_key, saved_key in aliases.items():
+            if not str(result.get(runtime_key, "")).strip() and str(
+                result.get(saved_key, "")
+            ).strip():
+                result[runtime_key] = result[saved_key]
     stages = {
         "translate": _stage_provider(result, "translate", "gemini-api"),
         "polish": _stage_provider(result, "polish", "gemini-api"),

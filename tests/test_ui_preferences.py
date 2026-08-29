@@ -172,6 +172,8 @@ class UiPreferencesTests(unittest.TestCase):
         self.assertIn("name:'Aiko Midnight'", script)
         self.assertNotIn("name:'Aiko Anime'", script)
         self.assertIn("novel-anime-illustrations", script)
+        self.assertIn("localStorage.getItem('novel-anime-illustrations')==='on'", script)
+        self.assertIn("localStorage.getItem('novel-anime-illustrations')==='on'?'on':'off'", (web / "index.html").read_text(encoding="utf-8"))
         self.assertIn('data-anime-illustrations="on"', themes)
         self.assertIn('data-anime-illustrations="on"] .chapter-nav', themes)
         self.assertNotIn('data-theme="aiko-anime"][data-anime-illustrations="on"]', themes)
