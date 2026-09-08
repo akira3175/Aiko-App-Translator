@@ -151,7 +151,9 @@ class UiPreferencesTests(unittest.TestCase):
             self.assertIn(f"id:'{theme_id}'", script)
             self.assertIn(f'html[data-theme="{theme_id}"]', themes)
             self.assertIn(f'data-theme-option="{theme_id}"', themes)
-        self.assertIn("themes.includes(saved)?saved:'dark-modern'", html)
+        self.assertIn("themes.includes(saved)?saved:'aiko-anime'", html)
+        self.assertIn('<html lang="vi" data-theme="aiko-anime">', html)
+        self.assertIn("dataset.theme||'aiko-anime'", script)
 
     def test_anime_illustrations_are_optional_for_every_theme(self):
         web = Path(__file__).resolve().parents[1] / "web"
@@ -161,8 +163,9 @@ class UiPreferencesTests(unittest.TestCase):
         asset = web / "assets" / "anime" / "aiko-blue-mascot.png"
         logo = web / "assets" / "anime" / "aiko-portrait-logo-v2.png"
         cursor = web / "assets" / "anime" / "aiko-quill-cursor-48.png"
-        chapter_arrow = web / "assets" / "anime" / "aiko-chapter-arrow-256.png"
-        review_loading = web / "assets" / "anime" / "aiko-wand-circle-padded-v15.png"
+        chapter_arrow = web / "assets" / "anime" / "aiko-chapter-chevron-v1.svg"
+        review_loading = web / "assets" / "anime" / "aiko-reading-loading-v2.webp"
+        review_loading_still = web / "assets" / "anime" / "aiko-reading-loading-still-v2.webp"
         nav_icons = [
             "workspace", "chapters", "pipeline", "ai-log", "terminology",
             "characters", "pronouns", "r19", "hako-edit", "sharing", "help",
@@ -184,19 +187,21 @@ class UiPreferencesTests(unittest.TestCase):
         self.assertTrue(cursor.is_file())
         self.assertTrue(chapter_arrow.is_file())
         self.assertTrue(review_loading.is_file())
-        self.assertIn("/assets/anime/aiko-wand-circle-padded-v15.png", themes)
-        self.assertIn("aiko-wand-circle", themes)
-        self.assertIn("animation:aiko-wand-circle 1.2s linear infinite", themes)
-        self.assertIn("37.5%,49.99%{background-position:100% 0}50%,62.49%{background-position:0 100%}", themes)
-        self.assertIn("background-size:400% 200%", themes)
+        self.assertTrue(review_loading_still.is_file())
+        self.assertIn("/assets/anime/aiko-reading-loading-v2.webp", themes)
+        self.assertIn("/assets/anime/aiko-reading-loading-still-v2.webp", themes)
+        self.assertNotIn("aiko-wand-circle", themes)
         project_memory = (web / "features" / "project-memory.js").read_text(encoding="utf-8")
         self.assertIn("firstElementChild?.classList.contains('review-loading')", project_memory)
         for name in nav_icons:
-            self.assertTrue((web / "assets" / "anime" / f"nav-{name}-96.png").is_file())
-        self.assertIn('data-view="chapters"]>.nav-icon{background-position:-6px center', themes)
-        self.assertIn('data-view="settings"]>.nav-icon{filter:brightness(1.28)', themes)
-        self.assertIn('data-feature-icon="chapters"]{background-position:-8px center', themes)
-        self.assertIn('data-feature-icon="settings"]{filter:brightness(1.28)', themes)
+            asset_name = f"nav-{name}-v2.png"
+            self.assertTrue((web / "assets" / "anime" / asset_name).is_file())
+            self.assertEqual(themes.count(f"/assets/anime/{asset_name}"), 2)
+        self.assertNotIn("-96.png?v=2", themes)
+        self.assertTrue((web / "assets" / "anime" / "nav-all-v2.png").is_file())
+        self.assertIn("/assets/anime/nav-all-v2.png", (web / "sidebar-icons.css").read_text(encoding="utf-8"))
+        self.assertNotIn("background-position:right -1px center", themes)
+        self.assertNotIn("background-position:right -2px center", themes)
         self.assertIn("novel-brush-cursor", script)
         self.assertIn('data-brush-cursor="on"', themes)
         self.assertIn("--anime-nav-icon", themes)

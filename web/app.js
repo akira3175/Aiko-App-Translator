@@ -1,3 +1,5 @@
+import { createStorySearchFeature } from './features/story-search.js';
+import { createProjectLoadingFeature } from './features/project-loading.js';
 import { api } from './api.js';
 import { createAppShellFeature } from './features/app-shell.js';
 import { createApiKeyFeature } from './features/api-keys.js';
@@ -18,7 +20,7 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const state = { projects: [], project: null, projectRevision: 0, chapters: [], reviews: [], context: {index:0,glossary:[],style_notes:'',prompt_preset:'default',prompt_role:'',prompt_task:'',prompt_presets:[],polish_prompt_preset:'default',polish_prompt_role:'',polish_prompt_task:'',polish_prompt_presets:[],raw_json:''}, characters: {content:'',count:0,exists:false,backup:false}, pronouns: {pairs:[],count:0,locked_count:0,raw_json:''}, pronounCurrent: null, characterDirty: false, glossaryDirty: false, reviewCurrent: null, currentImages: [], current: null, dirty: false, timer: null };
 const navigationCounts={chapters:0,characters:0,pronouns:0};
-async function loadChapters() {
+async function loadChapters({strict=false}={}) {
   if (!state.project) return;
   const project=state.project, revision=state.projectRevision;
   try {
@@ -31,8 +33,8 @@ async function loadChapters() {
     if(currentItem)$('#currentChapter').textContent=currentItem.title||prettyName(currentItem.name);
     sharingFeature.render();
     updateChapterNavigation();
-    if (!state.current && state.chapters.length) await openChapter(state.chapters.find(x => !x.translated)?.name || state.chapters[0].name,project,revision);
-  } catch (error) { if(state.project===project&&state.projectRevision===revision)toast(error.message); }
+    if (!state.current && state.chapters.length) await openChapter(state.chapters.find(x => !x.translated)?.name || state.chapters[0].name,project,revision,{strict});
+  } catch (error) { if(state.project===project&&state.projectRevision===revision){if(strict)throw error;toast(error.message);} }
 }
 
 async function loadProjects(preferredProject='') {
@@ -48,16 +50,25 @@ async function loadProjects(preferredProject='') {
   } catch (error) { toast(error.message); }
 }
 
+let projectSelection=0;
+const projectLoadingFeature=createProjectLoadingFeature({retry:()=>selectProject(state.project)});
 async function selectProject(name) {
+  const selection=++projectSelection;
   if (state.dirty) await saveChapter();
+  if(selection!==projectSelection||state.dirty)return;
   if (state.characterDirty) {
     await saveCharacters();
-    if (state.characterDirty) return;
+    if (selection!==projectSelection||state.characterDirty) return;
   }
   if(state.glossaryDirty){
     await saveGlossaryChanges();
-    if(state.glossaryDirty)return;
+    if(selection!==projectSelection||state.glossaryDirty)return;
   }
+  state.projectLoading=true;
+  projectLoadingFeature.begin(selection,name);
+  let timeout;
+  try {
+  storySearchFeature.reset();
   state.projectRevision+=1;
   state.project = name; state.current = null; state.chapters = [];
   localStorage.setItem('novel-project', name);
@@ -71,12 +82,24 @@ async function selectProject(name) {
   renderContext();
   state.currentImages=[]; renderMarkdownEditors();
   $('#projectPopover').classList.remove('open');
-  await loadChapters();
-  toast('Đã mở ' + name);
-  Promise.allSettled([loadReviews(), loadContext(), loadCharacters(), loadPronouns(), publishingBooksFeature.load(), sharingFeature.load(), r19Feature.load()]);
-  if($('#aiLogDrawer').classList.contains('open'))aiLogFeature.load(true);
+  $('#chapterPopover').classList.remove('open');
   $('#hakoPublicUrl').value=localStorage.getItem(`hako-public-url:${name}`)||'';
   hakoEditFeature.reset();
+  const strict={strict:true};
+  await Promise.race([
+    Promise.all([loadChapters(strict),loadReviews('',strict),loadContext(strict),loadCharacters(strict),loadPronouns(strict),publishingBooksFeature.load(strict),sharingFeature.load(strict),r19Feature.load(strict)]),
+    new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('Tải quá lâu. Hãy thử lại hoặc chọn truyện khác.')),30000);}),
+  ]);
+  if(selection!==projectSelection)return;
+  state.projectLoading=false;
+  projectLoadingFeature.finish(selection);
+  toast('Đã mở ' + name);
+  if($('#aiLogDrawer').classList.contains('open'))aiLogFeature.load(true);
+  } catch(error) {
+    if(selection!==projectSelection)return;
+    state.projectRevision+=1;
+    projectLoadingFeature.fail(selection,name,error);
+  } finally {clearTimeout(timeout);}
 }
 
 function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));}
@@ -95,14 +118,14 @@ const aiLogFeature=createAiLogFeature({api,copyPlainText,escapeHtml,getProject:(
 const apiKeyFeature=createApiKeyFeature({api,escapeHtml,toast});
 const {open:openAiLog,close:closeAiLog}=aiLogFeature;
 const appShellFeature=createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog,refreshEditors:editorFeature.refreshEditors,showView,toast});
-const r19Feature=createR19Feature({api,getProject:()=>state.project,showView,toast});
+const r19Feature=createR19Feature({api,getProject:()=>state.project,getRevision:()=>state.projectRevision,showView,toast});
 const bookExportFeature=createBookExportFeature({escapeHtml,getChapters:()=>state.chapters,getProject:()=>state.project,toast});
 const chapterImportFeature=createChapterImportFeature({api,escapeHtml,getProject:()=>state.project,loadChapters,openChapter,toast});
-const publishingBooksFeature=createPublishingBooksFeature({api,escapeHtml,getProject:()=>state.project,toast});
-const hakoEditFeature=createHakoEditFeature({api,escapeHtml,getProject:()=>state.project,getTargets:()=>pipelineFeature.publishingTargets(),toast});
+const publishingBooksFeature=createPublishingBooksFeature({api,escapeHtml,getProject:()=>state.project,getRevision:()=>state.projectRevision,toast});
+const hakoEditFeature=createHakoEditFeature({api,escapeHtml,executePipeline:(...args)=>pipelineFeature.execute(...args),getProject:()=>state.project,getTargets:()=>pipelineFeature.publishingTargets(),toast});
 const updateFeature=createUpdateFeature({api,escapeHtml,hasUnsavedChanges:()=>state.dirty||state.characterDirty,toast});
 const settingsFeature=createSettingsFeature({api,escapeHtml,refreshUpdate:updateFeature.load,showView,toast});
-const sharingFeature=createSharingFeature({api,copyPlainText,escapeHtml,getChapters:()=>state.chapters,getProject:()=>state.project,openSettings:()=>settingsFeature.openGroup('sharing'),toast});
+const sharingFeature=createSharingFeature({api,copyPlainText,escapeHtml,getChapters:()=>state.chapters,getProject:()=>state.project,getRevision:()=>state.projectRevision,openSettings:()=>settingsFeature.openGroup('sharing'),toast});
 pipelineFeature=createPipelineFeature({aiLogFeature,api,editorRuntime,editorViews,escapeHtml,loadChapters,loadProjects,openChapter,projectMemoryFeature,publishingBooksFeature,saveChapter,selectProject,settingsFeature,showView,state,toast,updateCounts});
 
 function renderChapterList(filter='') {
@@ -137,11 +160,13 @@ function openAdjacentChapter(offset) {
   if(chapter)openChapter(chapter.name);
 }
 
-async function openChapter(name,project=state.project,revision=state.projectRevision) {
+async function openChapter(name,project=state.project,revision=state.projectRevision,{strict=false}={}) {
   if (state.dirty) await saveChapter();
+  if (state.dirty) return false;
+  const request=state.chapterRequest=(state.chapterRequest||0)+1;
   try {
     const chapter = await api('/api/chapter/' + encodeURIComponent(name) + '?project=' + encodeURIComponent(project));
-    if(state.project!==project||state.projectRevision!==revision)return;
+    if(state.project!==project||state.projectRevision!==revision||request!==state.chapterRequest)return false;
     state.current = name; state.dirty = false;
     const currentItem=state.chapters.find(item=>item.name===name);
     $('#currentChapter').textContent = currentItem?.title||prettyName(name);
@@ -151,7 +176,8 @@ async function openChapter(name,project=state.project,revision=state.projectRevi
     state.currentImages=chapter.images||[]; renderMarkdownEditors();
     updateCounts(); updateLineNumbers('source'); updateLineNumbers('target'); refreshFind('source'); refreshFind('target'); setSaveState('Đã đồng bộ'); renderWorkspaceReview();
     $('#chapterPopover').classList.remove('open'); showView('workspace');
-  } catch (error) { toast(error.message); }
+    return true;
+  } catch (error) { if(state.project!==project||state.projectRevision!==revision)return false;if(strict)throw error;toast(error.message); }
 }
 
 async function createProject() {
@@ -177,9 +203,12 @@ async function createProject() {
 
 async function saveChapter() {
   if (!state.current) return toast('Hãy chọn một chương trước');
+  const project=state.project,name=state.current,content=editorValue('target');
   setSaveState('Đang lưu…');
   try {
-    await api('/api/chapter/' + encodeURIComponent(state.current) + '?project=' + encodeURIComponent(state.project), {method:'POST', body:JSON.stringify({translated:editorValue('target')})});
+    await api('/api/chapter/' + encodeURIComponent(name) + '?project=' + encodeURIComponent(project), {method:'POST', body:JSON.stringify({translated:content})});
+    if(state.project!==project||state.current!==name)return;
+    if(editorValue('target')!==content){state.dirty=true;setSaveState('Chưa lưu thay đổi mới');return;}
     state.dirty = false; setSaveState('Đã đồng bộ'); toast('Đã lưu bản dịch'); await loadChapters();
   } catch (error) { setSaveState('Lưu thất bại'); toast(error.message); }
 }
@@ -293,7 +322,10 @@ sharingFeature.bind();
 $('#popoverSearch').oninput = e => renderPopover(e.target.value);
 projectMemoryFeature.bind();
 editorFeature.bind();
+const storySearchFeature=createStorySearchFeature({api,escapeHtml,state,saveChapter,openChapter,showView,editorFeature,toast});
+storySearchFeature.bind();
 document.addEventListener('keydown',event=>{
+  if(state.projectLoading){if((event.ctrlKey||event.metaKey)&&['s','f'].includes(event.key.toLowerCase()))event.preventDefault();return;}
   if(event.key==='Escape'){
     editorFeature.closeSelectionTranslation();
     closeAiLog();

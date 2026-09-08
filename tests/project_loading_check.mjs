@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {createProjectLoadingFeature} from '../web/features/project-loading.js';
+function element(){const classes=new Set();return {hidden:false,inert:false,style:{},attributes:{},classList:{add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x)},setAttribute(k,v){this.attributes[k]=v;},removeAttribute(k){delete this.attributes[k];}};}
+const main=element(),view=element(),actions=element(),status=element(),retryButton=element(),overlay=element();
+main.getBoundingClientRect=()=>({left:248,right:1440});
+actions.inert=true;
+main.querySelectorAll=()=>[view,actions];main.appendChild=()=>{};
+overlay.querySelector=s=>s==='p'?status:retryButton;
+globalThis.document={querySelector:s=>s==='main'?main:s==='#toast'?null:{getBoundingClientRect:()=>({bottom:76})},createElement:()=>overlay};
+globalThis.window={innerWidth:1440,addEventListener(){}};
+let serial=0,retries=0;const timers=new Map();
+globalThis.setTimeout=(fn,ms)=>{assert.equal(ms,250);timers.set(++serial,fn);return serial;};
+globalThis.clearTimeout=id=>timers.delete(id);
+const loader=createProjectLoadingFeature({retry:()=>retries++});
+loader.begin(1,'A');assert.equal(view.inert,true);assert.equal(overlay.hidden,true);
+loader.finish(1);assert.equal(timers.size,0);assert.equal(view.inert,false);assert.equal(actions.inert,true);
+loader.begin(2,'B');loader.begin(3,'C');loader.finish(2);loader.fail(2,'B',new Error('old'));
+assert.equal(view.inert,true);assert.equal(status.textContent,'Đang mở C…');
+[...timers.values()][0]();assert.equal(overlay.hidden,false);
+loader.fail(3,'C',new Error('offline'));assert.equal(retryButton.hidden,false);assert.equal(view.inert,true);assert.match(status.textContent,/offline/);
+retryButton.onclick();assert.equal(retries,1);
+loader.begin(4,'C');assert.equal(retryButton.hidden,true);assert.equal(overlay.hidden,true);
+loader.finish(4);assert.equal(view.inert,false);assert.equal(actions.inert,true);assert.equal(overlay.hidden,true);
+console.log('project-loading-check-ok');

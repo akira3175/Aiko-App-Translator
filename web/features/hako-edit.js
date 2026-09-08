@@ -1,7 +1,7 @@
 const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
 
-export function createHakoEditFeature({api,escapeHtml,getProject,getTargets,toast}) {
+export function createHakoEditFeature({api,escapeHtml,executePipeline,getProject,getTargets,toast}) {
   let remoteChapters=[];
   let mapping=[];
 
@@ -25,7 +25,7 @@ export function createHakoEditFeature({api,escapeHtml,getProject,getTargets,toas
     try{
       const data=await api('/api/hako/chapters?url='+encodeURIComponent(url));
       remoteChapters=data.items||[];
-      localStorage.setItem(`hako-public-url:${state.project||''}`,data.url);
+      localStorage.setItem(`hako-public-url:${getProject()||''}`,data.url);
       resetHakoEdit();
       $('#hakoScanStatus').textContent=`Đã tải ${data.total} chương Hako. Chọn điểm bắt đầu tương ứng để đối chiếu.`;
     }catch(error){remoteChapters=[];resetHakoEdit();$('#hakoScanStatus').textContent=error.message;toast(error.message);}
@@ -75,4 +75,3 @@ export function createHakoEditFeature({api,escapeHtml,getProject,getTargets,toas
 
   return {bind,reset:resetHakoEdit};
 }
-

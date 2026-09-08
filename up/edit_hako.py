@@ -123,6 +123,22 @@ async def update_chapter(page, local_name, chapter_id, expected_title, chapter_d
     print(f"Đã cập nhật {local_name}: “{local_title}” ({image_count} ảnh)")
 
 
+async def update_chapters(page, targets, local, selectors):
+    for index, (local_name, chapter_id, title) in enumerate(targets, 1):
+        if stop_requested():
+            print("Đã dừng trước chương tiếp theo", flush=True)
+            return
+        print(f"[{index}/{len(targets)}]", flush=True)
+        await update_chapter(page, local_name, chapter_id, title, local[local_name], selectors)
+        if index < len(targets):
+            for remaining in range(10, 0, -1):
+                if stop_requested():
+                    print("Đã dừng trong lúc chờ chương tiếp theo", flush=True)
+                    return
+                print(f"Chờ {remaining} giây trước khi cập nhật chương tiếp theo…", flush=True)
+                await asyncio.sleep(1)
+
+
 async def main():
     targets = edit_targets()
     local = grouped_local_chapters()
@@ -159,12 +175,7 @@ async def main():
             await page.wait_for_timeout(1000)
         else:
             raise RuntimeError("Hết thời gian chờ đăng nhập Hako")
-        for index, (local_name, chapter_id, title) in enumerate(targets, 1):
-            if stop_requested():
-                print("Đã dừng trước chương tiếp theo")
-                break
-            print(f"[{index}/{len(targets)}]")
-            await update_chapter(page, local_name, chapter_id, title, local[local_name], selectors)
+        await update_chapters(page, targets, local, selectors)
         await browser.close()
 
 

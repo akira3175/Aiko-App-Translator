@@ -60,40 +60,36 @@ html[data-theme="aiko-anime"] .brand strong{position:relative;width:max-content;
 html[data-theme="aiko-anime"] .brand strong::after{content:"✦";position:absolute;right:-13px;top:-8px;color:var(--anime-gold);font-size:9px;line-height:1;-webkit-text-fill-color:var(--anime-gold);opacity:0;animation:aiko-brand-star 10s ease-in-out infinite;pointer-events:none}
 html[data-theme="aiko-anime"] .pipeline-card .number{border:1px solid color-mix(in srgb,var(--anime-gold) 42%,var(--line))}
 html[data-anime-illustrations="on"] .chapter-nav,html[data-anime-illustrations="on"] .chapter-nav:hover{width:118px;height:48px;padding:0;display:inline-grid;place-items:center;border-color:transparent;background:transparent;box-shadow:none;font-size:0;overflow:hidden}
-html[data-anime-illustrations="on"] .chapter-nav::before{content:"";display:block;width:112px;height:49px;background:url("/assets/anime/aiko-chapter-arrow-256.png") center/contain no-repeat;transition:transform .16s ease}
+html[data-anime-illustrations="on"] .chapter-nav::before{content:"";display:block;width:28px;height:32px;background:url("/assets/anime/aiko-chapter-chevron-v1.svg") center/contain no-repeat;transition:transform .16s ease}
 html[data-anime-illustrations="on"] #nextChapter::before{transform:scaleX(-1)}
 html[data-anime-illustrations="on"] .chapter-nav:not(:disabled):hover::before{transform:translateX(-2px)}
 html[data-anime-illustrations="on"] #nextChapter:not(:disabled):hover::before{transform:scaleX(-1) translateX(-2px)}
-html[data-anime-illustrations="on"] .nav-item[data-view="workspace"]{--anime-nav-icon:url("/assets/anime/nav-workspace-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-view="chapters"]{--anime-nav-icon:url("/assets/anime/nav-chapters-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-view="pipeline"]{--anime-nav-icon:url("/assets/anime/nav-pipeline-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-feature-action="ai-log"]{--anime-nav-icon:url("/assets/anime/nav-ai-log-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-view="terminology"]{--anime-nav-icon:url("/assets/anime/nav-terminology-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-view="characters"]{--anime-nav-icon:url("/assets/anime/nav-characters-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-view="pronouns"]{--anime-nav-icon:url("/assets/anime/nav-pronouns-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-view="r19"]{--anime-nav-icon:url("/assets/anime/nav-r19-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-view="hakoEdit"]{--anime-nav-icon:url("/assets/anime/nav-hako-edit-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-view="sharing"]{--anime-nav-icon:url("/assets/anime/nav-sharing-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-view="help"]{--anime-nav-icon:url("/assets/anime/nav-help-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-view="settings"]{--anime-nav-icon:url("/assets/anime/nav-settings-96.png?v=2")}
-html[data-anime-illustrations="on"] .nav-item[data-view]>.nav-icon,html[data-anime-illustrations="on"] .nav-item[data-feature-action="ai-log"]>.nav-icon{flex:0 0 22px;width:22px;height:22px;margin:0;padding:0;border:0;border-radius:0;background-color:transparent;background-image:var(--anime-nav-icon);background-position:center;background-size:contain;background-repeat:no-repeat;font-size:0}
-html[data-anime-illustrations="on"] .nav-item[data-view="chapters"]>.nav-icon{background-position:-6px center;background-size:28px 28px}
-html[data-anime-illustrations="on"] .nav-item[data-view="settings"]>.nav-icon{filter:brightness(1.28) saturate(1.08) drop-shadow(0 0 1px rgba(214,232,255,.72))}
-html[data-anime-illustrations="on"] [data-feature-icon="workspace"]{--anime-feature-icon:url("/assets/anime/nav-workspace-96.png?v=2")}
-html[data-anime-illustrations="on"] [data-feature-icon="chapters"]{--anime-feature-icon:url("/assets/anime/nav-chapters-96.png?v=2")}
-html[data-anime-illustrations="on"] [data-feature-icon="pipeline"]{--anime-feature-icon:url("/assets/anime/nav-pipeline-96.png?v=2")}
-html[data-anime-illustrations="on"] [data-feature-icon="ai-log"]{--anime-feature-icon:url("/assets/anime/nav-ai-log-96.png?v=2")}
-html[data-anime-illustrations="on"] [data-feature-icon="terminology"]{--anime-feature-icon:url("/assets/anime/nav-terminology-96.png?v=2")}
-html[data-anime-illustrations="on"] [data-feature-icon="characters"]{--anime-feature-icon:url("/assets/anime/nav-characters-96.png?v=2")}
-html[data-anime-illustrations="on"] [data-feature-icon="pronouns"]{--anime-feature-icon:url("/assets/anime/nav-pronouns-96.png?v=2")}
-html[data-anime-illustrations="on"] [data-feature-icon="r19"]{--anime-feature-icon:url("/assets/anime/nav-r19-96.png?v=2")}
-html[data-anime-illustrations="on"] [data-feature-icon="hakoEdit"]{--anime-feature-icon:url("/assets/anime/nav-hako-edit-96.png?v=2")}
-html[data-anime-illustrations="on"] [data-feature-icon="sharing"]{--anime-feature-icon:url("/assets/anime/nav-sharing-96.png?v=2")}
-html[data-anime-illustrations="on"] [data-feature-icon="help"]{--anime-feature-icon:url("/assets/anime/nav-help-96.png?v=2")}
-html[data-anime-illustrations="on"] [data-feature-icon="settings"]{--anime-feature-icon:url("/assets/anime/nav-settings-96.png?v=2")}
-html[data-anime-illustrations="on"] .feature-row-icon[data-feature-icon]{width:30px;height:30px;margin:0;padding:0;border:0;border-radius:0;background-color:transparent;background-image:var(--anime-feature-icon);background-position:center;background-size:contain;background-repeat:no-repeat;font-size:0}
-html[data-anime-illustrations="on"] .feature-row-icon[data-feature-icon="chapters"]{background-position:-8px center;background-size:38px 38px}
-html[data-anime-illustrations="on"] .feature-row-icon[data-feature-icon="settings"]{filter:brightness(1.28) saturate(1.08) drop-shadow(0 0 1px rgba(214,232,255,.72))}
+html[data-anime-illustrations="on"] .nav-item[data-view="workspace"]{--anime-nav-icon:url("/assets/anime/nav-workspace-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-view="chapters"]{--anime-nav-icon:url("/assets/anime/nav-chapters-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-view="pipeline"]{--anime-nav-icon:url("/assets/anime/nav-pipeline-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-feature-action="ai-log"]{--anime-nav-icon:url("/assets/anime/nav-ai-log-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-view="terminology"]{--anime-nav-icon:url("/assets/anime/nav-terminology-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-view="characters"]{--anime-nav-icon:url("/assets/anime/nav-characters-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-view="pronouns"]{--anime-nav-icon:url("/assets/anime/nav-pronouns-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-view="r19"]{--anime-nav-icon:url("/assets/anime/nav-r19-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-view="hakoEdit"]{--anime-nav-icon:url("/assets/anime/nav-hako-edit-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-view="sharing"]{--anime-nav-icon:url("/assets/anime/nav-sharing-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-view="help"]{--anime-nav-icon:url("/assets/anime/nav-help-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-view="settings"]{--anime-nav-icon:url("/assets/anime/nav-settings-v2.png")}
+html[data-anime-illustrations="on"] .nav-item[data-view]>.nav-icon,html[data-anime-illustrations="on"] .nav-item[data-feature-action="ai-log"]>.nav-icon{flex:0 0 24px;width:24px;height:24px;margin:0;padding:0;border:0;border-radius:0;background-color:transparent;background-image:var(--anime-nav-icon);background-position:center;background-size:contain;background-repeat:no-repeat;font-size:0}
+html[data-anime-illustrations="on"] [data-feature-icon="workspace"]{--anime-feature-icon:url("/assets/anime/nav-workspace-v2.png")}
+html[data-anime-illustrations="on"] [data-feature-icon="chapters"]{--anime-feature-icon:url("/assets/anime/nav-chapters-v2.png")}
+html[data-anime-illustrations="on"] [data-feature-icon="pipeline"]{--anime-feature-icon:url("/assets/anime/nav-pipeline-v2.png")}
+html[data-anime-illustrations="on"] [data-feature-icon="ai-log"]{--anime-feature-icon:url("/assets/anime/nav-ai-log-v2.png")}
+html[data-anime-illustrations="on"] [data-feature-icon="terminology"]{--anime-feature-icon:url("/assets/anime/nav-terminology-v2.png")}
+html[data-anime-illustrations="on"] [data-feature-icon="characters"]{--anime-feature-icon:url("/assets/anime/nav-characters-v2.png")}
+html[data-anime-illustrations="on"] [data-feature-icon="pronouns"]{--anime-feature-icon:url("/assets/anime/nav-pronouns-v2.png")}
+html[data-anime-illustrations="on"] [data-feature-icon="r19"]{--anime-feature-icon:url("/assets/anime/nav-r19-v2.png")}
+html[data-anime-illustrations="on"] [data-feature-icon="hakoEdit"]{--anime-feature-icon:url("/assets/anime/nav-hako-edit-v2.png")}
+html[data-anime-illustrations="on"] [data-feature-icon="sharing"]{--anime-feature-icon:url("/assets/anime/nav-sharing-v2.png")}
+html[data-anime-illustrations="on"] [data-feature-icon="help"]{--anime-feature-icon:url("/assets/anime/nav-help-v2.png")}
+html[data-anime-illustrations="on"] [data-feature-icon="settings"]{--anime-feature-icon:url("/assets/anime/nav-settings-v2.png")}
+html[data-anime-illustrations="on"] .feature-row-icon[data-feature-icon]{width:32px;height:32px;margin:0;padding:0;border:0;border-radius:0;background-color:transparent;background-image:var(--anime-feature-icon);background-position:center;background-size:contain;background-repeat:no-repeat;font-size:0}
 @keyframes aiko-brand-shimmer{0%,76%,100%{background-position:100% 0}88%{background-position:0 0}}
 @keyframes aiko-brand-star{0%,78%,92%,100%{opacity:0;transform:translate(-5px,4px) scale(.65)}84%{opacity:1;transform:translate(0,0) scale(1)}88%{opacity:.45;transform:translate(3px,-2px) scale(.82)}}
 
@@ -131,9 +127,15 @@ html[data-anime-illustrations="on"] :is(.character-empty,.pronoun-empty,.empty-r
 html[data-anime-illustrations="on"] :is(.empty-review,.ai-log-empty)::before{width:150px;height:124px}
 html[data-anime-illustrations="on"] .review-loading{position:relative;isolation:isolate;min-height:320px;place-content:center;place-items:center;overflow:hidden}
 html[data-anime-illustrations="on"] .review-loading :is(span,i){display:none}
-html[data-anime-illustrations="on"] .review-loading::before{content:"";display:block;width:min(235px,66vw);aspect-ratio:430/561;background-image:url("/assets/anime/aiko-wand-circle-padded-v15.png");background-repeat:no-repeat;background-size:400% 200%;background-position:0 0;filter:drop-shadow(0 8px 20px rgba(55,175,226,.18));animation:aiko-wand-circle 1.2s linear infinite;pointer-events:none}
-@keyframes aiko-wand-circle{0%,12.49%{background-position:0 0}12.5%,24.99%{background-position:33.333333% 0}25%,37.49%{background-position:66.666667% 0}37.5%,49.99%{background-position:100% 0}50%,62.49%{background-position:0 100%}62.5%,74.99%{background-position:33.333333% 100%}75%,87.49%{background-position:66.666667% 100%}87.5%,100%{background-position:100% 100%}}
+html[data-anime-illustrations="on"] .review-loading::before{content:"";display:block;width:min(360px,66vw);max-width:100%;aspect-ratio:16/9;border-radius:12px;background:url("/assets/anime/aiko-reading-loading-v2.webp") center/contain no-repeat;pointer-events:none}
 @media(max-width:700px){.theme-options{grid-template-columns:1fr 1fr}}
 @media(max-width:440px){.theme-options{grid-template-columns:1fr}}
 @media(pointer:coarse){html[data-brush-cursor="on"] :is(textarea,.CodeMirror-lines,.markdown-preview,[contenteditable="true"]){cursor:text}}
-@media(prefers-reduced-motion:reduce){html[data-theme="aiko-anime"] .brand strong,html[data-theme="aiko-anime"] .brand strong::after,html[data-anime-illustrations="on"] .review-loading::before{animation:none}html[data-theme="aiko-anime"] .brand:hover .brand-mark{transform:none}}
+@media(prefers-reduced-motion:reduce){html[data-theme="aiko-anime"] .brand strong,html[data-theme="aiko-anime"] .brand strong::after,html[data-anime-illustrations="on"] .review-loading::before{animation:none}html[data-anime-illustrations="on"] .review-loading::before{background-image:url("/assets/anime/aiko-reading-loading-still-v2.webp")}html[data-theme="aiko-anime"] .brand:hover .brand-mark{transform:none}}
+
+/* Give small anime silhouettes a readable edge without changing their palette. */
+html[data-anime-illustrations="on"] :is(.nav-icon,.feature-row-icon[data-feature-icon]){text-shadow:none}
+html[data-anime-illustrations="on"]:not([data-theme="quiet-light"]) :is(.nav-item[data-view],.nav-item[data-feature-action="ai-log"])>.nav-icon,
+html[data-anime-illustrations="on"]:not([data-theme="quiet-light"]) .feature-row-icon[data-feature-icon]{filter:brightness(1.12) drop-shadow(0 1px 0 rgba(210,232,250,.45))}
+html[data-anime-illustrations="on"][data-theme="quiet-light"] :is(.nav-item[data-view="settings"]>.nav-icon,.feature-row-icon[data-feature-icon="settings"]){filter:none}
+@media(max-width:600px){html[data-anime-illustrations="on"] :is(.character-empty,.pronoun-empty,.empty-review,.ai-log-empty)::before{width:120px;height:100px}html[data-anime-illustrations="on"] .review-loading::before{width:min(300px,76vw)}}

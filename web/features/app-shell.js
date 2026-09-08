@@ -14,7 +14,7 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
   };
   const appThemes=[
     {id:'quiet-light',name:'Quiet Light',description:'Sáng, nhẹ mắt',color:'#f5f5f5'},
-    {id:'dark-modern',name:'Dark Modern',description:'Tối mặc định',color:'#101412'},
+    {id:'dark-modern',name:'Dark Modern',description:'Tối hiện đại',color:'#101412'},
     {id:'github-dark',name:'GitHub Theme',description:'Dark Default chính thức',color:'#0d1117'},
     {id:'one-dark-pro',name:'One Dark Pro',description:'Atom cổ điển',color:'#282c34'},
     {id:'synthwave-84',name:"SynthWave '84",description:'Neon hoài cổ',color:'#21182d'},
@@ -133,7 +133,7 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
       const isFixed=fixedSidebarFeatures.has(item.id);
       const canReorder=isPinned&&!footerSidebarFeatures.has(item.id);
       const note=footerSidebarFeatures.has(item.id)?' · Hiện ở cuối sidebar':'';
-      return `<div class="feature-row" ${canReorder?`draggable="true" data-feature-drag="${item.id}"`:''}>${canReorder?'<span class="feature-drag-handle" aria-hidden="true">⋮⋮</span>':'<span class="feature-drag-spacer"></span>'}<span class="feature-row-icon" data-feature-icon="${item.id}">${escapeHtml(item.icon)}</span><button class="feature-row-copy" type="button" data-feature-open="${item.id}"><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.description+note)}</small></button><span class="feature-row-actions">${isFixed?'<span class="feature-fixed-label">Luôn hiển thị</span>':`<button class="pin ${isPinned?'active':''}" data-feature-pin="${item.id}">${isPinned?'Gỡ':'Ghim'}</button>`}</span></div>`;
+      return `<div class="feature-row" ${canReorder?`draggable="true" data-feature-drag="${item.id}"`:''}>${canReorder?'<span class="feature-drag-handle" aria-hidden="true"><span class="ui-icon ui-icon-grip" aria-hidden="true"></span></span>':'<span class="feature-drag-spacer"></span>'}<span class="feature-row-icon" data-feature-icon="${item.id}">${escapeHtml(item.icon)}</span><button class="feature-row-copy" type="button" data-feature-open="${item.id}"><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.description+note)}</small></button><span class="feature-row-actions">${isFixed?'<span class="feature-fixed-label">Luôn hiển thị</span>':`<button class="pin ${isPinned?'active':''}" data-feature-pin="${item.id}">${isPinned?'Gỡ':'Ghim'}</button>`}</span></div>`;
     }).join('');
     $('#pinnedFeatureCount').textContent=pinnedFeatures.length;
     $('#availableFeatureCount').textContent=featureDefinitions.length-pinnedFeatures.length-fixedSidebarFeatures.size;
@@ -151,7 +151,7 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
   pinnedFeatures=[...defaultPinnedFeatures];
   
   function renderThemeOptions() {
-    const current=document.documentElement.dataset.theme||'dark-modern';
+    const current=document.documentElement.dataset.theme||'aiko-anime';
     $('#themeOptions').innerHTML=appThemes.map(theme=>`<button class="theme-option ${theme.id===current?'active':''}" type="button" data-theme-option="${theme.id}" aria-pressed="${theme.id===current}"><span class="theme-swatch" aria-hidden="true"></span><span><strong>${theme.name}</strong><small>${theme.description}</small></span></button>`).join('');
     $$('[data-theme-option]').forEach(button=>button.onclick=()=>applyTheme(button.dataset.themeOption));
   }

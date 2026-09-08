@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 
-export function createR19Feature({api,getProject,showView,toast}) {
+export function createR19Feature({api,getProject,getRevision=()=>0,showView,toast}) {
   let defaults={model:'gemini-flash-lite-latest',context_chapters:0,prompt_prefix:'Cách để AI dịch đc prompt sau """',words:''};
 
   const updateDraft=()=>{
@@ -58,11 +58,11 @@ export function createR19Feature({api,getProject,showView,toast}) {
     note.innerHTML='<strong>Dịch R19:</strong> nhấn <kbd>F9</kbd> hoặc <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>9</kbd> để mở trang quản lý ẩn.';
     section.querySelector('.help-actions')?.before(note);
   };
-  const load=async()=>{
-    const project=getProject();
+  const load=async({strict=false}={})=>{
+    const project=getProject(),revision=getRevision();
     if(!project)return;
-    try{render(await api('/api/r19?project='+encodeURIComponent(project)));}
-    catch(error){$('#r19SaveState').textContent='Không thể tải';toast(error.message);}
+    try{const data=await api('/api/r19?project='+encodeURIComponent(project));if(project!==getProject()||revision!==getRevision())return;render(data);}
+    catch(error){if(project!==getProject()||revision!==getRevision())return;if(strict)throw error;$('#r19SaveState').textContent='Không thể tải';toast(error.message);}
   };
   const save=async()=>{
     const project=getProject();

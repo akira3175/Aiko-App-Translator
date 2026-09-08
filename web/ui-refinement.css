@@ -168,8 +168,8 @@ html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav:hover {
 
 html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav,
 html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav:hover {
-  flex-basis: 56px;
-  width: 56px;
+  flex-basis: 44px;
+  width: 44px;
   border-color: transparent;
   background: transparent;
 }
@@ -180,9 +180,9 @@ html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav > span {
 
 html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav::before {
   display: block;
-  width: 52px;
-  height: 40px;
-  background-image: url("/assets/anime/aiko-chapter-arrow-compact.png");
+  width: 28px;
+  height: 32px;
+  background-image: url("/assets/anime/aiko-chapter-chevron-v1.svg");
 }
 
 html[data-anime-illustrations="on"] .workspace-toolbar #nextChapter::before {
@@ -248,3 +248,7 @@ body.focus #workspaceView.active .editor-grid {
   #retranslateButton { display: none; }
   .workspace-toolbar .workspace-action { flex: 1; }
 }
+
+html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav:disabled{opacity:.4;cursor:default}
+@media(prefers-reduced-motion:reduce){html[data-anime-illustrations="on"] .workspace-toolbar .chapter-nav::before{transition:none}html[data-anime-illustrations="on"] .workspace-toolbar #previousChapter:not(:disabled):hover::before{transform:none}html[data-anime-illustrations="on"] .workspace-toolbar #nextChapter:not(:disabled):hover::before{transform:scaleX(-1)}}

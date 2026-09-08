@@ -1,0 +1,14 @@
+.app-shell>main{position:relative}
+.app-shell>main.project-is-loading{isolation:isolate}
+#projectLoading{position:fixed;inset:0;z-index:35;display:grid;place-items:center;background:var(--surface);padding:24px}
+.project-is-loading .top-actions{opacity:.5}
+#projectLoading[hidden]{display:none}
+.project-loading-content{display:grid;justify-items:center;gap:20px;max-width:480px;text-align:center;color:var(--ink)}
+.project-loading-content p{margin:0;line-height:1.6;overflow-wrap:anywhere}
+.project-loading-spinner{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:project-loading-spin .8s linear infinite}
+.project-loading-art{display:none;width:min(360px,76vw);aspect-ratio:16/9;background:url('/assets/anime/aiko-reading-loading-v2.webp') center/contain no-repeat}
+html[data-anime-illustrations="on"] .project-loading-art{display:block}
+html[data-anime-illustrations="on"] .project-loading-spinner{display:none}
+#projectLoading.is-error :is(.project-loading-art,.project-loading-spinner){display:none}
+@keyframes project-loading-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.project-loading-spinner{animation:none}.project-loading-art{background-image:url('/assets/anime/aiko-reading-loading-still-v2.webp')}}

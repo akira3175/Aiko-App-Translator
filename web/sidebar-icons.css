@@ -1,0 +1,61 @@
+/* Shared functional icons across navigation, menus and controls. */
+.nav-item[data-view="workspace"], html [data-feature-icon="workspace"] { --sidebar-icon: url("/assets/icons/workspace.svg"); }
+.nav-item[data-view="chapters"], html [data-feature-icon="chapters"] { --sidebar-icon: url("/assets/icons/chapters.svg"); }
+.nav-item[data-view="pipeline"], html [data-feature-icon="pipeline"] { --sidebar-icon: url("/assets/icons/pipeline.svg"); }
+.nav-item[data-view="terminology"], html [data-feature-icon="terminology"] { --sidebar-icon: url("/assets/icons/terminology.svg"); }
+.nav-item[data-view="characters"], html [data-feature-icon="characters"] { --sidebar-icon: url("/assets/icons/characters.svg"); }
+.nav-item[data-view="pronouns"], html [data-feature-icon="pronouns"] { --sidebar-icon: url("/assets/icons/pronouns.svg"); }
+.nav-item[data-view="hakoEdit"], html [data-feature-icon="hakoEdit"] { --sidebar-icon: url("/assets/icons/hakoEdit.svg"); }
+.nav-item[data-view="settings"], html [data-feature-icon="settings"] { --sidebar-icon: url("/assets/icons/settings.svg"); }
+.nav-item[data-view="help"], html [data-feature-icon="help"] { --sidebar-icon: url("/assets/icons/help.svg"); }
+.nav-item[data-view="sharing"], html [data-feature-icon="sharing"] { --sidebar-icon: url("/assets/icons/sharing.svg"); }
+.nav-item[data-view="r19"], html [data-feature-icon="r19"] { --sidebar-icon: url("/assets/icons/r19.svg"); }
+.nav-item[data-feature-action="ai-log"], html [data-feature-icon="ai-log"] { --sidebar-icon: url("/assets/icons/ai-log.svg"); }
+.sidebar #allFeaturesButton { --sidebar-icon: url("/assets/icons/all.svg"); }
+html:not([data-anime-illustrations="on"]) .feature-row-icon[data-feature-icon],
+html:not([data-anime-illustrations="on"]) #sidebar .nav-item > .nav-icon {
+  display: inline-block;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font-size: 0;
+  color: inherit;
+  background: currentColor;
+  -webkit-mask: var(--sidebar-icon) center / contain no-repeat;
+  mask: var(--sidebar-icon) center / contain no-repeat;
+  filter: none;
+  text-shadow: none;
+}
+html:not([data-anime-illustrations="on"]) #sidebar .nav-item.active > .nav-icon,
+html:not([data-anime-illustrations="on"]) #sidebar .nav-item:hover > .nav-icon {
+  color: var(--accent);
+}
+html[data-theme="quiet-light"]:not([data-anime-illustrations="on"]) #sidebar .nav-item > .nav-icon {
+  color: var(--sidebar-ink);
+}
+html[data-theme="quiet-light"]:not([data-anime-illustrations="on"]) #sidebar .nav-item.active > .nav-icon,
+html[data-theme="quiet-light"]:not([data-anime-illustrations="on"]) #sidebar .nav-item:hover > .nav-icon {
+  color: var(--accent);
+}
+
+/* Control glyphs share the same 24px grid and 1.75px stroke. */
+html .ui-icon { display:inline-block; width:1em; height:1em; flex:0 0 auto; vertical-align:-.125em; background:currentColor; -webkit-mask:var(--ui-icon) center / contain no-repeat; mask:var(--ui-icon) center / contain no-repeat; }
+.ui-icon-close { --ui-icon:url("/assets/icons/close.svg"); }
+.ui-icon-left { --ui-icon:url("/assets/icons/left.svg"); }
+.ui-icon-right { --ui-icon:url("/assets/icons/right.svg"); }
+.ui-icon-up { --ui-icon:url("/assets/icons/up.svg"); }
+.ui-icon-down { --ui-icon:url("/assets/icons/down.svg"); }
+.ui-icon-chevron { --ui-icon:url("/assets/icons/chevron.svg"); }
+.ui-icon-menu { --ui-icon:url("/assets/icons/menu.svg"); }
+.ui-icon-swap { --ui-icon:url("/assets/icons/swap.svg"); }
+.ui-icon-check { --ui-icon:url("/assets/icons/check.svg"); }
+.ui-icon-grip { --ui-icon:url("/assets/icons/grip.svg"); }
+html .chapter-nav > .ui-icon { display:inline-block; width:18px; height:18px; background:currentColor; filter:none; }
+html:not([data-anime-illustrations="on"]) .feature-row-icon[data-feature-icon] { color:var(--muted); }
+
+/* Anime catalog tile matches the rest of the navigation family. */
+html[data-anime-illustrations="on"] #allFeaturesButton > .nav-icon { display:inline-block; flex:0 0 24px; width:24px; height:24px; font-size:0; background:url("/assets/anime/nav-all-v2.png") center / contain no-repeat; -webkit-mask:none; mask:none; }

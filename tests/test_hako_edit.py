@@ -3,7 +3,7 @@ import os
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 from services.publishing import PublishingService
 
@@ -77,6 +77,42 @@ class HakoEditTests(unittest.TestCase):
                     {"local_name": "v1_c2_s1.md", "chapter_id": "12", "remote_title": "Hai"},
                 ]
             )
+
+
+class HakoEditDelayTests(unittest.IsolatedAsyncioTestCase):
+    async def run_updates(self, stop=lambda: False, fail=False):
+        from up import edit_hako
+        events = []
+
+        async def update(_page, name, *_args):
+            events.append(name)
+            if fail:
+                raise RuntimeError("Update failed")
+
+        async def sleep(seconds):
+            events.append(seconds)
+
+        targets = [("first", "1", "First"), ("second", "2", "Second")]
+        with patch.object(edit_hako, "update_chapter", new=AsyncMock(side_effect=update)), \
+             patch.object(edit_hako.asyncio, "sleep", new=AsyncMock(side_effect=sleep)), \
+             patch.object(edit_hako, "stop_requested", side_effect=stop), \
+             patch("builtins.print"):
+            await edit_hako.update_chapters(None, targets, {"first": None, "second": None}, {})
+        return events
+
+    async def test_waits_ten_seconds_between_chapters_but_not_after_last(self):
+        self.assertEqual(["first"] + [1] * 10 + ["second"], await self.run_updates())
+
+    async def test_stop_during_wait_prevents_next_update(self):
+        checks = iter([False, False, False, True])
+        self.assertEqual(["first", 1, 1], await self.run_updates(stop=lambda: next(checks)))
+
+    async def test_stop_before_start_skips_updates(self):
+        self.assertEqual([], await self.run_updates(stop=lambda: True))
+
+    async def test_failed_update_stops_batch(self):
+        with self.assertRaisesRegex(RuntimeError, "Update failed"):
+            await self.run_updates(fail=True)
 
 
 if __name__ == "__main__":

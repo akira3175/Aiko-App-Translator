@@ -16,6 +16,14 @@ class FrontendRuntimeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("runtime-import-ok", result.stdout)
 
+    def test_project_loading_delay_retry_and_stale_completion(self):
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            ["node", "tests/project_loading_check.mjs"], cwd=root,
+            capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_web_review_hides_parallel_workers(self):
         root = Path(__file__).resolve().parents[1]
         script = (root / "web" / "features" / "pipeline.js").read_text(
@@ -46,6 +54,20 @@ class FrontendRuntimeTests(unittest.TestCase):
         self.assertIn("review_stage_model:getSetting('pipeline_review_model')", script)
         self.assertIn("review_stage_thinking:getSetting('pipeline_review_thinking')", script)
         self.assertIn("getSetting:key=>settingsFeature.getValue(key)", app)
+
+    def test_hako_edit_uses_injected_project_and_pipeline_dependencies(self):
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "web" / "features" / "hako-edit.js").read_text(
+            encoding="utf-8"
+        )
+        app = (root / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("executePipeline,getProject,getTargets", script)
+        self.assertIn("hako-public-url:${getProject()||''}", script)
+        self.assertNotIn("hako-public-url:${state.project||''}", script)
+        self.assertIn(
+            "createHakoEditFeature({api,escapeHtml,executePipeline:(...args)=>pipelineFeature.execute(...args)",
+            app,
+        )
 
     def test_console_only_follows_output_when_reader_is_near_bottom(self):
         root = Path(__file__).resolve().parents[1]

@@ -5,7 +5,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
   let pronounEditIndex=null;
   let reviewLoadingChapter=null;
 
-  async function loadContext() {
+  async function loadContext({strict=false}={}) {
     if (!state.project) return;
     const project=state.project, revision=state.projectRevision;
     try {
@@ -15,13 +15,14 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
       state.glossaryDirty=false;
     } catch(error) {
       if(state.project!==project||state.projectRevision!==revision)return;
+      if(strict)throw error;
       state.context={index:0,glossary:[],style_notes:'',prompt_preset:'default',prompt_role:'',prompt_task:'',prompt_presets:[],polish_prompt_preset:'default',polish_prompt_role:'',polish_prompt_task:'',polish_prompt_presets:[],raw_json:''}; toast(error.message);
     }
     state.glossaryDirty=false;
     renderContext($('#glossarySearch')?.value||'');
   }
   
-  async function loadCharacters() {
+  async function loadCharacters({strict=false}={}) {
     if(!state.project)return;
     const project=state.project, revision=state.projectRevision;
     try {
@@ -30,7 +31,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
       state.characters=data; state.characterDirty=false;
       $('#characterEditor').value=data.content||'';
       renderCharacters();
-    } catch(error) { if(state.project===project&&state.projectRevision===revision)toast(error.message); }
+    } catch(error) { if(state.project===project&&state.projectRevision===revision){if(strict)throw error;toast(error.message);} }
   }
   
   function renderCharacters() {
@@ -42,7 +43,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     $('#characterEmpty').classList.toggle('open',!content.trim()&&!state.characterDirty);
   }
   
-  async function loadPronouns() {
+  async function loadPronouns({strict=false}={}) {
     if(!state.project)return;
     const project=state.project, revision=state.projectRevision;
     try {
@@ -53,6 +54,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
       renderPronouns();
     } catch(error) {
       if(state.project!==project||state.projectRevision!==revision)return;
+      if(strict)throw error;
       state.pronouns={pairs:[],count:0,locked_count:0,raw_json:''};state.pronounCurrent=null;renderPronouns();toast(error.message);
     }
   }
@@ -317,7 +319,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     finally { button.disabled=false; button.textContent='Nạp glossary'; }
   }
   
-  async function loadReviews(source='') {
+  async function loadReviews(source='',{strict=false}={}) {
     if (!state.project) return;
     const project=state.project, revision=state.projectRevision;
     try {
@@ -328,7 +330,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
       $('#reviewBadge').textContent=data.items.length;
       $('#reviewSource').innerHTML=data.sources.map(x=>`<option value="${escapeHtml(x)}" ${x===data.source?'selected':''}>${escapeHtml(x)}</option>`).join('');
       renderWorkspaceReview();
-    } catch(error) { if(state.project!==project||state.projectRevision!==revision)return; state.reviews=[]; $('#reviewBadge').textContent='0'; toast(error.message); }
+    } catch(error) { if(state.project!==project||state.projectRevision!==revision)return;if(strict)throw error; state.reviews=[]; $('#reviewBadge').textContent='0'; toast(error.message); }
   }
   
   function renderWorkspaceReview() {

@@ -6,6 +6,7 @@ import shutil
 from dataclasses import dataclass
 from http import HTTPStatus
 from urllib.parse import unquote
+from services.library.search import search_chapters
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,13 @@ class ProjectRoutes:
 
     def handle_get(self, handler, path, query):
         project = query.get("project", [""])[0]
+        if path == "/api/story-search":
+            try:
+                raw, translated = self.project_folders(project)
+                handler.json_response(search_chapters(raw, translated, self.safe_file, self.read_text, query))
+            except (ValueError, OSError) as exc:
+                handler.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
         if path == "/api/projects":
             handler.json_response({"items": self.projects()})
             return True
