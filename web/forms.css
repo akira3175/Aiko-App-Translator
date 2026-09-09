@@ -297,12 +297,12 @@
   .python-settings { grid-area: content; min-width: 0; margin-top: 0; }
   .python-settings-head {
     position: sticky;
-    top: 88px;
+    top: 76px;
     z-index: 5;
-    margin: -8px -8px 18px;
+    margin: 0 0 18px;
     padding: 8px;
-    background: color-mix(in srgb,var(--bg) 92%,transparent);
-    backdrop-filter: blur(14px);
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
   }
 }
 .python-settings-head > div:first-child { min-width: 0; }

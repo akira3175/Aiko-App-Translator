@@ -1,6 +1,19 @@
 {
   "versions": [
     {
+      "version": "1.4.0",
+      "date": "2026-09-09",
+      "title": "Giao diện gọn hơn, hướng dẫn ngay trong từng trang",
+      "summary": "Tập trung hơn vào công việc chính, tìm chương cần sửa nhanh hơn và xem hướng dẫn mà không phải rời khỏi màn hình đang dùng.",
+      "highlights": [
+        "Tinh gọn tiêu đề, mô tả và khoảng trống thừa; sắp xếp lại các nút thao tác trên Kho chương, Thuật ngữ, Nhân vật, Edit Hako, Chia sẻ, R19 và Cài đặt.",
+        "Thêm nút hướng dẫn theo từng trang, giải thích chức năng, cách thao tác và các lưu ý quan trọng ngay trong ứng dụng.",
+        "Kho chương hiển thị điểm AI review, hỗ trợ sắp xếp điểm thấp trước và mở chi tiết review trực tiếp từ danh sách.",
+        "Tập trung lựa chọn model của từng công đoạn tại Quy trình dịch để việc cấu hình rõ ràng và nhất quán hơn.",
+        "Bổ sung hướng dẫn dùng cú pháp (note: ...) để tạo ghi chú đúng vị trí khi xuất bản hoặc cập nhật chương Hako bằng ứng dụng."
+      ]
+    },
+    {
       "version": "1.3.0",
       "date": "2026-09-08",
       "title": "Tìm toàn truyện và trải nghiệm Aiko mới",

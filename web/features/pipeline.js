@@ -43,7 +43,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     $('#targetEditor').value=next;
     editorRuntime.syncing=false;
   }
-  
+
   function replaceStreamLine(line,text) {
     const editor=editorViews.target;
     if(!editor)return;
@@ -59,7 +59,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     $('#targetEditor').value=editor.getValue();
     editorRuntime.syncing=false;
   }
-  
+
   function markNovelStreamLine(line,text) {
     const editor=editorViews.target;
     if(!editor)return;
@@ -73,7 +73,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     const viewport=editor.getViewport();
     if(safeLine<viewport.from+1||safeLine>=viewport.to-1)editor.scrollIntoView({line:safeLine,ch:0},80);
   }
-  
+
   async function applyNovelStreamEvents(job) {
     const events=(job.stream_events||[]).filter(event=>Number(event.sequence)>novelStreamSequence);
     let marker=null;
@@ -114,14 +114,14 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     if(reviewsChanged)await loadReviews($('#reviewSource').value||'');
     if(aiLogsChanged&&$('#aiLogDrawer').classList.contains('open'))await aiLogFeature.load(true);
   }
-  
+
   function queueNovelStreamEvent(event) {
     const previous=novelStreamPending[novelStreamPending.length-1];
     if(previous&&previous.type==='translation_snapshot'&&event.type==='translation_snapshot'&&previous.chapter===event.chapter)novelStreamPending[novelStreamPending.length-1]=event;
     else novelStreamPending.push(event);
     if(!novelStreamFrame)novelStreamFrame=requestAnimationFrame(flushNovelStreamEvents);
   }
-  
+
   async function flushNovelStreamEvents() {
     novelStreamFrame=null;
     if(novelStreamApplying){novelStreamFrame=requestAnimationFrame(flushNovelStreamEvents);return;}
@@ -134,7 +134,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
       if(novelStreamPending.length&&!novelStreamFrame)novelStreamFrame=requestAnimationFrame(flushNovelStreamEvents);
     }
   }
-  
+
   function openNovelEventStream(kind) {
     if(novelStreamSource)novelStreamSource.close();
     novelStreamPending=[];
@@ -178,10 +178,9 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
   };
   const multiChapterTasks=new Set(['pipeline','interactions']);
   let pendingTask=null;
-  
-  
+
+
   function initPipeline() {
-    $('#pipelineTotal').textContent=`${pipelineItems.length} tác vụ`;
     $('#pipelineTabs').innerHTML=Object.entries(pipelineGroups).map(([key,group])=>{
       const count=pipelineItems.filter(item=>item.group===key).length;
       return `<button type="button" data-pipeline-group="${key}" aria-current="${key===activePipelineGroup?'page':'false'}" class="${key===activePipelineGroup?'active':''}"><span>${group.title}</span><b>${count}</b></button>`;
@@ -199,7 +198,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     const group=pipelineGroups[activePipelineGroup];
     const items=pipelineItems.filter(item=>item.group===activePipelineGroup);
     $('#pipelineGroupTitle').textContent=group.title;
-    $('#pipelineGroupDescription').textContent=group.description;
+
     $('#pipelineGrid').innerHTML=items.map(item=>`<article class="pipeline-card"><div class="number" aria-hidden="true">${item.code}</div><div><h3>${item.title}</h3><p>${item.desc}</p></div><button class="secondary" data-run="${item.id}">Chạy tác vụ</button></article>`).join('');
   }
   function updateConsoleOutput(text) {
@@ -231,7 +230,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     });
     return [...unique.values()].sort((a,b)=>a.key.localeCompare(b.key));
   }
-  
+
   async function copyPlainText(text) {
     try {
       if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);
@@ -299,7 +298,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     $('#taskFields').innerHTML=fields;
     $('#taskModal').classList.add('open');
   }
-  
+
   function confirmTask() {
     const config=Object.fromEntries($$('[data-task-field]').map(field=>[field.dataset.taskField,field.type==='checkbox'?field.checked:field.value]));
     if(pendingTask==='pipeline'){
@@ -357,7 +356,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     if(!confirmGlossaryCoverage(pendingTask,config))return;
     $('#taskModal').classList.remove('open'); executePipeline(pendingTask,config);
   }
-  
+
   function confirmGlossaryCoverage(kind,config={}) {
     if(!['pipeline','interactions','manual','retranslate'].includes(kind))return true;
     const glossaryIndex=Number(state.context?.index)||0;
@@ -373,7 +372,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     const range=endChapter===startIndex+1?`chương ${endChapter}`:`chương ${startIndex+1}–${endChapter}`;
     return confirm(`Glossary mới được duyệt đến chương ${glossaryIndex}, nhưng tác vụ có thể dịch ${range}.\n\nNhấn OK để vẫn dịch hoặc Cancel để hủy.`);
   }
-  
+
   function setTaskStopControls(translation,running) {
     const after=$('#stopAfterCurrent'), immediate=$('#stopImmediately'), current=$('#stopCurrentTask');
     after.style.display=translation&&running?'':'none';
@@ -381,7 +380,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     current.style.display=!translation&&running?'':'none';
     after.disabled=false; immediate.disabled=false; current.disabled=false;
   }
-  
+
   async function executePipeline(kind,config,options={}) {
     activeJobKind=kind;
     lastLiveDataRefresh=0;
@@ -399,7 +398,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
   async function pollJob(kind, button, options={}) {
     try { const job=await api('/api/job/'+kind); if(!novelStreamSource)await applyNovelStreamEvents(job); updateConsoleOutput(job.output || 'Đang xử lý…'); options.onUpdate?.(job); if(job.status==='running'){const now=Date.now();if(now-lastLiveDataRefresh>=1200){lastLiveDataRefresh=now;if(['pipeline','interactions','manual'].includes(kind))await loadChapters();if(kind==='review')await loadReviews($('#reviewSource').value||'');}return setTimeout(()=>pollJob(kind,button,options),500);} activeJobKind=null; button.disabled=false; button.textContent=job.status==='done'?'Chạy lại':'Thử lại'; toast(job.status==='done'?'Tác vụ đã hoàn tất':job.status==='cancelled'?'Đã dừng tác vụ':'Tác vụ gặp lỗi'); await loadChapters(); if(kind==='review')await loadReviews(); if(kind==='context')await loadContext(); if(kind==='characters')await loadCharacters(); options.onComplete?.(job); } catch(error){ button.disabled=false; options.onComplete?.({status:'error',output:error.message}); toast(error.message); }
   }
-  
+
   async function restoreActiveJob(job) {
     if(!job)return;
     if(job.project&&state.project!==job.project&&state.projects.includes(job.project))await selectProject(job.project);
@@ -448,7 +447,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     if(job.streaming)openNovelEventStream(job.kind);
     pollJob(job.kind,button);
   }
-  
+
   async function bootstrapWorkspace() {
     let activeJob=null;
     try {
@@ -458,7 +457,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     await loadProjects(activeJob?.project||'');
     await restoreActiveJob(activeJob);
   }
-  
+
   async function cancelCurrentTask() {
     if(!activeJobKind)return toast('Không có tác vụ đang chạy');
     const button=$('#stopCurrentTask'); button.disabled=true;
@@ -466,7 +465,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     catch(error) { toast(error.message); }
     finally { button.disabled=false; }
   }
-  
+
   async function cancelTranslation(mode) {
     const after=mode==='after_current';
     const button=$(after?'#stopAfterCurrent':'#stopImmediately');
@@ -477,7 +476,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
       toast(after?'Sẽ dừng sau chương/batch hiện tại':'Đã gửi lệnh dừng ngay');
     } catch(error) { button.disabled=false; toast(error.message); }
   }
-  
+
   async function startRetranslate() {
     if (!state.current) return toast('Hãy chọn một chương trước');
     if(!confirmGlossaryCoverage('retranslate'))return;
@@ -494,7 +493,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
       pollRetranslate();
     } catch(error) { toast(error.message); }
   }
-  
+
   async function pollRetranslate() {
     try {
       const job=await api('/api/job/retranslate');
@@ -542,8 +541,8 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
       button.disabled=false;button.textContent='Hiệu đính';toast(error.message);
     }
   }
-  
-  
+
+
   function handleDocumentClick(event) {
     const run=event.target.closest('[data-run]');
     if(run)configureTask(run.dataset.run);

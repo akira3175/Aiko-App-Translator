@@ -1,7 +1,7 @@
 const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
 
-export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSetting,markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast}) {
+export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSetting,markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast,onReviewsChanged=()=>{}}) {
   let pronounEditIndex=null;
   let reviewLoadingChapter=null;
 
@@ -21,7 +21,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     state.glossaryDirty=false;
     renderContext($('#glossarySearch')?.value||'');
   }
-  
+
   async function loadCharacters({strict=false}={}) {
     if(!state.project)return;
     const project=state.project, revision=state.projectRevision;
@@ -33,16 +33,16 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
       renderCharacters();
     } catch(error) { if(state.project===project&&state.projectRevision===revision){if(strict)throw error;toast(error.message);} }
   }
-  
+
   function renderCharacters() {
     const content=$('#characterEditor').value, count=(content.match(/^##\s+.+$/gm)||[]).length;
     navigationCounts.characters=count;if($('#characterBadge'))$('#characterBadge').textContent=count;
-    $('#characterSummary').textContent=state.project?`${state.project} · ${count} nhân vật`:'Chưa chọn truyện.';
+
     $('#characterSaveState').textContent=state.characterDirty?'Chưa lưu':(!state.characters.exists?'Chưa có dữ liệu':state.characters.backup?'Đã lưu · Có backup':'Đã lưu');
     $('#characterPreview').innerHTML=markdownToHtml(content,[]);
     $('#characterEmpty').classList.toggle('open',!content.trim()&&!state.characterDirty);
   }
-  
+
   async function loadPronouns({strict=false}={}) {
     if(!state.project)return;
     const project=state.project, revision=state.projectRevision;
@@ -58,12 +58,12 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
       state.pronouns={pairs:[],count:0,locked_count:0,raw_json:''};state.pronounCurrent=null;renderPronouns();toast(error.message);
     }
   }
-  
+
   function pronounPairLabel(pair) {
     const latest=pair.latest||{};
     return latest.speaker&&latest.listener?`${latest.speaker} → ${latest.listener}`:(pair.characters||[]).join(' ↔ ');
   }
-  
+
   function renderPronouns() {
     const data=state.pronouns||{pairs:[],count:0,locked_count:0,raw_json:''};
     const query=($('#pronounSearch')?.value||'').trim().toLocaleLowerCase('vi');
@@ -73,7 +73,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
       return (!query||haystack.includes(query))&&(filter==='all'||(filter==='locked'&&pair.locked)||(filter==='conflict'&&pair.changed));
     });
     navigationCounts.pronouns=data.count||0;if($('#pronounBadge'))$('#pronounBadge').textContent=data.count||0;
-    $('#pronounSummary').textContent=state.project?`${state.project} · ${data.count||0} cặp · ${data.locked_count||0} đã khóa`:'Chưa chọn truyện.';
+
     $('#pronounCount').textContent=`${pairs.length}/${data.count||0} cặp`;
     $('#pronounRawJson').textContent=data.raw_json||'# Chưa có dữ liệu xưng hô.';
     $('#pronounList').innerHTML=pairs.length?pairs.map((pair,index)=>{
@@ -82,7 +82,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     }).join(''):'<div class="pronoun-list-empty">Không có cặp xưng hô phù hợp.</div>';
     renderPronounDetail();
   }
-  
+
   function renderPronounDetail() {
     const pair=(state.pronouns.pairs||[]).find(item=>item.key===state.pronounCurrent);
     if(!pair){$('#pronounDetail').innerHTML='<div class="pronoun-empty"><strong>Chưa có dữ liệu xưng hô</strong><span>Dữ liệu sẽ xuất hiện sau khi một chương chạy hậu xử lý.</span></div>';return;}
@@ -92,7 +92,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     $('#editPronounPair').onclick=()=>openPronounEditor();
     $('#deletePronounPair').onclick=deletePronounPair;
   }
-  
+
   function openPronounEditor(recordIndex=null) {
     const pair=(state.pronouns.pairs||[]).find(item=>item.key===state.pronounCurrent);
     if(!pair)return;
@@ -109,7 +109,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     $('#pronounLocked').checked=Boolean(pair.locked);
     $('#pronounModal').classList.add('open');
   }
-  
+
   async function savePronounEdit() {
     if(!state.pronounCurrent)return;
     const button=$('#savePronounEdit');button.disabled=true;button.textContent='Đang lưu…';
@@ -119,7 +119,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     } catch(error){toast(error.message);}
     finally{button.disabled=false;button.textContent='Lưu quy tắc';}
   }
-  
+
   async function deletePronounPair() {
     const pair=(state.pronouns.pairs||[]).find(item=>item.key===state.pronounCurrent);
     if(!pair||!confirm(`Xóa toàn bộ lịch sử “${pronounPairLabel(pair)}”?`))return;
@@ -128,7 +128,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
       state.pronounCurrent=state.pronouns.pairs[0]?.key||null;renderPronouns();toast('Đã xóa cặp xưng hô · Có thể khôi phục từ .bak');
     } catch(error){toast(error.message);}
   }
-  
+
   function setCharacterMode(mode) {
     const preview=mode==='preview';
     if(preview)renderCharacters();
@@ -136,7 +136,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     $('#characterPreview').classList.toggle('editor-hidden',!preview);
     $$('[data-character-mode]').forEach(button=>button.classList.toggle('active',button.dataset.characterMode===mode));
   }
-  
+
   async function saveCharacters() {
     if(!requireProject())return;
     const button=$('#saveCharacters'); button.disabled=true; button.textContent='Đang lưu…';
@@ -146,25 +146,25 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     } catch(error) { toast(error.message); }
     finally { button.disabled=false; button.textContent='Lưu hồ sơ'; }
   }
-  
+
   function renderContext(filter='') {
     const context=state.context||{index:0,glossary:[],style_notes:''};
     const query=filter.trim().toLowerCase();
     const items=(context.glossary||[]).map((item,index)=>({...item,index})).filter(item=>!query||item.source.toLowerCase().includes(query)||item.target.toLowerCase().includes(query));
-    $('#contextSummary').textContent=state.project?`${state.project} · context đến chương ${context.index||0}`:'Chưa chọn truyện.';
+
     $('#glossaryCount').textContent=`${items.length}/${(context.glossary||[]).length} thuật ngữ`;
     $('#glossaryList').innerHTML=items.length?items.map(item=>`<div class="glossary-row" data-glossary-index="${item.index}"><input data-glossary-field="source" value="${escapeHtml(item.source)}" placeholder="Nguyên văn" aria-label="Nguyên văn thuật ngữ"><i>→</i><input data-glossary-field="target" value="${escapeHtml(item.target)}" placeholder="Bản dịch" aria-label="Bản dịch thuật ngữ"><button type="button" data-delete-glossary aria-label="Xóa ${escapeHtml(item.source||'thuật ngữ')}">Xóa</button></div>`).join(''):'<div class="memory-empty">Không có thuật ngữ phù hợp.</div>';
     $('#saveGlossaryButton').disabled=!state.glossaryDirty;
     $('#glossarySaveState').textContent=state.glossaryDirty?'Có thay đổi chưa lưu':'Đã đồng bộ';
     $('#styleNotes').textContent=context.style_notes||'Chưa có style note cho truyện này.';
   }
-  
+
   function markGlossaryDirty() {
     state.glossaryDirty=true;
     $('#saveGlossaryButton').disabled=false;
     $('#glossarySaveState').textContent='Có thay đổi chưa lưu';
   }
-  
+
   function addGlossaryItem() {
     if(!requireProject())return;
     state.context.glossary.push({source:'',target:''});
@@ -173,7 +173,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     renderContext();
     $('#glossaryList [data-glossary-index]:last-child input')?.focus();
   }
-  
+
   async function saveGlossaryChanges() {
     if(!requireProject())return;
     const items=(state.context.glossary||[]).map(item=>({source:String(item.source||'').trim(),target:String(item.target||'').trim()}));
@@ -186,12 +186,12 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     } catch(error) { toast(error.message); }
     finally { button.textContent='Lưu thay đổi';button.disabled=!state.glossaryDirty; }
   }
-  
+
   function requireProject() {
     if(state.project)return true;
     toast('Hãy chọn một truyện trước'); return false;
   }
-  
+
   async function openContextEditor() {
     if(!requireProject())return;
     if(state.glossaryDirty){
@@ -216,19 +216,19 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     updateContextEditorStatus();
     $('#contextModal').classList.add('open');
   }
-  
+
   function renderPromptPresets() {
     const presets=state.context.prompt_presets||[];
     const selected=state.context.prompt_preset||'default';
     $('#contextPromptPreset').innerHTML=presets.map(item=>`<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join('')+'<option value="custom">Tự viết</option>';
     $('#contextPromptPreset').value=presets.some(item=>item.key===selected)?selected:'custom';
   }
-  
+
   function selectedPromptPreset() {
     const key=$('#contextPromptPreset').value;
     return (state.context.prompt_presets||[]).find(item=>item.key===key);
   }
-  
+
   function applyPromptPreset() {
     const preset=selectedPromptPreset();
     if(preset){
@@ -238,7 +238,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     syncPromptPreset();
     updateContextEditorStatus();
   }
-  
+
   function syncPromptPreset() {
     const preset=selectedPromptPreset();
     if(preset&&($('#contextPromptRole').value!==preset.role||$('#contextPromptTask').value!==preset.task)){
@@ -247,19 +247,19 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     const current=selectedPromptPreset();
     $('#contextPromptPresetHint').textContent=current?current.description:'Nội dung tự viết được lưu riêng cho truyện này.';
   }
-  
+
   function renderPolishPromptPresets() {
     const presets=state.context.polish_prompt_presets||[];
     const selected=state.context.polish_prompt_preset||'default';
     $('#contextPolishPromptPreset').innerHTML=presets.map(item=>`<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join('')+'<option value="custom">Tự viết</option>';
     $('#contextPolishPromptPreset').value=presets.some(item=>item.key===selected)?selected:'custom';
   }
-  
+
   function selectedPolishPromptPreset() {
     const key=$('#contextPolishPromptPreset').value;
     return (state.context.polish_prompt_presets||[]).find(item=>item.key===key);
   }
-  
+
   function applyPolishPromptPreset() {
     const preset=selectedPolishPromptPreset();
     if(preset){
@@ -269,7 +269,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     syncPolishPromptPreset();
     updateContextEditorStatus();
   }
-  
+
   function syncPolishPromptPreset() {
     const preset=selectedPolishPromptPreset();
     if(preset&&($('#contextPolishPromptRole').value!==preset.role||$('#contextPolishPromptTask').value!==preset.task)){
@@ -278,12 +278,12 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     const current=selectedPolishPromptPreset();
     $('#contextPolishPromptPresetHint').textContent=current?current.description:'Nội dung tự viết được lưu riêng cho truyện này.';
   }
-  
+
   function setContextTab(tab) {
     $$('[data-context-tab]').forEach(button=>button.classList.toggle('active',button.dataset.contextTab===tab));
     $$('[data-context-pane]').forEach(pane=>pane.classList.toggle('active',pane.dataset.contextPane===tab));
   }
-  
+
   function updateContextEditorStatus() {
     const glossary=$('#contextGlossaryEditor').value.split(/\r?\n/).filter(line=>line.trim());
     const invalid=glossary.filter(line=>{const [source,...target]=line.split('=');return !source?.trim()||!target.join('=').trim();});
@@ -295,7 +295,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     status.querySelector('span').textContent=invalid.length?`${invalid.length} dòng glossary chưa hợp lệ`:promptMissing?'Vai trò và nhiệm vụ không được để trống':'Sẵn sàng kiểm tra và lưu';
     status.querySelector('small').textContent=invalid.length?'Mỗi dòng cần có dạng Raw = Dịch.':promptMissing?'Chọn một preset hoặc tự nhập đầy đủ hai phần prompt.':'Bản cũ sẽ được sao lưu tự động trước khi thay thế.';
   }
-  
+
   async function saveContextJson() {
     const button=$('#saveContextEdit'); button.disabled=true; button.textContent='Đang lưu…';
     try {
@@ -308,7 +308,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     } catch(error) { toast(error.message); }
     finally { button.disabled=false; button.textContent='Kiểm tra và lưu an toàn'; }
   }
-  
+
   async function importGlossary() {
     const button=$('#confirmGlossaryImport'); button.disabled=true; button.textContent='Đang nạp…';
     try {
@@ -318,7 +318,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     } catch(error) { toast(error.message); }
     finally { button.disabled=false; button.textContent='Nạp glossary'; }
   }
-  
+
   async function loadReviews(source='',{strict=false}={}) {
     if (!state.project) return;
     const project=state.project, revision=state.projectRevision;
@@ -326,13 +326,13 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
       const query = '?project='+encodeURIComponent(project)+(source?'&source='+encodeURIComponent(source):'');
       const data = await api('/api/reviews'+query);
       if(state.project!==project||state.projectRevision!==revision)return;
-      state.reviews=data.items; state.reviewCurrent=null;
+      state.reviews=data.items; state.reviewCurrent=null; onReviewsChanged();
       $('#reviewBadge').textContent=data.items.length;
       $('#reviewSource').innerHTML=data.sources.map(x=>`<option value="${escapeHtml(x)}" ${x===data.source?'selected':''}>${escapeHtml(x)}</option>`).join('');
       renderWorkspaceReview();
-    } catch(error) { if(state.project!==project||state.projectRevision!==revision)return;if(strict)throw error; state.reviews=[]; $('#reviewBadge').textContent='0'; toast(error.message); }
+    } catch(error) { if(state.project!==project||state.projectRevision!==revision)return;if(strict)throw error; state.reviews=[]; onReviewsChanged(); $('#reviewBadge').textContent='0'; toast(error.message); }
   }
-  
+
   function renderWorkspaceReview() {
     const chapterId=(state.current||'').replace(/\.md$/,'');
     const item=state.reviews.find(x=>x.chapter_id===chapterId);
@@ -348,7 +348,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     const issues=item.issues||[];
     reviewBody.innerHTML=`<div class="review-detail-head"><div class="review-metrics"><span class="metric">Điểm <strong>${item.score??'—'}/10</strong></span><span class="metric"><strong>${item.issue_count??issues.length}</strong> lỗi</span></div></div><p class="review-copy">${escapeHtml(item.summary||'Không có tóm tắt.')}</p><div class="issues">${issues.length?issues.map((issue,index)=>`<section class="issue"><div class="issue-top"><span class="issue-type">Lỗi ${index+1} · ${escapeHtml(issue.type||'khác')}</span><span>${escapeHtml(issue.severity||'')}</span></div><dl><div><dt>NGUYÊN VĂN</dt><dd>${escapeHtml(issue.original_kr||issue.original||'—')}</dd></div><div><dt>BẢN DỊCH</dt><dd>${escapeHtml(issue.original_vi||issue.translation||'—')}</dd></div><div><dt>ĐỀ XUẤT</dt><dd class="suggestion">${escapeHtml(issue.suggestion||'—')}</dd></div></dl></section>`).join(''):'<div class="empty-review"><strong>Không phát hiện lỗi</strong><span>Chương này đã đạt yêu cầu.</span></div>'}</div>`;
   }
-  
+
   async function reviewCurrentChapter() {
     const translatedChapters=state.chapters.filter(chapter=>chapter.translated);
     const targetIndex=translatedChapters.findIndex(
@@ -389,8 +389,8 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     reviewLoadingChapter=chapter;
     renderWorkspaceReview();
   }
-  
-  
+
+
   function handleDocumentClick(event) {
     const historyEdit=event.target.closest('[data-pronoun-history-index]');
     if(historyEdit){openPronounEditor(historyEdit.dataset.pronounHistoryIndex);return true;}

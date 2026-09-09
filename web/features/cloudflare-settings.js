@@ -1,11 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
 
-export function r2CredentialGuide(kind){
-  const label=kind==='sharing'?'Share R2':'R2 Xuất bản';
-  const note=kind==='sharing'?'<p>Nếu dùng <strong>Tự động thiết lập Cloudflare</strong> ở trên, app sẽ tự điền ba giá trị này.</p>':'';
-  return `<details class="cloudflare-token-guide r2-credential-guide"><summary>Cách lấy ${label} Account ID và Access Key</summary>${note}<ol><li>Mở <a href="https://dash.cloudflare.com/?to=/:account/r2/overview" target="_blank" rel="noopener noreferrer">Cloudflare → R2 Overview</a>. Trong <strong>Account Details</strong>, sao chép <strong>Account ID</strong>.</li><li>Chọn <strong>Manage R2 API Tokens</strong> rồi tạo Account API token hoặc User API token.</li><li>Chọn quyền <strong>Object Read & Write</strong>. Có thể giới hạn token vào bucket dùng cho ${kind==='sharing'?'chia sẻ':'ảnh xuất bản'}.</li><li>Sau khi tạo, sao chép đúng hai giá trị <strong>Access Key ID</strong> và <strong>Secret Access Key</strong> vào app.</li></ol><small>Secret Access Key chỉ được Cloudflare hiển thị một lần. Đây không phải chuỗi API Token dùng để deploy Worker.</small></details>`;
-}
-
 export function createCloudflareSettingsFeature({api,getSettingsItems,renderSettings,toast}){
   const setupPublishing=async()=>{
     const button=$('#setupPublishingR2'),token=$('#publishingR2Token').value.trim();

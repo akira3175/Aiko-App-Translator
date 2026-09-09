@@ -1,4 +1,4 @@
-import { createCloudflareSettingsFeature, r2CredentialGuide } from './cloudflare-settings.js';
+import { createCloudflareSettingsFeature } from './cloudflare-settings.js';
 
 const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
@@ -15,8 +15,9 @@ const settingsGroups={
 };
 const PROVIDER_LABELS={'gemini-api':'Gemini API','gemini-web':'Gemini Web','google-ai-studio-web':'Google AI Studio Web','openai-api':'OpenAI API','chatgpt-web':'ChatGPT Web'};
 const PIPELINE_OWNED_SETTING_KEYS=new Set([
-  'translate_model','polish_model','pronoun_model','review_bg_model','gemini_api_thinking',
+  'translate_model','polish_model','pronoun_model','review_bg_model','review_model','context_model','gemini_api_thinking',
   'gemini_web_model','gemini_thinking',
+  'ai_studio_model','ai_studio_pronoun_model','ai_studio_review_model',
   'gpt_api_translate_model','gpt_api_polish_model','gpt_api_pronoun_model','gpt_api_review_model',
   'gpt_api_translate_effort','gpt_api_polish_effort','gpt_api_review_effort',
 ]);
@@ -48,7 +49,7 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
     if(!$('#cloudflareDeployAccount').value)$('#cloudflareDeployAccount').value=items.find(item=>item.key==='share_r2_account_id')?.value||'';
     $('#settingsTabs').innerHTML=Object.entries(settingsGroups).map(([key,[label]])=>`<button type="button" role="tab" data-settings-tab="${key}" aria-selected="${key===activeGroup}" class="${key===activeGroup?'active':''}">${label}<span>${visibleSettingsForGroup(items,key).length+(key==='general'||key==='publishing'?1:0)}</span></button>`).join('');
     const [title,description]=settingsGroups[activeGroup];
-    $('#settingsGroupTitle').textContent=title; $('#settingsGroupDescription').textContent=description;
+    $('#settingsGroupTitle').textContent=title;
     $('#workspaceSettings').classList.toggle('active',activeGroup==='general');
     $('#geminiApiKeyManager').classList.toggle('active',activeGroup==='gemini-api');
     $('#publishingManager').classList.toggle('active',activeGroup==='publishing');
@@ -105,9 +106,9 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
     $('#pythonSettingsFields').innerHTML=activeGroup==='pipeline'
       ? `<div class="pipeline-stage-list">${pipelineStage('Dịch','translate')}${pipelineStage('Hiệu đính','polish')}${pipelineStage('Xuất xưng hô','pronouns')}${pipelineStage('Review','review')}${pipelineStage('Tạo Context','context')}${pipelineStage('Hồ sơ nhân vật','characters')}</div>`
       : activeGroup==='publishing'&&settingFields
-      ? `${r2CredentialGuide('publishing')}<details class="publishing-advanced"><summary>Cài đặt nâng cao: tài khoản Hako và kho ảnh</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
+      ? `<details class="publishing-advanced"><summary>Cài đặt nâng cao: tài khoản Hako và kho ảnh</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
       : activeGroup==='sharing'&&settingFields
-        ? `${r2CredentialGuide('sharing')}<details class="publishing-advanced"><summary>Cài đặt R2 nâng cao</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
+        ? `<details class="publishing-advanced"><summary>Cài đặt R2 nâng cao</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
         : settingFields;
     $$('[data-settings-tab]').forEach(button=>button.onclick=()=>{
       $$('[data-python-setting]').forEach(input=>{ const item=items.find(entry=>entry.key===input.dataset.pythonSetting); if(item)item.value=input.value; });
@@ -127,12 +128,12 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       $$('.pipeline-stage-setting').forEach(detail=>detail.open=opened.has(detail.dataset.pipelineStage));
     });
   }
-  
+
   async function load() {
     try { render((await api('/api/settings')).items); }
     catch(error) { toast(error.message); }
   }
-  
+
   async function loadLanStatus() {
     try {
       const data=await api('/api/lan/status'), card=$('#lanAccessCard');
@@ -144,7 +145,7 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       $('#copyLanAccess').disabled=!data.url;
     } catch(error) { $('#lanAccessState').textContent='Không đọc được trạng thái LAN'; }
   }
-  
+
   async function copyLanAccess() {
     const text=$('#lanAccessUrl').textContent;
     if(!text)return;
@@ -156,7 +157,7 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       toast('Đã sao chép địa chỉ mở trên điện thoại');
     } catch(error) { toast('Không thể sao chép địa chỉ'); }
   }
-  
+
   async function save() {
     const button=$('#savePythonSettings'); button.disabled=true;
     const values=Object.fromEntries(items.map(item=>[item.key,item.value]));
@@ -165,22 +166,22 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
     catch(error) { toast(error.message); }
     finally { button.disabled=false; }
   }
-  
+
   async function reset() {
     const button=$('#resetPythonSettings'); button.disabled=true;
     try { render((await api('/api/settings',{method:'POST',body:JSON.stringify({reset:true})})).items); await loadLanStatus(); toast('Đã khôi phục toàn bộ giá trị mặc định'); }
     catch(error) { toast(error.message); }
     finally { button.disabled=false; }
   }
-  
+
   async function openAppBrowser() {
     const button=$('#openAppBrowser'); button.disabled=true; button.textContent='Đang mở…';
     try { const result=await api('/api/app-browser/open',{method:'POST',body:'{}'}); toast(result.message); }
     catch(error) { toast(error.message); }
     finally { button.disabled=false; button.textContent='Mở Chrome'; }
   }
-  
-  
+
+
   function openGroup(group) {
     activeGroup=group;
     render(items);

@@ -22,52 +22,39 @@
   width: 17px;
 }
 
-.sidebar-foot .official-notice {
+html[data-theme] .sidebar-foot .official-notice {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: center;
-  column-gap: 8px;
-  row-gap: 2px;
-  margin: 1px 4px;
-  padding: 7px 10px;
+  gap: 4px;
+  margin: 12px 0 4px;
+  padding: 0 10px;
   border: 0;
-  border-left: 2px solid var(--accent);
-  border-radius: 0 8px 8px 0;
-  background: color-mix(in srgb, var(--sidebar-active) 48%, transparent);
+  border-radius: 0;
+  background: transparent;
 }
-
-.sidebar-foot .official-notice strong {
-  color: var(--accent);
-  font-size: 9px;
-  line-height: 1.35;
-  letter-spacing: .1em;
-  white-space: nowrap;
-}
-
-.sidebar-foot .official-notice span {
-  min-width: 0;
+html[data-theme] .sidebar-foot .official-notice > span {
   color: var(--sidebar-muted);
-  font-size: 10px;
-  line-height: 1.4;
+  font-size: 11px;
+  line-height: 1.5;
 }
-
-.sidebar-foot .official-notice span:last-child {
-  grid-column: 1 / -1;
-}
-
-.sidebar-foot .official-notice a {
+.sidebar-foot .official-links { display: flex; gap: 16px; }
+html[data-theme] .sidebar-foot .official-links a {
   color: var(--sidebar-ink);
+  font-size: 11px;
+  line-height: 1.5;
   text-decoration: none;
 }
-
-.sidebar-foot .official-notice a:hover {
+html[data-theme] .sidebar-foot .official-links a span {
+  color: inherit;
+  font-size: inherit;
+}
+html[data-theme] .sidebar-foot .official-links a:hover {
   color: var(--accent);
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
-
-.sidebar-foot .official-notice i {
-  margin: 0 5px;
-  color: var(--sidebar-muted);
+.sidebar-foot .official-links a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .sidebar-fixed-navigation {

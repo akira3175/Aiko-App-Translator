@@ -53,6 +53,221 @@ select { font: inherit; }
 .search:focus { box-shadow: 0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent); }
 
 .chapter-select { border-radius: 10px; }
+#r19View .r19-config-actions { flex-wrap: wrap; }
+#r19View .r19-config-heading { margin-right: auto; }
+#r19View .r19-config-heading small { display: block; margin-top: 6px; }
+#r19View .r19-config-actions .r19-master {
+  flex-direction: row;
+  align-items: center;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+#r19View .r19-master input { width: 1px; padding: 0; }
+#r19View .r19-master i { flex-shrink: 0; }
+#r19View .r19-master:focus-within { outline: 2px solid var(--accent); outline-offset: 4px; }
+#r19View #r19PromptPrefix {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.page-help-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 32px;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.page-help-button svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  /* Match the optical center of the adjacent text labels. */
+  transform: translateY(2px);
+}
+.top-actions #pageHelpButton {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  padding: 0;
+}
+.page-help-button:hover { background: var(--soft); color: var(--ink); }
+.page-help-button:focus-visible,
+#closePageHelp:focus-visible,
+#pageHelpBody:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#pageHelpDialog {
+  width: min(640px, calc(100vw - 28px));
+  max-height: min(760px, calc(100dvh - 40px));
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  overflow: hidden;
+}
+#pageHelpDialog[open] { display: flex; flex-direction: column; }
+#pageHelpDialog::backdrop { background: rgb(0 0 0 / 60%); }
+#pageHelpDialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--line);
+}
+#pageHelpTitle { margin: 0; font-size: 19px; line-height: 1.4; }
+#closePageHelp { flex: 0 0 36px; width: 36px; height: 36px; color: var(--ink); }
+#pageHelpBody { overflow-y: auto; overscroll-behavior: contain; padding: 24px; }
+#pageHelpBody section + section { margin-top: 24px; }
+#pageHelpBody h3 { margin: 0 0 8px; font-size: 15px; }
+#pageHelpBody p { margin: 0; font-size: 14px; line-height: 1.7; }
+@media (max-width: 600px) {
+  .top-actions #pageHelpButton { display: inline-flex; min-width: 44px; min-height: 44px; padding: 8px; }
+  #pageHelpDialog > header, #pageHelpBody { padding: 16px; }
+}
+
+/* Keep page actions at the trailing edge and search controls at the start. */
+#terminologyView .context-actions {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+#terminologyView .context-actions > .search {
+  min-width: 0;
+  width: min(360px, 100%);
+  margin-right: auto;
+}
+#terminologyView .context-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-left: auto;
+}
+#charactersView .character-head-actions {
+  margin-left: auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+#hakoEditView .hako-source-heading,
+#sharingView .share-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+#hakoEditView .hako-source-heading { grid-column: 1 / -1; }
+@media (min-width: 901px) {
+  /* Only the initial empty mapping fills the available desktop viewport. */
+  #hakoEditView .hako-edit-card:has(#hakoMapping > .memory-empty) {
+    min-height: calc(100dvh - 132px);
+    grid-template-rows: auto auto auto minmax(100px, 1fr) auto;
+  }
+  #hakoEditView .hako-edit-card:has(#hakoMapping > .memory-empty) #hakoMapping {
+    display: grid;
+    place-items: center;
+  }
+}
+#hakoEditView .hako-source-heading label { font-size: 12px; font-weight: 650; }
+#hakoEditView .inline-settings-button,
+#sharingView .inline-settings-button {
+  margin-left: auto;
+  padding: 6px 8px;
+  min-height: 32px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+#hakoEditView .inline-settings-button:hover,
+#sharingView .inline-settings-button:hover {
+  background: var(--soft);
+  color: var(--ink);
+}
+#settingsView .python-settings-head > div:last-child { margin-left: auto; }
+@media (max-width: 900px) {
+  #terminologyView .context-actions > .search { flex: 1 1 100%; }
+  #terminologyView .context-action-buttons { width: 100%; }
+}
+
+#chaptersView .chapter-toolbar { margin-bottom: 12px; }
+#chaptersView .chapter-row,
+#chaptersView .chapter-list-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(4, 112px);
+  align-items: center;
+  column-gap: 12px;
+  padding-inline: 18px;
+}
+#chaptersView .chapter-list-head {
+  padding-block: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+#chaptersView .chapter-list-head > :not(:first-child),
+#chaptersView .chapter-row > :not(:first-child) { justify-self: center; text-align: center; }
+#chaptersView .chapter-review-score {
+  border: 0;
+  border-radius: 6px;
+  min-height: 36px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+#chaptersView .chapter-review-score small { color: var(--muted); margin-left: 3px; }
+#chaptersView .chapter-review-score:hover { background: var(--soft); }
+#chaptersView .chapter-review-score:focus-visible { outline: 2px solid var(--accent); }
+#chaptersView #chapterReviewSort { width: auto; flex: 0 1 auto; margin-right: 0; }
+@media (max-width: 1100px) {
+  #chaptersView .chapter-row, #chaptersView .chapter-list-head {
+    grid-template-columns: minmax(0, 1fr) repeat(3, 100px);
+  }
+  #chaptersView .chapter-row .words, #chaptersView .chapter-list-head .words { display: none; }
+  #chaptersView .chapter-head-actions { flex-wrap: wrap; }
+}
+@media (max-width: 560px) {
+  #chaptersView .chapter-row, #chaptersView .chapter-list-head {
+    grid-template-columns: minmax(0, 1fr) repeat(2, 80px);
+    column-gap: 6px;
+    padding-inline: 10px;
+  }
+  #chaptersView .chapter-list-head .chapter-action { display: none; }
+  #chaptersView #chapterReviewSort { flex-basis: 100%; width: 100%; }
+}
+#chaptersView .chapter-head-actions { width: 100%; }
+#chaptersView .chapter-head-actions .search {
+  width: min(360px, 100%);
+  min-width: 0;
+  margin-right: auto;
+}
+#chaptersView .chapter-head-actions > button,
+#chaptersView .chapter-head-actions .search {
+  min-height: 40px;
+  padding-block: 8px;
+}
+#chaptersView .chapter-head-actions > button { white-space: nowrap; }
+@media (max-width: 700px) {
+  #chaptersView .chapter-head-actions .search {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  #chaptersView .chapter-head-actions > button { flex: 1; }
+}
 .editor-panel,
 .chapter-list,
 .popover,

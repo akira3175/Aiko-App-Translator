@@ -1,3 +1,4 @@
+import { chapterReviewMap } from './features/chapter-review.js';
 import { createStorySearchFeature } from './features/story-search.js';
 import { createProjectLoadingFeature } from './features/project-loading.js';
 import { api } from './api.js';
@@ -112,7 +113,7 @@ async function copyPlainText(text){
 let pipelineFeature;
 const editorFeature=createEditorFeature({api,escapeHtml,positionPopover,saveChapter,state,toast});
 const {markdownToHtml,refreshFind,renderMarkdownEditors,runtime:editorRuntime,setEditorValue,updateCounts,updateLineNumbers,value:editorValue,views:editorViews}=editorFeature;
-const projectMemoryFeature=createProjectMemoryFeature({api,escapeHtml,executePipeline:(...args)=>pipelineFeature.execute(...args),getSetting:key=>settingsFeature.getValue(key),markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast});
+const projectMemoryFeature=createProjectMemoryFeature({api,escapeHtml,executePipeline:(...args)=>pipelineFeature.execute(...args),getSetting:key=>settingsFeature.getValue(key),onReviewsChanged:()=>renderChapterList(),markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast});
 const {loadCharacters,loadContext,loadPronouns,loadReviews,renderContext,renderWorkspaceReview,requireProject,saveCharacters,saveGlossaryChanges}=projectMemoryFeature;
 const aiLogFeature=createAiLogFeature({api,copyPlainText,escapeHtml,getProject:()=>state.project,toast});
 const apiKeyFeature=createApiKeyFeature({api,escapeHtml,toast});
@@ -128,10 +129,13 @@ const settingsFeature=createSettingsFeature({api,escapeHtml,refreshUpdate:update
 const sharingFeature=createSharingFeature({api,copyPlainText,escapeHtml,getChapters:()=>state.chapters,getProject:()=>state.project,getRevision:()=>state.projectRevision,openSettings:()=>settingsFeature.openGroup('sharing'),toast});
 pipelineFeature=createPipelineFeature({aiLogFeature,api,editorRuntime,editorViews,escapeHtml,loadChapters,loadProjects,openChapter,projectMemoryFeature,publishingBooksFeature,saveChapter,selectProject,settingsFeature,showView,state,toast,updateCounts});
 
-function renderChapterList(filter='') {
+function renderChapterList(filter=$('#chapterSearch').value) {
   const query=filter.trim().toLocaleLowerCase('vi');
   const items = state.chapters.filter(item => !query||[item.title,item.id,item.name].some(value=>String(value||'').toLocaleLowerCase('vi').includes(query)));
-  $('#chapterList').innerHTML = items.length ? items.map(item => `<div class="chapter-row" data-chapter="${escapeHtml(item.name)}"><span class="chapter-row-copy"><strong>${escapeHtml(item.title||item.id)}</strong><small>${escapeHtml(item.id)}</small></span><span class="words">${item.words.toLocaleString('vi-VN')} ${escapeHtml(item.word_unit||'từ')}</span><span class="status ${item.translated?'':'pending'}">${item.translated?'Đã dịch':'Chờ dịch'}</span><span class="chapter-action">Mở chương →</span></div>`).join('') : '<div class="empty-state"><p>Không tìm thấy chương phù hợp.</p></div>';
+  const scores=chapterReviewMap(state.reviews);
+  const scoreFor=item=>scores.get(item.name.replace(/\.md$/,''))??null;
+  if($('#chapterReviewSort').value==='score')items.sort((a,b)=>(scoreFor(a)??Infinity)-(scoreFor(b)??Infinity));
+  $('#chapterList').innerHTML = items.length ? items.map(item => `<div class="chapter-row" data-chapter="${escapeHtml(item.name)}"><span class="chapter-row-copy"><strong>${escapeHtml(item.title||item.id)}</strong><small>${escapeHtml(item.id)}</small></span><span class="words">${item.words.toLocaleString('vi-VN')} ${escapeHtml(item.word_unit||'từ')}</span><span class="status ${item.translated?'':'pending'}">${item.translated?'Đã dịch':'Chờ dịch'}</span><span class="chapter-review-cell">${scoreFor(item)===null?'<span class="chapter-unreviewed">Ch&#432;a ch&#7845;m</span>':`<button class="chapter-review-score" type="button" data-chapter-review="${escapeHtml(item.name)}" aria-label="AI review ${scoreFor(item).toFixed(1)}/10: ${escapeHtml(item.title||item.id)}">${scoreFor(item).toFixed(1)}<small>/10</small></button>`}</span><span class="chapter-action">Mở chương →</span></div>`).join('') : '<div class="empty-state"><p>Không tìm thấy chương phù hợp.</p></div>';
 }
 
 function renderPopover(filter='') {
@@ -300,6 +304,8 @@ document.addEventListener('click', (event) => {
   const view=event.target.closest('[data-view]'); if(view) showView(view.dataset.view);
   const helpView=event.target.closest('[data-help-view]'); if(helpView) showView(helpView.dataset.helpView);
   const helpAction=event.target.closest('[data-help-action]'); if(helpAction) handleHelpAction(helpAction.dataset.helpAction);
+  const review=event.target.closest('[data-chapter-review]');
+  if(review){openChapter(review.dataset.chapterReview).then(opened=>{if(opened)$('#workspaceReview').classList.add('open');});return;}
   const chapter=event.target.closest('[data-chapter]'); if(chapter) openChapter(chapter.dataset.chapter);
   const project=event.target.closest('[data-project]'); if(project) selectProject(project.dataset.project);
   pipelineFeature.handleDocumentClick(event);
@@ -316,6 +322,7 @@ $('#confirmNewProject').onclick=createProject;
 chapterImportFeature.bind();
 $('#helpSearch').oninput=event=>filterHelp(event.target.value);
 $$('[data-help-topic-button]').forEach(button=>button.onclick=()=>openHelpTopic(button.dataset.helpTopicButton));
+$('#chapterReviewSort').onchange=()=>renderChapterList();
 $('#chapterSearch').oninput = e => renderChapterList(e.target.value);
 bookExportFeature.bind();
 sharingFeature.bind();

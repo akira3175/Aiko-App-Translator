@@ -24,6 +24,15 @@ export function createR19Feature({api,getProject,getRevision=()=>0,showView,toas
     card.className='r19-config-card';
     card.innerHTML='<div class="r19-config-actions"><strong>Cấu hình R19</strong><button class="secondary" id="resetR19Defaults" type="button">Khôi phục mặc định</button></div><label><span>Model dịch từ R19 trong khung bên dưới</span><input id="r19Model" type="text" spellcheck="false" placeholder="gemini-flash-lite-latest"></label><label><span>Số chương ngữ cảnh R19</span><input id="r19ContextChapters" type="number" min="0" max="20" step="1" inputmode="numeric"><small>Chỉ ghi đè cài đặt chung khi R19 bật.</small></label><label class="r19-prompt-field"><span>Dòng mở đầu prompt</span><textarea id="r19PromptPrefix" rows="2" spellcheck="false"></textarea><small>Dòng này được đặt trước prompt dịch; hệ thống tự thêm <code>"""</code> đóng ở cuối.</small></label>';
     $('.r19-editor-card').before(card);
+    const toggle=$('.r19-master');
+    const scope=toggle.querySelector('small');
+    const title=card.querySelector('.r19-config-actions > strong');
+    const heading=document.createElement('div');
+    heading.className='r19-config-heading';
+    title.replaceWith(heading);
+    heading.append(title,scope);
+    card.querySelector('#resetR19Defaults').before(toggle);
+    $('.r19-head').remove();
     ['#r19Model','#r19ContextChapters','#r19PromptPrefix'].forEach(selector=>$(selector).oninput=updateDraft);
     $('#resetR19Defaults').onclick=resetDefaults;
   };
