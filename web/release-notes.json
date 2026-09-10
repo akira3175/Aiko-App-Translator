@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "1.4.1",
+      "date": "2026-09-10",
+      "title": "Sao chép câu trả lời Google AI Studio ổn định hơn",
+      "summary": "Cải thiện thao tác tự động lấy nội dung từ Google AI Studio.",
+      "highlights": [
+        "Cải thiện độ ổn định khi tự động sao chép câu trả lời từ Google AI Studio.",
+        "Khắc phục trường hợp phải rê chuột vào câu trả lời thì ứng dụng mới sao chép được.",
+        "Giữ định dạng Markdown khi lấy nội dung qua “Copy as Markdown”."
+      ]
+    },
+    {
       "version": "1.4.0",
       "date": "2026-09-09",
       "title": "Giao diện gọn hơn, hướng dẫn ngay trong từng trang",

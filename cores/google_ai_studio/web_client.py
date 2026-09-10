@@ -8,6 +8,7 @@ from uuid import uuid4
 import pyperclip
 from cores.json_output import parse_complete_json_object
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
@@ -147,12 +148,21 @@ def _copy_response_as_markdown(driver, turn, clipboard=None):
     try:
         original = clipboard.paste()
         clipboard.copy(sentinel)
-        options_button = next(
-            button
-            for button in _visible(turn.find_elements(By.CSS_SELECTOR, "button"))
-            if (button.get_attribute("aria-label") or "") == "Open options"
-        )
-        driver.execute_script("arguments[0].click();", options_button)
+        ActionChains(driver).move_to_element(turn).perform()
+
+        def options_ready(_driver):
+            return next(
+                (
+                    button
+                    for button in _visible(turn.find_elements(By.CSS_SELECTOR, "button"))
+                    if (button.get_attribute("aria-label") or "") == "Open options"
+                    and button.is_enabled()
+                ),
+                False,
+            )
+
+        options_button = WebDriverWait(driver, 10).until(options_ready)
+        options_button.click()
 
         def markdown_button(active_driver):
             for item in _visible(
@@ -160,12 +170,15 @@ def _copy_response_as_markdown(driver, turn, clipboard=None):
                     By.CSS_SELECTOR, '[role="menuitem"], button.mat-mdc-menu-item'
                 )
             ):
-                if "copy as markdown" in (item.text or "").strip().lower():
+                if (
+                    "copy as markdown" in (item.text or "").strip().lower()
+                    and item.is_enabled()
+                ):
                     return item
             return False
 
         copy_button = WebDriverWait(driver, 10).until(markdown_button)
-        driver.execute_script("arguments[0].click();", copy_button)
+        copy_button.click()
         copied = WebDriverWait(driver, 10).until(
             lambda _driver: (
                 value if (value := clipboard.paste()) != sentinel else False

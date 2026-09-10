@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import Mock, patch
 
 from cores.google_ai_studio.web_client import (
     _prompt_url,
@@ -84,6 +85,9 @@ class _PasteInput:
 
 
 class _Button(_Element):
+    def is_enabled(self):
+        return True
+
     def __init__(self, text="", aria="", title=""):
         self.text = text
         self.aria = aria
@@ -105,23 +109,25 @@ class _ButtonDriver:
 
 class _CopyTurn:
     def __init__(self):
+        self.hovered = False
         self.options = _Button(aria="Open options")
+        self.options.click = Mock()
 
     def find_elements(self, _by, _selector):
-        return [self.options]
+        return [self.options] if self.hovered else []
 
 
 class _CopyDriver:
     def __init__(self, clipboard):
         self.clipboard = clipboard
         self.copy_button = _Button("markdown_copy\nCopy as markdown")
+        self.copy_button.click = Mock(side_effect=self._copy_markdown)
 
     def find_elements(self, _by, _selector):
         return [self.copy_button]
 
-    def execute_script(self, _script, element):
-        if element is self.copy_button:
-            self.clipboard.copy("###TITLE###\nThử\n\n###CONTENT###\nNội dung")
+    def _copy_markdown(self):
+        self.clipboard.copy("###TITLE###\nThử\n\n###CONTENT###\nNội dung")
 
 
 class GoogleAiStudioWebTests(unittest.TestCase):
@@ -210,7 +216,17 @@ class GoogleAiStudioWebTests(unittest.TestCase):
     def test_copy_as_markdown_preserves_unicode_and_restores_clipboard(self):
         clipboard = _Clipboard("nội dung clipboard cũ")
         driver = _CopyDriver(clipboard)
-        copied = _copy_response_as_markdown(driver, _CopyTurn(), clipboard)
+        turn = _CopyTurn()
+        with patch("cores.google_ai_studio.web_client.ActionChains") as actions:
+            actions.return_value.move_to_element.return_value.perform.side_effect = (
+                lambda: setattr(turn, "hovered", True)
+            )
+            copied = _copy_response_as_markdown(driver, turn, clipboard)
+            actions.assert_called_once_with(driver)
+            actions.return_value.move_to_element.assert_called_once_with(turn)
+            actions.return_value.move_to_element.return_value.perform.assert_called_once_with()
+        turn.options.click.assert_called_once_with()
+        driver.copy_button.click.assert_called_once_with()
         self.assertIn("###TITLE###\nThử", copied)
         self.assertEqual(clipboard.value, "nội dung clipboard cũ")
 
