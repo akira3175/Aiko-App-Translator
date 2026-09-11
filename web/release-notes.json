@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "1.4.2",
+      "date": "2026-09-11",
+      "title": "Nhập EPUB đầy đủ ảnh và hỗ trợ file lớn",
+      "summary": "Truyện đã nhập bị thiếu ảnh cần nhập lại EPUB để bổ sung.",
+      "highlights": [
+        "Khắc phục thiếu ảnh khi nhập EPUB: nhận diện thêm ảnh nhúng qua SVG, bao gồm ảnh WebP trong EPUB từ ESJ Zone.",
+        "Bỏ giới hạn nhập file 300 MB: áp dụng khi tạo truyện mới và thêm chương từ EPUB/TXT.",
+        "Giảm mức sử dụng RAM khi tải file lớn vào app."
+      ]
+    },
+    {
       "version": "1.4.1",
       "date": "2026-09-10",
       "title": "Sao chép câu trả lời Google AI Studio ổn định hơn",

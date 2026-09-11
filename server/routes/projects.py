@@ -3,6 +3,7 @@
 import json
 import mimetypes
 import shutil
+from services.importing.uploads import write_upload
 from dataclasses import dataclass
 from http import HTTPStatus
 from urllib.parse import unquote
@@ -147,9 +148,19 @@ class ProjectRoutes:
     @staticmethod
     def _upload_body(handler):
         length = int(handler.headers.get("Content-Length", 0))
-        if not length or length > 300 * 1024 * 1024:
-            raise ValueError("File trống hoặc vượt quá 300 MB")
-        return handler.rfile.read(length)
+        if length <= 0:
+            raise ValueError("File trống hoặc dung lượng không hợp lệ")
+
+        def chunks():
+            remaining = length
+            while remaining:
+                chunk = handler.rfile.read(min(remaining, 1024 * 1024))
+                if not chunk:
+                    raise ValueError("Tải file chưa hoàn tất; hãy thử nhập lại")
+                remaining -= len(chunk)
+                yield chunk
+
+        return chunks()
 
     def _create_project(self, handler, query):
         project_path = None
@@ -173,7 +184,7 @@ class ProjectRoutes:
             created_project = True
             (project_path / "translated").mkdir()
             upload = project_path / f".import.{source_format}"
-            upload.write_bytes(content)
+            write_upload(upload, content)
             from split.chapter_splitter_novelpia_md import (
                 split_epub_to_md,
                 split_txt_to_md,

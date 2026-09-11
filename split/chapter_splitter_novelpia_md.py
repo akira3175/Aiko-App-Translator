@@ -84,8 +84,9 @@ class EpubHTMLParser(HTMLParser):
             self._current_text.append('\n')
 
         # Ảnh đứng độc lập hoặc bên trong <p>
-        if tag == 'img' and self._in_body:
-            src = attrs_dict.get('src', '')
+        if tag in {'img', 'image', 'svg:image'} and self._in_body:
+            src = (attrs_dict.get('src', '') if tag == 'img' else
+                   attrs_dict.get('href') or attrs_dict.get('xlink:href', ''))
             if src:
                 # Flush text đang dang dở trước khi thêm ảnh
                 if self._in_p and self._current_text:
@@ -314,9 +315,10 @@ def parse_epub_sections(z, opf_base, html_href, section_titles):
 
         def walk(node):
             tag = local_name(node.tag)
-            if tag == 'img':
+            if tag in {'img', 'image'}:
                 flush_text()
-                src = node.get('src', '')
+                src = (node.get('src', '') if tag == 'img' else
+                       node.get('href') or node.get('{http://www.w3.org/1999/xlink}href', ''))
                 if src:
                     zip_path = resolve_img_path(z, opf_base, html_href, src)
                     elements.append({'type': 'image', 'zip_path': zip_path, 'src': src})

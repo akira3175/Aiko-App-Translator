@@ -9,6 +9,7 @@ import shutil
 import time
 import unicodedata
 from pathlib import Path
+from services.importing.uploads import write_upload
 
 
 CHAPTER_FILE_RE = re.compile(r"^v(\d+)_c(\d+)_s(\d+)\.md$", re.IGNORECASE)
@@ -93,14 +94,12 @@ def create_preview(
         raise ValueError("Chỉ hỗ trợ file EPUB hoặc TXT")
     if not 500 <= segment_limit <= 50000:
         raise ValueError("Giới hạn segment phải từ 500 đến 50.000")
-    if not content or len(content) > 300 * 1024 * 1024:
-        raise ValueError("File trống hoặc vượt quá 300 MB")
     token = secrets.token_urlsafe(18)
     staging = runtime_root / "chapter-imports" / token
     staging.mkdir(parents=True)
     upload = staging / f"source.{source_format}"
-    upload.write_bytes(content)
     try:
+        write_upload(upload, content)
         split = splitter or _splitter(source_format)
         result = split(
             str(upload),
