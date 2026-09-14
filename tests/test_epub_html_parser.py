@@ -10,6 +10,37 @@ from split.chapter_splitter_novelpia_md import (
 
 
 class EpubHtmlParserTests(unittest.TestCase):
+    def test_import_writes_korean_heading_once_before_segmenting(self):
+        title = '외전 - 살려주십시오 (2)'
+        parser = EpubHTMLParser()
+        parser.feed(f'<html><body><h1>{title}</h1><p>First paragraph</p><p>{title}</p></body></html>')
+        original = list(parser.elements)
+        with tempfile.TemporaryDirectory() as folder:
+            raw, images = Path(folder) / 'raw', Path(folder) / 'image'
+            raw.mkdir()
+            images.mkdir()
+            count, _ = write_document_segments(parser.elements, parser.title, 1, 0, raw, images, 2, character_based=False)
+            first = (raw / 'v1_c0_s1.md').read_text(encoding='utf-8')
+            self.assertEqual(f'# {title}\n\nFirst paragraph\n\n', first)
+            self.assertGreater(count, 1)
+            bodies = ''.join(path.read_text(encoding='utf-8').split('\n\n', 1)[1] for path in sorted(raw.glob('*.md')))
+            self.assertIn('살려주십시오', bodies)
+        self.assertEqual(original, parser.elements)
+
+    def test_title_only_page_and_later_repeated_text_are_preserved(self):
+        for elements, expected in (
+            ([{'type': 'text', 'content': 'Volume One'}], '# Volume One\n\n'),
+            ([{'type': 'text', 'content': 'Opening'}, {'type': 'text', 'content': 'Volume One'}], '# Volume One\n\nOpening\n\nVolume One\n\n'),
+            ([{'type': 'text', 'content': 'Volume\u00a0One'}, {'type': 'text', 'content': 'Body'}], '# Volume One\n\nBody\n\n'),
+        ):
+            with self.subTest(elements=elements), tempfile.TemporaryDirectory() as folder:
+                raw, images = Path(folder) / 'raw', Path(folder) / 'image'
+                raw.mkdir()
+                images.mkdir()
+                count, _ = write_document_segments(elements, 'Volume One', 1, 0, raw, images, 5000)
+                self.assertEqual(1, count)
+                self.assertEqual(expected, (raw / 'v1_c0_s1.md').read_text(encoding='utf-8'))
+
     def test_svg_images_are_extracted_in_order_and_saved_unchanged(self):
         for image_tag in (
             '<image xlink:href="../Images/picture.webp"/>',

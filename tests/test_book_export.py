@@ -9,6 +9,7 @@ from PIL import Image
 
 from services.exporting import BookExportService
 from services.library import LibraryService
+from cores.chapters.files import load_md_chapter, save_translated_md
 
 
 class BookExportTests(unittest.TestCase):
@@ -79,6 +80,28 @@ class BookExportTests(unittest.TestCase):
                 self.assertNotIn("Chương một", body_text)
                 self.assertIn("OEBPS/images/image-1.png", archive.namelist())
             self.assertEqual(content_type, "application/epub+zip")
+
+    def test_marker_translation_exports_images_between_translated_paragraphs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.project(root)
+            project = root / self.PROJECT
+            raw = project / "raw" / "v1_c1_s1.md"
+            raw.write_text("# Source\n\nOne\n\nTwo\n\n![Image](../image/minh-hoa.png)\n\nThree", encoding="utf-8")
+            chapter = load_md_chapter(raw, image_markers=True)
+            save_translated_md(raw, project / "translated", "Title",
+                "MergedBefore\n\n[[IMAGE_001]]\n\nAfterImage", image_markers=chapter["_image_markers"])
+            for format_name, document_name, image_tag in (
+                ("epub", "OEBPS/chapter-1.xhtml", "<img"),
+                ("docx", "word/document.xml", "<w:drawing"),
+            ):
+                with self.subTest(format=format_name):
+                    body, _, _ = self.export(root, {"format": format_name, "source": "translated", "scope": "volume", "volume": 1})
+                    with zipfile.ZipFile(io.BytesIO(body)) as archive:
+                        document = archive.read(document_name).decode("utf-8")
+                    self.assertLess(document.index("MergedBefore"), document.index(image_tag))
+                    self.assertLess(document.index(image_tag), document.index("AfterImage"))
+                    self.assertNotIn("[[IMAGE_", document)
 
     def test_docx_is_valid_ooxml_zip(self):
         with tempfile.TemporaryDirectory() as directory:

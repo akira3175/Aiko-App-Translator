@@ -2,6 +2,7 @@ import { createCloudflareSettingsFeature } from './cloudflare-settings.js';
 
 const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
+const settingValue=input=>input.type==='checkbox'?(input.checked?'on':'off'):input.value;
 const settingsGroups={
   pipeline:['Quy trình dịch','Chọn engine, model và mức suy nghĩ cho từng công đoạn.'],
   'gemini-api':['Gemini API','Model và thông số sinh nội dung khi dịch, hậu dịch và review qua API.'],
@@ -56,6 +57,7 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
     $('#publishingR2Manager').classList.toggle('active',activeGroup==='publishing');
     $('#cloudflareDeployManager').classList.toggle('active',activeGroup==='sharing');
     const renderSetting=item=>{
+      if(item.key==='image_markers')return `<div class="setting-row image-marker-setting"><span><strong id="imageMarkerSettingLabel">${escapeHtml(item.label)}</strong><small id="imageMarkerSettingHint">${escapeHtml(item.description)} Mặc định: Tắt.</small></span><label class="switch"><input data-python-setting="image_markers" type="checkbox" role="switch" aria-labelledby="imageMarkerSettingLabel" aria-describedby="imageMarkerSettingHint" ${item.value==='on'?'checked':''}><i aria-hidden="true"></i></label></div>`;
       const control=item.type==='select'
         ? `<select data-python-setting="${escapeHtml(item.key)}">${item.options.map(([value,label])=>`<option value="${escapeHtml(value)}" ${value===item.value?'selected':''}>${escapeHtml(label)}</option>`).join('')}</select>`
         : item.type==='textarea'
@@ -111,12 +113,12 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
         ? `<details class="publishing-advanced"><summary>Cài đặt R2 nâng cao</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
         : settingFields;
     $$('[data-settings-tab]').forEach(button=>button.onclick=()=>{
-      $$('[data-python-setting]').forEach(input=>{ const item=items.find(entry=>entry.key===input.dataset.pythonSetting); if(item)item.value=input.value; });
+      $$('[data-python-setting]').forEach(input=>{ const item=items.find(entry=>entry.key===input.dataset.pythonSetting); if(item)item.value=settingValue(input); });
       activeGroup=button.dataset.settingsTab;
       render(items);
     });
     $$('[data-stage-engine]').forEach(select=>select.onchange=()=>{
-      $$('[data-python-setting]').forEach(input=>{ const item=items.find(entry=>entry.key===input.dataset.pythonSetting); if(item)item.value=input.value; });
+      $$('[data-python-setting]').forEach(input=>{ const item=items.find(entry=>entry.key===input.dataset.pythonSetting); if(item)item.value=settingValue(input); });
       const stage=select.dataset.stageEngine;
       const sourceKeys=providerDefaults[select.value][stage];
       const model=items.find(item=>item.key===`pipeline_${stage}_model`);
@@ -161,7 +163,7 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
   async function save() {
     const button=$('#savePythonSettings'); button.disabled=true;
     const values=Object.fromEntries(items.map(item=>[item.key,item.value]));
-    $$('[data-python-setting]').forEach(input=>values[input.dataset.pythonSetting]=input.value);
+    $$('[data-python-setting]').forEach(input=>values[input.dataset.pythonSetting]=settingValue(input));
     try { render((await api('/api/settings',{method:'POST',body:JSON.stringify({values})})).items); await Promise.all([refreshUpdate(),loadLanStatus()]); toast('Đã lưu cấu hình · thay đổi LAN cần khởi động lại app'); }
     catch(error) { toast(error.message); }
     finally { button.disabled=false; }

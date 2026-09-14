@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "1.4.3",
+      "date": "2026-09-15",
+      "title": "Giữ vị trí ảnh và thêm chương thông minh hơn",
+      "summary": "Ảnh ổn định hơn trong bản dịch và việc nhập thêm chương thuận tiện hơn.",
+      "highlights": [
+        "Thêm tùy chọn Giữ vị trí ảnh bằng mã trong bản dịch, giúp ảnh không bị xê dịch khi AI gộp hoặc tách đoạn.",
+        "Khi không tìm thấy chương trùng làm điểm neo, Thêm chương tự đề xuất volume kế tiếp và bắt đầu từ chương đầu tiên.",
+        "Sửa lỗi tiêu đề chương bị lặp trong nội dung khi nhập truyện hoặc thêm chương từ EPUB.",
+        "Cải thiện kiểm tra vị trí ảnh khi dịch và hiệu đính; app sẽ báo lỗi nếu AI làm mất hoặc đảo thứ tự ảnh."
+      ]
+    },
+    {
       "version": "1.4.2",
       "date": "2026-09-11",
       "title": "Nhập EPUB đầy đủ ảnh và hỗ trợ file lớn",

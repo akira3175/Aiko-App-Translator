@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from cores.chapters.files import load_md_chapter, save_translated_md, scan_md_dir
+from cores.chapters.images import uses_image_markers
 from cores.config import CONTEXT_JSON, RAW_DIR, TRANSLATED_DIR
 from cores.config.runtime import option, task_config
 from cores.postprocess import runtime
@@ -30,8 +31,11 @@ def main():
         raise RuntimeError("Không tìm thấy chương đã dịch cần hiệu đính")
 
     chapter_index = raw_files.index(raw_path)
-    chapter = load_md_chapter(raw_path)
-    translated = load_md_chapter(translated_path)
+    marker_mode = uses_image_markers(translated_path)
+    chapter = load_md_chapter(raw_path, image_markers=marker_mode)
+    translated = load_md_chapter(translated_path, image_markers=marker_mode)
+    if marker_mode:
+        chapter["_image_markers"] = translated["_image_markers"]
     chapter["title_translation"] = translated["title"]
     chapter["translation"] = translated["content"]
     context_text, glossary_names, pronouns_path = filtered_context_and_names(
@@ -60,7 +64,10 @@ def main():
         title, content = runtime.fix_translation(
             chapter, chapter_index + 1, context_text, pronoun_context
         )
-        output = save_translated_md(raw_path, TRANSLATED_DIR, title, content)
+        output = save_translated_md(
+            raw_path, TRANSLATED_DIR, title, content,
+            image_markers=chapter.get("_image_markers"),
+        )
         print(f"Đã lưu bản hiệu đính: {output}")
     finally:
         runtime.close_browsers()

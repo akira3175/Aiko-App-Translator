@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 from cores.postprocess.snapshots import build_characters_snapshot
+from cores.chapters.images import IMAGE_INSTRUCTION, validate_image_markers
 
 
 def polish_translation(
@@ -87,6 +88,8 @@ Chỉ trả về:
 ###END###""")
         if tmp_characters:
             prompt = runtime.with_character_document_instruction(prompt)
+        if "_image_markers" in chapter:
+            prompt = IMAGE_INSTRUCTION + "\n\n" + prompt
 
         while True:
             try:
@@ -111,6 +114,8 @@ Chỉ trả về:
                 content_out = text[content_marker + len("###CONTENT###") :].strip()
                 if content_out.endswith("###END###"):
                     content_out = content_out[: -len("###END###")].rstrip()
+                if "_image_markers" in chapter:
+                    validate_image_markers(content_out, chapter["_image_markers"], title_out)
                 runtime.log_api_call(
                     chapter_id,
                     "polish",

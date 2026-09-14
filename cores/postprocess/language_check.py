@@ -5,6 +5,7 @@ import time
 
 from cores.storage.project import load_json, save_json
 from cores.stages.outputs import parse_title_content
+from cores.chapters.images import IMAGE_INSTRUCTION, validate_image_markers
 
 
 def save_manual_check_id(chapter_id, file_path):
@@ -57,11 +58,15 @@ Nội dung dịch hiện tại:
 
 ###END###
 """)
+        if "_image_markers" in chapter:
+            prompt = IMAGE_INSTRUCTION + "\n\n" + prompt
         try:
             chapter_id_fix = chapter.get("id", f"chapter_{chapter_number}")
             text, provider, effective_model = runtime.generate("polish", prompt)
             if "###END###" in text:
                 title_out, content_out = parse_title_content(text, "Dịch lại")
+                if "_image_markers" in chapter:
+                    validate_image_markers(content_out, chapter["_image_markers"], title_out)
                 chapter["title_translation"] = title_out
                 chapter["translation"] = content_out
                 runtime.log_api_call(chapter_id_fix, "fix", f"{provider}:{effective_model}", prompt, text, ok=True)

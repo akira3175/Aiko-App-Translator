@@ -6,6 +6,7 @@ from pathlib import Path
 from cores.storage.project import load_context
 
 from cores.config.runtime import bool_option, option
+from cores.chapters.images import IMAGE_INSTRUCTION
 
 
 CHARACTER_DOCUMENT_INSTRUCTION = """Đọc kỹ file `characters.md` đính kèm trước khi xử lý văn bản. Dùng toàn bộ thông tin trong hồ sơ về giới tính, thân phận, vai trò, tên, bí danh, quan hệ và cách xưng hô. Với nhân vật chuyển sinh, TS hoặc biến đổi giới tính/cơ thể, phải phân biệt trạng thái trước và sau biến đổi, cơ thể hiện tại, nhận thức bản thân, góc nhìn của người khác và thời điểm của cảnh; không giản lược thành một giới tính cố định. Không tự suy đoán khi hồ sơ và nguyên tác chưa đủ căn cứ."""
@@ -253,6 +254,8 @@ Chỉ xuất đúng theo định dạng sau:
 
 ###END###
 """
+    if "_image_markers" in chapter:
+        prompt = IMAGE_INSTRUCTION + "\n\n" + prompt
     return wrap_r19_prompt(prompt)
 
 

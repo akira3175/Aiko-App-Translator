@@ -17,6 +17,7 @@ DEFAULT_REVIEW_BG_CRITERIA = """1. Thiếu nội dung: chỉ báo khi một ý, 
 5. Ngoại ngữ: chỉ báo khi ký tự hoặc câu ngoại ngữ thực sự còn xuất hiện trong bản dịch; không dùng văn bản nguồn làm bằng chứng cho lỗi này.
 6. Chỉ nêu lỗi khi có dẫn chứng cụ thể trong cả bản gốc và bản dịch; không suy đoán hoặc bắt lỗi khác biệt diễn đạt thuần túy."""
 SETTING_DEFAULTS = {
+    "image_markers": "off",
     "pipeline_translate_provider": "gemini-api",
     "pipeline_translate_model": "gemini-flash-latest",
     "pipeline_translate_thinking": "high",
@@ -88,6 +89,7 @@ SETTING_DEFAULTS = {
     "lan_pin": "",
 }
 SETTING_LABELS = {
+    "image_markers": "Giữ vị trí ảnh bằng mã trong bản dịch",
     "pipeline_translate_provider": "Provider dịch",
     "pipeline_translate_model": "Model",
     "pipeline_translate_thinking": "Cấp độ suy nghĩ",
@@ -167,6 +169,11 @@ SETTING_RANGES = {
     "gpt_api_retries": (1, 10),
 }
 SETTING_META = {
+    "image_markers": {
+        "group": "general", "type": "select",
+        "options": [["off", "Tắt"], ["on", "Bật"]],
+        "description": "Giữ ảnh đúng vị trí khi AI gộp hoặc tách đoạn. Áp dụng cho lượt dịch mới; chương đã dịch giữ phương thức cũ. Nếu mã ảnh sai, app báo lỗi và không lưu bản sai.",
+    },
     "pipeline_translate_provider": {"group": "pipeline", "type": "select", "options": [["gemini-api", "Gemini API"], ["gemini-web", "Gemini Web"], ["google-ai-studio-web", "Google AI Studio Web"], ["openai-api", "OpenAI API"], ["chatgpt-web", "ChatGPT Web"]]},
     "pipeline_translate_model": {"group": "pipeline"},
     "pipeline_translate_thinking": {"group": "pipeline"},

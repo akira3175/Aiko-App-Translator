@@ -56,7 +56,7 @@ def run_single_translation(
             continue
 
         chapter_number = index + 1
-        chapter = load_md_chapter(raw_path)
+        chapter = load_md_chapter(raw_path, image_markers=bool_option("image_markers", False))
         context_text, glossary_names, pronouns_path = filtered_context_and_names(
             context_path, raw_files, index
         )
@@ -81,6 +81,10 @@ def run_single_translation(
         if result is None:
             return
         title, content = result
+        if "_image_markers" in chapter:
+            from cores.chapters.images import validate_image_markers
+
+            validate_image_markers(content, chapter["_image_markers"], title)
         chapter["title_translation"] = title
         chapter["translation"] = content
 
@@ -114,7 +118,10 @@ def run_single_translation(
         chapter["title_translation"] = title
         chapter["translation"] = content
 
-        output_path = save_translated_md(raw_path, translated_dir, title, content)
+        output_path = save_translated_md(
+            raw_path, translated_dir, title, content,
+            image_markers=chapter.get("_image_markers"),
+        )
         print(f"Da luu: {output_path}")
         enqueue_background_review(chapter, chapter_number, pipeline_context)
         return 1

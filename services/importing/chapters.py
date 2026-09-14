@@ -188,10 +188,9 @@ def create_preview(
             target_start = source_from + offset
             confidence = "high" if len(mapped) >= 2 else "medium"
         else:
-            latest = max(existing_groups, default=(1, -1))
-            volume = latest[0]
+            volume = max((key[0] for key in existing_groups), default=0) + 1
             source_from = chapters[0]["source_index"]
-            target_start = latest[1] + 1
+            target_start = 0
             confidence = "manual"
             no_new = False
         source_to = chapters[-1]["source_index"]

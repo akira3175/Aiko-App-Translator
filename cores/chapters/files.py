@@ -31,7 +31,7 @@ def is_translated(chapter_id, translated_dir):
     return os.path.exists(path) and os.path.getsize(path) > 10
 
 
-def load_md_chapter(filepath):
+def load_md_chapter(filepath, *, image_markers=False):
     with open(filepath, "r", encoding="utf-8") as handle:
         raw = handle.read()
     chapter_id = os.path.splitext(os.path.basename(filepath))[0]
@@ -45,7 +45,7 @@ def load_md_chapter(filepath):
             continue
         element_type = "image" if block.startswith("![") else "text"
         elements.append({"type": element_type, "content": block})
-    return {
+    chapter = {
         "id": chapter_id,
         "title": title,
         "content": "\n\n".join(element["content"] for element in elements if element["type"] == "text"),
@@ -53,6 +53,13 @@ def load_md_chapter(filepath):
         "translation": "",
         "_elements": elements,
     }
+    if image_markers:
+        from cores.chapters.images import mark_images
+
+        chapter["content"], chapter["_image_markers"] = mark_images(
+            "\n\n".join(element["content"] for element in elements)
+        )
+    return chapter
 
 
 def get_translated_title(chapter_id, translated_dir):
@@ -67,9 +74,18 @@ def get_translated_title(chapter_id, translated_dir):
     return ""
 
 
-def save_translated_md(raw_filepath, translated_dir, title, content):
+def save_translated_md(raw_filepath, translated_dir, title, content, *, image_markers=None):
     """Save translated text while restoring image blocks from the raw chapter."""
     os.makedirs(translated_dir, exist_ok=True)
+    from cores.chapters.images import image_mode_path, restore_images
+
+    output_path = os.path.join(translated_dir, os.path.basename(raw_filepath))
+    if image_markers is not None:
+        restored = restore_images(content, image_markers, title)
+        with open(output_path, "w", encoding="utf-8") as handle:
+            handle.write(f"# {title}\n\n{restored.strip()}\n")
+        image_mode_path(output_path).write_text("markers\n", encoding="utf-8")
+        return output_path
     with open(raw_filepath, "r", encoding="utf-8") as handle:
         blocks = [block.strip() for block in handle.read().split("\n\n") if block.strip()]
 
@@ -99,6 +115,7 @@ def save_translated_md(raw_filepath, translated_dir, title, content):
     output_path = os.path.join(translated_dir, os.path.basename(raw_filepath))
     with open(output_path, "w", encoding="utf-8") as handle:
         handle.write("\n".join(output))
+    image_mode_path(output_path).unlink(missing_ok=True)
     return output_path
 
 

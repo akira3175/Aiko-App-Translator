@@ -109,7 +109,7 @@ class BackgroundReviewTests(unittest.TestCase):
         events = []
         chapter = {"id": "v1_c1_s1", "title": "Gốc", "content": "Raw"}
 
-        def save(_path, _directory, title, content):
+        def save(_path, _directory, title, content, *, image_markers=None):
             events.append(("save", title, content))
             return "translated/v1_c1_s1.md"
 

@@ -81,6 +81,47 @@ class ChapterImportServiceTests(unittest.TestCase):
         self.assertNotIn(token, previews)
         self.assertFalse(staging.exists())
 
+    def test_preview_without_anchors_uses_next_volume_and_imports_from_zero(self):
+        for filename in ("v3_c85_s1.md", "v12_c4_s1.md"):
+            (self.raw / filename).write_text("# Unrelated\n\nabcdefghxyz", encoding="utf-8")
+        result = create_preview(
+            "demo", self.project, self.raw, self.runtime, "epub", 5000,
+            b"content", splitter=self._fake_splitter,
+        )
+        self.assertEqual(0, result["anchors"])
+        self.assertEqual((13, 0), (result["target_volume"], result["target_start"]))
+        confirmed = confirm("demo", self.project, self.raw, {
+            "token": result["token"], "source_from": result["source_from"],
+            "source_to": result["source_to"], "target_volume": result["target_volume"],
+            "target_start": result["target_start"], "selected": [0, 1], "conflict": "skip",
+        })
+        self.assertEqual(2, confirmed["imported"])
+        self.assertTrue((self.raw / "v13_c0_s1.md").is_file())
+        self.assertTrue((self.raw / "v13_c1_s1.md").is_file())
+        self.assertEqual("# Unrelated\n\nabcdefghxyz", (self.raw / "v12_c4_s1.md").read_text(encoding="utf-8"))
+
+    def test_preview_empty_project_starts_at_volume_one(self):
+        result = create_preview(
+            "demo", self.project, self.raw, self.runtime, "txt", 5000,
+            b"content", splitter=self._fake_splitter,
+        )
+        self.assertEqual(0, result["anchors"])
+        self.assertEqual((1, 0), (result["target_volume"], result["target_start"]))
+
+    def test_preview_with_anchor_continues_matching_volume(self):
+        fixture = self.root / "fixture"
+        fixture.mkdir()
+        self._fake_splitter(None, None, None, project_dir=fixture)
+        (self.raw / "v3_c85_s1.md").write_bytes((fixture / "raw" / "v0_c0_s1.md").read_bytes())
+        (self.raw / "v12_c4_s1.md").write_text("# Unrelated\n\nabcdefghxyz", encoding="utf-8")
+        result = create_preview(
+            "demo", self.project, self.raw, self.runtime, "epub", 5000,
+            b"content", splitter=self._fake_splitter,
+        )
+        self.assertEqual(1, result["anchors"])
+        self.assertEqual((3, 86), (result["target_volume"], result["target_start"]))
+        self.assertEqual(1, result["source_from"])
+
     def test_cancel_removes_preview_and_staging(self):
         result = create_preview(
             "demo",

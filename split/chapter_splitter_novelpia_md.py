@@ -503,6 +503,14 @@ def localize_remote_images(elements, img_dir, prefix, delay=1.0):
 
 
 def write_document_segments(elements, title, vol_num, chap_index, raw_dir, img_dir, segment_limit, archive=None, character_based=None, remote_image_delay=1.0):
+    # The EPUB heading is also emitted as body text by the parsers. Remove only
+    # the first text element when it duplicates the Markdown heading we write.
+    normalized_title = ' '.join(title.split())
+    for index, element in enumerate(elements):
+        if element['type'] == 'text':
+            if ' '.join(element['content'].split()) == normalized_title:
+                elements = elements[:index] + elements[index + 1:]
+            break
     elements = localize_remote_images(
         elements, img_dir, f"v{vol_num}_c{chap_index}", remote_image_delay
     )
