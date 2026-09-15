@@ -20,14 +20,23 @@ def copy_response_markdown(driver, token, old_assistant_count, *, require_end=Fa
                 turn = find_new_response(driver, token, old_assistant_count)
                 if turn is None:
                     return False
-                ActionChains(driver).move_to_element(turn).perform()
-                buttons = turn.find_elements(By.CSS_SELECTOR,
-                    'button[data-testid="copy-turn-action-button"], '
-                    'button[aria-label="Copy response"], button[aria-label="Copy"], '
-                    'button[aria-label="Sao chép"], button[aria-label="Sao chép câu trả lời"]')
-                return next((button for button in buttons
-                             if button.is_displayed() and button.is_enabled()
-                             and not button.find_elements(By.XPATH, 'ancestor::pre | ancestor::code')), False)
+                scope = turn
+                for _ in range(5):
+                    ActionChains(driver).move_to_element(scope).perform()
+                    buttons = scope.find_elements(By.CSS_SELECTOR,
+                        '[data-testid="copy-turn-action-button"], '
+                        '[aria-label="Copy response"], [aria-label="Copy"], '
+                        '[aria-label="Sao chép"], [aria-label="Sao chép câu trả lời"]')
+                    button = next((item for item in buttons
+                                   if item.is_displayed() and item.is_enabled()
+                                   and not item.find_elements(By.XPATH, 'ancestor::pre | ancestor::code')), None)
+                    if button is not None:
+                        return button
+                    parent = scope.find_element(By.XPATH, "..")
+                    if parent == scope:
+                        break
+                    scope = parent
+                return False
             except StaleElementReferenceException:
                 return False
 
@@ -54,9 +63,12 @@ def copy_response_markdown(driver, token, old_assistant_count, *, require_end=Fa
 
 _CHATGPT_SNAPSHOT_SCRIPT = r"""
 const token = arguments[0];
-const rootOf = (el) => el.closest(
-    'article,[data-testid^="conversation-turn-"],[data-message-id],.group\\/conversation-turn,.agent-turn'
-) || el;
+const rootOf = (el) =>
+    el.closest('[data-testid^="conversation-turn-"]') ||
+    el.closest('article') ||
+    el.closest('.group\\/conversation-turn') ||
+    el.closest('.agent-turn') ||
+    el.closest('[data-message-id]') || el;
 const uniqueRoots = (selector) => {
     const result = [];
     for (const el of document.querySelectorAll(selector)) {
@@ -80,9 +92,12 @@ return {users: users.length, assistants: assistants.length};
 _CHATGPT_NEW_RESPONSE_SCRIPT = r"""
 const token = arguments[0];
 const oldAssistantCount = arguments[1];
-const rootOf = (el) => el.closest(
-    'article,[data-testid^="conversation-turn-"],[data-message-id],.group\\/conversation-turn,.agent-turn'
-) || el;
+const rootOf = (el) =>
+    el.closest('[data-testid^="conversation-turn-"]') ||
+    el.closest('article') ||
+    el.closest('.group\\/conversation-turn') ||
+    el.closest('.agent-turn') ||
+    el.closest('[data-message-id]') || el;
 const uniqueRoots = (selector) => {
     const result = [];
     for (const el of document.querySelectorAll(selector)) {

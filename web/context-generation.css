@@ -2,4 +2,3 @@
 .context-generation-actions .context-field{max-width:180px}
 #contextGenerationPreviewStatus{color:var(--muted);font-size:13px;line-height:1.6}
 #contextGenerationInstructions,#contextGenerationPreview{width:100%;min-height:220px;resize:vertical}
-.context-tabs{flex-wrap:wrap}

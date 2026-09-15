@@ -16,7 +16,7 @@ class ImmediateWait:
 
 
 class ChatGPTCopyTests(unittest.TestCase):
-    def copy(self, markdown, *, button_present=True, writes=True, require_end=True):
+    def copy(self, markdown, *, button_present=True, writes=True, require_end=True, button_on_parent=False):
         clipboard = Mock()
         value = ['original clipboard']
         clipboard.paste.side_effect = lambda: value[0]
@@ -28,7 +28,11 @@ class ChatGPTCopyTests(unittest.TestCase):
         if writes:
             button.click.side_effect = lambda: value.__setitem__(0, markdown)
         turn = Mock()
-        turn.find_elements.return_value = [button] if button_present else []
+        parent = Mock()
+        turn.find_elements.return_value = [] if button_on_parent else ([button] if button_present else [])
+        turn.find_element.return_value = parent
+        parent.find_elements.return_value = [button] if button_present and button_on_parent else []
+        parent.find_element.return_value = parent
         driver = Mock()
         with patch.object(web_response, 'find_new_response', return_value=turn) as locate, patch.object(web_response, 'ActionChains'), patch.object(web_response, 'WebDriverWait', ImmediateWait):
             try:
@@ -43,6 +47,10 @@ class ChatGPTCopyTests(unittest.TestCase):
     def test_copy_preserves_markdown_and_end_marker(self):
         text = '###TITLE###\nTitle\n###CONTENT###\n**Bold** and *italic*\n\n---\n\n[[IMAGE_001]]\n###END###'
         self.assertEqual(text, self.copy(text))
+
+    def test_copy_button_may_live_on_work_turn_parent(self):
+        text = 'Nội dung\n\n---\n\n###END###'
+        self.assertEqual(text, self.copy(text, button_on_parent=True))
 
     def test_copy_failure_does_not_return_old_clipboard_or_plain_text(self):
         with self.assertRaises(TimeoutException):

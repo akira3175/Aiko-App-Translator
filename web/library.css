@@ -11,5 +11,7 @@
 .library-manage{border-top:1px solid var(--line)!important;margin-top:6px}
 #projectItems{max-height:310px;overflow:auto}.library-empty{color:var(--muted);padding:28px 0}
 #libraryView button:focus-visible,#libraryView input:focus-visible,#libraryView select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-.nav-item[data-view="library"],html [data-feature-icon="library"]{--sidebar-icon:url('/assets/icons/chapters.svg')}
+.nav-item[data-view="library"],html [data-feature-icon="library"]{--sidebar-icon:url('/assets/icons/library.svg')}
+html[data-anime-illustrations="on"] .nav-item[data-view="library"]{--anime-nav-icon:url('/assets/anime/nav-library-v1.png')}
+html[data-anime-illustrations="on"] [data-feature-icon="library"]{--anime-feature-icon:url('/assets/anime/nav-library-v1.png')}
 @media(max-width:700px){.library-row{align-items:stretch;flex-direction:column;gap:12px}.library-actions{width:100%}.library-actions button{flex:1}.library-toolbar label:first-child{flex-basis:100%}}

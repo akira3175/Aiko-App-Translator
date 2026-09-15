@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "1.4.5",
+      "date": "2026-09-16",
+      "title": "ChatGPT Work ổn định hơn và giao diện gọn hơn",
+      "summary": "Cải thiện sao chép Markdown trên ChatGPT Work và hoàn thiện giao diện Thư viện, Context.",
+      "highlights": [
+        "Cải thiện thao tác sao chép bản dịch trên ChatGPT Work, giữ nguyên định dạng Markdown.",
+        "Thêm icon thường và icon anime riêng cho Thư viện, dễ phân biệt với Kho chương.",
+        "Làm gọn hàng tab chỉnh Context: tên ngắn hơn, tab đang chọn rõ hơn và hỗ trợ cuộn ngang khi cửa sổ hẹp."
+      ]
+    },
+    {
       "version": "1.4.4",
       "date": "2026-09-15",
       "title": "Thư viện truyện và tùy chỉnh Context",
