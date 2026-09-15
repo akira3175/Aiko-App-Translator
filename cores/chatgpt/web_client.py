@@ -13,6 +13,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from cores.chatgpt.web_controls import select_chatgpt_model, select_chatgpt_thinking
 from cores.chatgpt.web_response import (
+    copy_response_markdown,
     find_new_response as _find_new_chatgpt_response,
     ready_send_button as _ready_chatgpt_send_button,
     response_text as _chatgpt_response_text,
@@ -49,7 +50,10 @@ def _settle_end_marker_response(
         refreshed = (
             _chatgpt_response_text(response_turn) if response_turn is not None else ""
         )
-    return refreshed if len(refreshed or "") >= len(current_text) else current_text
+    return copy_response_markdown(
+        driver, response_token, old_assistant_count,
+        require_end='###END###' in current_text or '###END###' in refreshed,
+    )
 
 
 def generate_content(
@@ -242,7 +246,7 @@ def generate_content(
                         print(
                             "\n✅ Streaming hoàn tất (không thấy END, ngừng do đợi quá 30 phút)."
                         )
-                        return current_text
+                        return copy_response_markdown(driver, response_token, old_assistant_count)
                 else:
                     stable_count = 0
                     last_text = current_text
@@ -250,7 +254,7 @@ def generate_content(
                 time.sleep(1)
 
             if last_text:
-                return last_text
+                return copy_response_markdown(driver, response_token, old_assistant_count)
             raise TimeoutException("Timeout chờ ChatGPT response")
 
         except Exception as e:

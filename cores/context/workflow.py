@@ -61,7 +61,10 @@ def run_context_generation(
             )
 
             prompt_context = load_context(project_dir)
-            new_glossary = generate_glossary(batch, prompt_context.get("glossary", ""))
+            new_glossary = generate_glossary(
+                batch, prompt_context.get("glossary", ""),
+                instructions=prompt_context.get('context_instructions'),
+            )
             # AI có thể chạy lâu; đọc lại sau khi nhận kết quả để giữ các chỉnh sửa
             # người dùng vừa lưu trong lúc batch đang xử lý.
             latest_context = load_context(project_dir)

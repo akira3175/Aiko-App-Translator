@@ -3,6 +3,8 @@
 import json
 import mimetypes
 import shutil
+import os
+from services.library.catalog import catalog, hidden_projects, set_hidden
 from services.importing.uploads import write_upload
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -39,7 +41,13 @@ class ProjectRoutes:
                 handler.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return True
         if path == "/api/projects":
-            handler.json_response({"items": self.projects()})
+            handler.json_response({"items": self.projects(), "hidden": sorted(hidden_projects(self.library))})
+            return True
+        if path == "/api/library":
+            try:
+                handler.json_response({"items": catalog(self.library), "can_open_folder": os.name == 'nt' and handler.is_loopback()})
+            except (ValueError, OSError) as exc:
+                handler.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return True
         if path == "/api/chapters":
             try:
@@ -97,6 +105,27 @@ class ProjectRoutes:
 
     def handle_post(self, handler, path, query):
         project = query.get("project", [""])[0]
+        if path == '/api/library/visibility':
+            try:
+                handler.json_response(set_hidden(self.library, project, handler.body().get('hidden')))
+            except (ValueError, OSError) as exc:
+                handler.json_response({'error': str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
+        if path == '/api/library/open-folder':
+            if not handler.is_loopback():
+                handler.json_response({'error': 'Mở thư mục cần dùng app trên máy tính đang lưu truyện.'}, HTTPStatus.FORBIDDEN)
+                return True
+            try:
+                target = self.safe_project(project)
+                if project not in self.projects() or not target.is_dir():
+                    raise ValueError('Không tìm thấy thư mục truyện')
+                if os.name != 'nt':
+                    raise ValueError('Mở thư mục hiện hỗ trợ Windows')
+                os.startfile(str(target))
+                handler.json_response({'ok': True})
+            except (ValueError, OSError) as exc:
+                handler.json_response({'error': str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
         if path == "/api/export-book":
             try:
                 body, content_type, filename = self.export_book(project, handler.body())

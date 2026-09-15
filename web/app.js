@@ -1,6 +1,7 @@
 import { chapterReviewMap } from './features/chapter-review.js';
 import { createStorySearchFeature } from './features/story-search.js';
 import { createProjectLoadingFeature } from './features/project-loading.js';
+import { createLibraryFeature } from './features/library.js';
 import { api } from './api.js';
 import { createAppShellFeature } from './features/app-shell.js';
 import { createApiKeyFeature } from './features/api-keys.js';
@@ -38,16 +39,22 @@ async function loadChapters({strict=false}={}) {
   } catch (error) { if(state.project===project&&state.projectRevision===revision){if(strict)throw error;toast(error.message);} }
 }
 
+function renderProjectPicker() {
+  const names=state.projects.filter(name=>!(state.hiddenProjects||[]).includes(name));
+  $('#projectItems').innerHTML=names.length
+    ? names.map(name=>`<button class="pop-item" data-project="${escapeHtml(name)}"><span>${escapeHtml(name)}</span></button>`).join('')
+    : '<p class="library-empty">Không có truyện đang hiện. Mở Quản lý thư viện để hiện lại.</p>';
+}
 async function loadProjects(preferredProject='') {
   try {
     const data = await api('/api/projects');
     state.projects = data.items;
-    $('#projectItems').innerHTML = state.projects.length
-      ? state.projects.map(name => `<button class="pop-item" data-project="${name}"><span>${name}</span></button>`).join('')
-      : '<div class="empty-state"><p>Chưa tìm thấy truyện.</p></div>';
+    state.hiddenProjects=data.hidden||[];
+    renderProjectPicker();
+    const visible=state.projects.filter(name=>!state.hiddenProjects.includes(name));
     const remembered = localStorage.getItem('novel-project');
-    const first = state.projects.includes(preferredProject) ? preferredProject : (state.projects.includes(remembered) ? remembered : state.projects[0]);
-    if (first) await selectProject(first); else toast('Chưa có truyện nào trong thư mục truyen');
+    const first = visible.includes(preferredProject) ? preferredProject : (visible.includes(remembered) ? remembered : visible[0]);
+    if (first) await selectProject(first); else if(!state.project)showView('library');
   } catch (error) { toast(error.message); }
 }
 
@@ -229,6 +236,10 @@ function showView(name) {
   $('#polishButton').style.display = name === 'workspace' ? '' : 'none';
   $('#sidebar').classList.remove('open');
   appShellFeature.renderNavigation();
+  if(name==='library'){
+    $('#projectPopover').classList.remove('open');
+    libraryFeature.load();
+  }
 }
 
 function filterHelp(query='') {
@@ -320,6 +331,8 @@ $('#addProjectButton').onclick=()=>$('#newProjectModal').classList.add('open');
 $('#cancelNewProject').onclick=()=>$('#newProjectModal').classList.remove('open');
 $('#confirmNewProject').onclick=createProject;
 chapterImportFeature.bind();
+const libraryFeature=createLibraryFeature({api,escapeHtml,state,renderProjectPicker,selectProject,showView,toast});
+libraryFeature.bind();
 $('#helpSearch').oninput=event=>filterHelp(event.target.value);
 $$('[data-help-topic-button]').forEach(button=>button.onclick=()=>openHelpTopic(button.dataset.helpTopicButton));
 $('#chapterReviewSort').onchange=()=>renderChapterList();

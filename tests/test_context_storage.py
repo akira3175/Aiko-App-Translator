@@ -16,7 +16,7 @@ class ContextStorageTests(unittest.TestCase):
             (raw / "v1_c1_s1.md").write_text("# Một\n\n原文", encoding="utf-8")
             save_context(project, {"index": 0, "glossary": "旧 = Cũ"})
 
-            def generate(_batch, _old_glossary):
+            def generate(_batch, _old_glossary, instructions=None):
                 save_context(project, {"index": 0, "glossary": "旧 = Đã sửa tay"})
                 return "###START###\n新 = Mới\n###END###"
 

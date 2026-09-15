@@ -6,7 +6,7 @@ DEFAULT_PINNED_SIDEBAR = [
     "workspace", "chapters", "pipeline", "terminology", "characters", "help",
 ]
 SIDEBAR_FEATURES = set(DEFAULT_PINNED_SIDEBAR) | {
-    "sharing", "hakoEdit", "pronouns", "r19", "ai-log", "settings",
+    "sharing", "hakoEdit", "pronouns", "r19", "ai-log", "settings", "library",
 }
 FIXED_SIDEBAR_FEATURES = {"settings"}
 

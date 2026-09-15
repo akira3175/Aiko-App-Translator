@@ -1,4 +1,9 @@
 export const pageHelp = {
+  library: [
+    ['Quản lý truyện', 'Tìm theo tên và lọc Tất cả, Đang hiện hoặc Đã ẩn. Mở truyện để quay về Không gian dịch.'],
+    ['Ẩn và hiện', 'Ẩn chỉ bỏ truyện khỏi danh sách chọn, không xóa dữ liệu. Bạn vẫn có thể mở truyện từ Thư viện hoặc bấm Hiện lại. Truyện đang mở không bị đóng khi ẩn.'],
+    ['Mở thư mục', 'Mở trực tiếp thư mục truyện trong Windows Explorer. Chức năng này dùng trên máy tính đang lưu truyện.'],
+  ],
   workspace: [
     ['Đọc và biên tập', 'Chọn truyện và chương trước khi làm việc. Dùng chế độ song song để đối chiếu bản gốc với bản dịch; chuyển chế độ khi muốn tập trung vào một bên.'],
     ['Các công cụ', 'Dùng tìm kiếm chương và nút trước/tiếp để chuyển chương. Tìm trong truyện tìm nội dung trên nhiều chương; Ctrl+F và Ctrl+H thao tác trong editor đang chọn. Chế độ tập trung mở rộng vùng đọc.'],

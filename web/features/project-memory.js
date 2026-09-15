@@ -4,6 +4,26 @@ const $$=selector=>[...document.querySelectorAll(selector)];
 export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSetting,markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast,onReviewsChanged=()=>{}}) {
   let pronounEditIndex=null;
   let reviewLoadingChapter=null;
+  let contextPreviewRevision=0;
+
+  function clearContextPreview() {
+    contextPreviewRevision++;
+    $('#contextGenerationPreview').value='';
+    $('#contextGenerationPreviewStatus').textContent='Xem trước dùng hướng dẫn và glossary đang chỉnh, chưa gọi AI. Chọn số chương giống tác vụ Tạo Context để đối chiếu.';
+  }
+
+  async function previewContextPrompt() {
+    const project=state.project,revision=++contextPreviewRevision,button=$('#previewContextGeneration');
+    button.disabled=true;
+    $('#contextGenerationPreviewStatus').textContent='Đang ghép prompt…';
+    try {
+      const data=await api('/api/context/prompt-preview?project='+encodeURIComponent(project),{method:'POST',body:JSON.stringify({context_instructions:$('#contextGenerationInstructions').value,index:Number($('#contextIndexEditor').value),glossary:$('#contextGlossaryEditor').value,batch_size:Number($('#contextGenerationBatch').value)})});
+      if(state.project!==project||revision!==contextPreviewRevision)return;
+      $('#contextGenerationPreview').value=data.prompt;
+      $('#contextGenerationPreviewStatus').textContent=data.prompt?`Prompt cho ${data.chapters.length} chương kế tiếp, từ vị trí ${data.index+1}. Chưa lưu hướng dẫn và chưa gọi AI.`:'Không còn nội dung raw để xem trước từ tiến độ này.';
+    } catch(error) {if(state.project===project&&revision===contextPreviewRevision)$('#contextGenerationPreviewStatus').textContent=error.message;}
+    finally {button.disabled=false;}
+  }
 
   async function loadContext({strict=false}={}) {
     if (!state.project) return;
@@ -211,6 +231,8 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     renderPolishPromptPresets();
     $('#contextPolishPromptRole').value=state.context.polish_prompt_role||'';
     $('#contextPolishPromptTask').value=state.context.polish_prompt_task||'';
+    $('#contextGenerationInstructions').value=state.context.context_instructions||'';
+    clearContextPreview();
     syncPolishPromptPreset();
     setContextTab('writing');
     updateContextEditorStatus();
@@ -302,6 +324,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
       const nextIndex=Number($('#contextIndexEditor').value);
       if(nextIndex<(state.context.index||0)&&!confirm(`Bạn đang lùi tiến độ từ chương ${state.context.index||0} về ${nextIndex}. Tiếp tục?`))return;
       const context_fields={index:nextIndex,style_notes:$('#contextStyleEditor').value,glossary:$('#contextGlossaryEditor').value,prompt_preset:$('#contextPromptPreset').value,prompt_role:$('#contextPromptRole').value,prompt_task:$('#contextPromptTask').value,polish_prompt_preset:$('#contextPolishPromptPreset').value,polish_prompt_role:$('#contextPolishPromptRole').value,polish_prompt_task:$('#contextPolishPromptTask').value};
+      context_fields.context_instructions=$('#contextGenerationInstructions').value;
       state.context=await api('/api/context?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({context_fields})});
       state.glossaryDirty=false;
       renderContext($('#glossarySearch').value); $('#contextModal').classList.remove('open'); toast('Đã lưu an toàn · Có bản sao lưu .bak');
@@ -427,10 +450,16 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     $('#pronounFilter').onchange=renderPronouns;
     $('#cancelPronounEdit').onclick=()=>$('#pronounModal').classList.remove('open');
     $('#savePronounEdit').onclick=savePronounEdit;
+    $('#contextModal .context-tabs').insertAdjacentHTML('beforeend','<button type="button" role="tab" data-context-tab="context-prompt">Prompt tạo Context</button>');
+    $('#contextModal .context-modal-actions').insertAdjacentHTML('beforebegin',`<div class="context-tab-pane" data-context-pane="context-prompt"><label class="context-field"><span>Hướng dẫn cho AI</span><textarea id="contextGenerationInstructions" maxlength="20000" rows="12" spellcheck="false"></textarea><small>Lưu riêng theo truyện. App tự thêm nguyên tác, glossary và định dạng đầu ra. Tác vụ này chỉ tạo glossary; ghi chú phong cách được chỉnh ở tab Thiết lập &amp; văn phong.</small></label><div class="context-generation-actions"><button class="secondary" type="button" id="resetContextGeneration">Khôi phục mặc định</button><label class="context-field"><span>Số chương xem trước</span><input type="number" id="contextGenerationBatch" min="1" max="100" value="30"></label><button class="secondary" type="button" id="previewContextGeneration">Xem prompt đầy đủ</button></div><p id="contextGenerationPreviewStatus" role="status"></p><label class="context-field"><span>Prompt đầy đủ</span><textarea id="contextGenerationPreview" rows="12" readonly spellcheck="false"></textarea></label></div>`);
+    $('#resetContextGeneration').onclick=()=>{$('#contextGenerationInstructions').value=state.context.context_instructions_default||'';clearContextPreview();toast('Đã khôi phục hướng dẫn mặc định. Bấm Kiểm tra và lưu an toàn để áp dụng.');};
+    $('#contextGenerationInstructions').oninput=clearContextPreview;
+    $('#contextGenerationBatch').oninput=clearContextPreview;
+    $('#previewContextGeneration').onclick=previewContextPrompt;
     $('#editContextButton').onclick=openContextEditor;
     $('#cancelContextEdit').onclick=()=>$('#contextModal').classList.remove('open');
     $('#saveContextEdit').onclick=saveContextJson;
-    ['contextIndexEditor','contextStyleEditor','contextGlossaryEditor'].forEach(id=>$('#'+id).oninput=updateContextEditorStatus);
+    ['contextIndexEditor','contextStyleEditor','contextGlossaryEditor'].forEach(id=>$('#'+id).oninput=()=>{updateContextEditorStatus();clearContextPreview();});
     ['contextPromptRole','contextPromptTask'].forEach(id=>$('#'+id).oninput=()=>{syncPromptPreset();updateContextEditorStatus();});
     $('#contextPromptPreset').onchange=applyPromptPreset;
     ['contextPolishPromptRole','contextPolishPromptTask'].forEach(id=>$('#'+id).oninput=()=>{syncPolishPromptPreset();updateContextEditorStatus();});

@@ -1,6 +1,8 @@
 """Read, validate, and safely update project context and glossary data."""
 
 import json
+from cores.context.prompts import DEFAULT_CONTEXT_INSTRUCTIONS, context_instructions, build_glossary_prompt
+from cores.chapters.files import scan_md_dir, load_md_chapter
 
 from cores.storage.project import load_context, save_context
 from cores.translation.prompts import (
@@ -30,6 +32,23 @@ class ContextService:
         raw_json = json.dumps(data, ensure_ascii=False, indent=2)
         return self._payload(data, raw_json)
 
+    def preview_prompt(self, project_name, payload):
+        project = self._safe_project(project_name)
+        data = load_context(project)
+        instructions = context_instructions(payload.get('context_instructions', data.get('context_instructions')))
+        batch_size = int(payload.get('batch_size', 30))
+        if not 1 <= batch_size <= 100:
+            raise ValueError('Chọn từ 1 đến 100 chương để xem trước')
+        files = scan_md_dir(project / 'raw')
+        index = int(payload.get('index', data.get('index', 0)))
+        if index < 0 or index > len(files):
+            raise ValueError('Tiến độ chương không hợp lệ')
+        selected = files[index:index + batch_size]
+        prompt = build_glossary_prompt([load_md_chapter(path) for path in selected],
+                                      str(payload.get('glossary', data.get('glossary', ''))), instructions)
+        return {'prompt': prompt, 'chapters': [str(path).replace('\\', '/').rsplit('/', 1)[-1] for path in selected],
+                'index': index}
+
     @staticmethod
     def _payload(data, raw_json):
         glossary = []
@@ -40,6 +59,8 @@ class ContextService:
                     {"source": source.strip(), "target": target.strip()}
                 )
         return {
+            'context_instructions': context_instructions(data.get('context_instructions')),
+            'context_instructions_default': DEFAULT_CONTEXT_INSTRUCTIONS,
             "index": data.get("index", 0),
             "glossary": glossary,
             "style_notes": str(data.get("style_notes", "")).strip(),
@@ -139,6 +160,7 @@ class ContextService:
 
     @staticmethod
     def _save_prompt_fields(data, fields):
+        data['context_instructions'] = context_instructions(fields.get('context_instructions', data.get('context_instructions')))
         prompt_preset = str(
             fields.get("prompt_preset", data.get("prompt_preset", "default"))
         ).strip()

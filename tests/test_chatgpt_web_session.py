@@ -46,15 +46,16 @@ class ChatGPTWebSessionTests(unittest.TestCase):
         self.assertEqual({"character_pairs": []}, parse_complete_json_object(surrounded))
         self.assertIsNone(parse_complete_json_object('{"character_pairs": ['))
 
-    def test_end_marker_waits_three_seconds_and_uses_refreshed_response(self):
+    def test_end_marker_waits_three_seconds_and_copies_markdown(self):
         with patch.object(web_client.time, "sleep") as sleep, patch.object(
             web_client, "_chatgpt_response_text", return_value="JSON}\n###END###\n"
-        ):
+        ), patch.object(web_client, "copy_response_markdown", return_value="JSON}\n###END###\n") as copy:
             result = web_client._settle_end_marker_response(
                 object(), object(), "token", 1, "JSON}\n###END###"
             )
 
         sleep.assert_called_once_with(3)
+        self.assertTrue(copy.call_args.kwargs['require_end'])
         self.assertEqual(result, "JSON}\n###END###\n")
 
     def test_reuses_and_closes_driver(self):

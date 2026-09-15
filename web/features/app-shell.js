@@ -31,6 +31,7 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
   ];
   const views = { workspace: ['BÀN DỊCH','Không gian dịch'], chapters: ['THƯ VIỆN','Kho chương'], sharing: ['R2 PRIVATE','Chia sẻ & đọc truyện'], hakoEdit: ['XUẤT BẢN','Edit chương Hako'], pipeline: ['TỰ ĐỘNG HÓA','Quy trình AI'], terminology: ['BỘ NHỚ','Thuật ngữ'], characters: ['BỘ NHỚ','Hồ sơ nhân vật'], pronouns: ['BỘ NHỚ','Xưng hô'], r19: ['BỘ LỌC TOÀN CỤC','Quản lý Dịch R19'], help: ['TRỢ GIÚP','Hướng dẫn sử dụng'], settings: ['HỆ THỐNG','Cài đặt'] };
   const featureDefinitions=[
+    ['library','C','Thư viện','Ẩn, hiện truyện và mở thư mục lưu'],
     ['workspace','W','Không gian dịch','Đọc và biên tập chương song song'],
     ['chapters','C','Kho chương','Tìm, mở và quản lý các chương'],
     ['pipeline','P','Quy trình AI','Dịch, hiệu đính, review và xuất bản'],
@@ -166,7 +167,7 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
   }
   
   
-  function getView(name) { return views[name]; }
+  function getView(name) { return name==='library'?['TRUYỆN CỦA BẠN','Thư viện']:views[name]; }
 
   function bind() {
     ensureAnimeIllustrationControl();

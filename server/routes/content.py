@@ -46,6 +46,9 @@ class ContentRoutes:
 
     def handle_post(self, handler, path, query):
         project = query.get("project", [""])[0]
+        if path == '/api/context/prompt-preview':
+            return self._json_call(handler, lambda: self.context.preview_prompt(project, handler.body()),
+                                   (ValueError, OSError, TypeError, json.JSONDecodeError))
         if path == "/api/context":
             return self._json_call(
                 handler,

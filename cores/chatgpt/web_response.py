@@ -1,7 +1,55 @@
 """Locate, read, and submit the current ChatGPT Web conversation turn."""
 
-from selenium.common.exceptions import StaleElementReferenceException
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import WebDriverWait
+from uuid import uuid4
+import pyperclip
+
+
+def copy_response_markdown(driver, token, old_assistant_count, *, require_end=False, clipboard=None):
+    """Copy only the matching assistant turn; never substitute rendered text."""
+    clipboard = clipboard or pyperclip
+    sentinel = f"aiko-chatgpt-copy-{uuid4()}"
+    original = clipboard.paste()
+    copied = None
+    try:
+        def ready_button(_driver):
+            try:
+                turn = find_new_response(driver, token, old_assistant_count)
+                if turn is None:
+                    return False
+                ActionChains(driver).move_to_element(turn).perform()
+                buttons = turn.find_elements(By.CSS_SELECTOR,
+                    'button[data-testid="copy-turn-action-button"], '
+                    'button[aria-label="Copy response"], button[aria-label="Copy"], '
+                    'button[aria-label="Sao chép"], button[aria-label="Sao chép câu trả lời"]')
+                return next((button for button in buttons
+                             if button.is_displayed() and button.is_enabled()
+                             and not button.find_elements(By.XPATH, 'ancestor::pre | ancestor::code')), False)
+            except StaleElementReferenceException:
+                return False
+
+        button = WebDriverWait(driver, 20, poll_frequency=0.25).until(ready_button)
+        clipboard.copy(sentinel)
+        button.click()
+
+        def clipboard_ready(_driver):
+            value = clipboard.paste()
+            return value if value and value != sentinel and (not require_end or '###END###' in value) else False
+
+        copied = WebDriverWait(driver, 10, poll_frequency=0.25).until(clipboard_ready)
+        return copied.strip()
+    except TimeoutException as error:
+        raise TimeoutException('Không sao chép được Markdown của câu trả lời ChatGPT. Thử lại để giữ nguyên định dạng.') from error
+    finally:
+        # Do not overwrite unrelated clipboard changes made while waiting.
+        try:
+            if clipboard.paste() in (sentinel, copied):
+                clipboard.copy(original)
+        except Exception:
+            pass
 
 
 _CHATGPT_SNAPSHOT_SCRIPT = r"""

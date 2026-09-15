@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "1.4.4",
+      "date": "2026-09-15",
+      "title": "Thư viện truyện và tùy chỉnh Context",
+      "summary": "Quản lý nhiều truyện gọn hơn, tùy chỉnh cách tạo Context và giữ nguyên Markdown khi dùng ChatGPT Web.",
+      "highlights": [
+        "Thêm Thư viện truyện: tìm kiếm, lọc, ẩn/hiện truyện trong danh sách chọn và mở nhanh thư mục lưu truyện.",
+        "Thêm Prompt tạo Context riêng cho từng truyện, hỗ trợ khôi phục mặc định và xem prompt đầy đủ trước khi chạy.",
+        "Cải thiện ChatGPT Web: lấy câu trả lời dưới dạng Markdown, giữ nguyên dấu phân cách ---, chữ đậm, chữ nghiêng và mã ảnh."
+      ]
+    },
+    {
       "version": "1.4.3",
       "date": "2026-09-15",
       "title": "Giữ vị trí ảnh và thêm chương thông minh hơn",
