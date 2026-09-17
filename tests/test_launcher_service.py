@@ -7,25 +7,17 @@ from services.launcher import LauncherService
 
 
 class LauncherServiceTests(unittest.TestCase):
-    def test_wpf_launcher_does_not_download_install_or_update(self):
+    def test_launcher_runtime_does_not_invoke_powershell(self):
         root = Path(__file__).resolve().parents[1]
         controller = (root / "launcher-wpf" / "LauncherController.cs").read_text(
             encoding="utf-8"
         )
-        window = (root / "launcher-wpf" / "MainWindow.xaml.cs").read_text(
+        updater = (root / "launcher-wpf" / "PortableUpdater.cs").read_text(
             encoding="utf-8"
         )
 
-        for marker in (
-            "api.github.com",
-            "DownloadAndVerify",
-            "InstallAsync",
-            "UpdateAsync",
-            "powershell.exe",
-        ):
-            self.assertNotIn(marker, controller)
-        self.assertNotIn("CÀI ĐẶT AIKO", window)
-        self.assertNotIn("CẬP NHẬT NGAY", window)
+        for marker in ("powershell.exe", "cmd.exe", "apply_update.ps1"):
+            self.assertNotIn(marker, controller + updater)
 
     def test_prefers_bundled_launcher_and_marks_it_opened(self):
         with tempfile.TemporaryDirectory() as directory:

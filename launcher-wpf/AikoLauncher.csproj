@@ -38,16 +38,19 @@
     <Page Include="MainWindow.xaml"><Generator>MSBuild:Compile</Generator></Page>
     <Compile Include="App.xaml.cs"><DependentUpon>App.xaml</DependentUpon></Compile>
     <Compile Include="LauncherController.cs" />
+    <Compile Include="PortableUpdater.cs" />
+    <Compile Include="LauncherArtwork.cs" />
+    <Compile Include="ReleaseNotesMarkdown.cs" />
     <Compile Include="MainWindow.xaml.cs"><DependentUpon>MainWindow.xaml</DependentUpon></Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Content Include="..\web\assets\anime\aiko-launcher-background.png">
+    <Resource Include="Assets\Fonts\BeVietnamPro-Medium.ttf" />
+    <Resource Include="Assets\Fonts\OFL.txt" />
+    <Resource Include="..\web\assets\anime\aiko-launcher-background.png">
       <Link>Assets\aiko-launcher-background.png</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\web\assets\anime\aiko-blue-logo.png">
+    </Resource>
+    <Resource Include="..\web\assets\anime\aiko-blue-logo.png">
       <Link>Assets\aiko-blue-logo.png</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    </Resource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

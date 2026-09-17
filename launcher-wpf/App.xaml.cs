@@ -15,6 +15,8 @@ namespace AikoLauncher
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            AppContext.SetSwitch("Switch.System.IO.UseLegacyPathHandling", false);
+            AppContext.SetSwitch("Switch.System.IO.BlockLongPaths", false);
             SetProcessDPIAware();
             base.OnStartup(e);
             if (e.Args.Contains("--self-test")) Environment.Exit(LauncherController.SelfTest());

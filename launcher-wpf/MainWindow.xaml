@@ -1,12 +1,21 @@
 <Window x:Class="AikoLauncher.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Aiko Launcher" Width="1040" Height="650" MinWidth="920" MinHeight="590" WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="CanResize" WindowStartupLocation="CenterScreen">
+  <Window.Resources>
+    <LinearGradientBrush x:Key="HeadingInk" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#FFFFFF" Offset="0"/>
+      <GradientStop Color="#FFFFFF" Offset="0.15"/>
+      <GradientStop Color="#83D4FF" Offset="1"/>
+    </LinearGradientBrush>
+  </Window.Resources>
   <Border CornerRadius="3" Background="#07142F" BorderBrush="#48658F" BorderThickness="1" ClipToBounds="True">
     <Grid>
-      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/></Grid.ColumnDefinitions>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="440"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
       <Grid.RowDefinitions><RowDefinition Height="58"/><RowDefinition Height="*"/><RowDefinition Height="112"/></Grid.RowDefinitions>
 
-      <Grid Grid.RowSpan="2" Grid.ColumnSpan="2" ClipToBounds="True">
-        <Image Source="pack://siteoforigin:,,,/Assets/aiko-launcher-background.png" Stretch="UniformToFill" RenderTransformOrigin="0.5,0.5"><Image.RenderTransform><TransformGroup><ScaleTransform ScaleX="1.06" ScaleY="1.06"/><TranslateTransform X="-30"/></TransformGroup></Image.RenderTransform></Image>
-        <Rectangle HorizontalAlignment="Right" Width="680"><Rectangle.Fill><LinearGradientBrush StartPoint="1,0" EndPoint="0,0"><GradientStop Color="#F0071738" Offset="0"/><GradientStop Color="#B5091A3D" Offset="0.62"/><GradientStop Color="#38091A3D" Offset="0.84"/><GradientStop Color="#00091A3D" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
+      <Grid x:Name="BannerSurface" Grid.RowSpan="2" Grid.ColumnSpan="2" ClipToBounds="True">
+        <Image x:Name="BannerImage" Source="pack://application:,,,/Aiko-Launcher;component/Assets/aiko-launcher-background.png" Visibility="Collapsed"/>
+        <Rectangle>
+          <Rectangle.Fill><ImageBrush ImageSource="{Binding Source, ElementName=BannerImage}" TileMode="FlipX" Stretch="UniformToFill" AlignmentX="Left"><ImageBrush.Transform><TranslateTransform X="45"/></ImageBrush.Transform></ImageBrush></Rectangle.Fill>
+        </Rectangle>
       </Grid>
 
       <Border Grid.ColumnSpan="2" MouseLeftButtonDown="DragWindow" ClipToBounds="True">
@@ -14,27 +23,41 @@
           <Rectangle HorizontalAlignment="Left" Width="390"><Rectangle.Fill><RadialGradientBrush GradientOrigin="0,0" Center="0,0" RadiusX="1" RadiusY="1"><GradientStop Color="#D807142F" Offset="0"/><GradientStop Color="#7207142F" Offset="0.48"/><GradientStop Color="#0007142F" Offset="1"/></RadialGradientBrush></Rectangle.Fill></Rectangle>
           <Rectangle HorizontalAlignment="Right" Width="300"><Rectangle.Fill><RadialGradientBrush GradientOrigin="1,0" Center="1,0" RadiusX="1" RadiusY="1"><GradientStop Color="#D807142F" Offset="0"/><GradientStop Color="#7207142F" Offset="0.48"/><GradientStop Color="#0007142F" Offset="1"/></RadialGradientBrush></Rectangle.Fill></Rectangle>
           <Grid Margin="22,0,10,0"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Border Width="34" Height="34" CornerRadius="10" Background="#24FFFFFF"><Image Source="pack://siteoforigin:,,,/Assets/aiko-blue-logo.png" Stretch="Uniform" Margin="2"/></Border><StackPanel Margin="11,0,0,0" VerticalAlignment="Center"><TextBlock Text="AIKO" FontFamily="Segoe UI" FontWeight="Bold" FontSize="14" Foreground="#F4FAFF"/><TextBlock Text="APP TRANSLATOR" FontSize="8" FontWeight="Bold" Foreground="#AFCBE8"/></StackPanel></StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Border Width="34" Height="34" CornerRadius="10" Background="#24FFFFFF"><Image x:Name="LogoImage" Source="pack://application:,,,/Aiko-Launcher;component/Assets/aiko-blue-logo.png" Stretch="Uniform" Margin="2"/></Border><StackPanel Margin="11,0,0,0" VerticalAlignment="Center"><TextBlock Text="AIKO" FontFamily="Segoe UI" FontWeight="Bold" FontSize="14" Foreground="#F4FAFF"/><TextBlock Text="APP TRANSLATOR" FontSize="8" FontWeight="Bold" Foreground="#AFCBE8"/></StackPanel></StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal"><Button Content="—" Foreground="#D9ECFF" Background="Transparent" Width="42" Height="38" Padding="0" BorderThickness="0" Click="MinimizeWindow"/><Button Content="×" Foreground="#D9ECFF" Background="Transparent" Width="42" Height="38" Padding="0" BorderThickness="0" Click="CloseWindow"/></StackPanel>
           </Grid>
         </Grid>
       </Border>
 
-      <Grid Grid.Row="1" Grid.ColumnSpan="2" ClipToBounds="True">
-        <Rectangle VerticalAlignment="Bottom" Height="190"><Rectangle.Fill><LinearGradientBrush StartPoint="0,1" EndPoint="0,0"><GradientStop Color="#B20A1734" Offset="0"/><GradientStop Color="#000A1734" Offset="1"/></LinearGradientBrush></Rectangle.Fill></Rectangle>
-      </Grid>
-
-      <Grid Grid.Row="1" Grid.Column="1" Margin="24,34,24,20" x:Name="ContentPanel" Opacity="0">
+      <Grid Grid.Row="1" Grid.Column="0" Margin="36,34,24,20" x:Name="ContentPanel">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <Border HorizontalAlignment="Left" Background="#2B7ED6FF" BorderBrush="#75C5FF" BorderThickness="1" CornerRadius="8" Padding="10,5"><TextBlock x:Name="VersionText" Text="ĐANG KIỂM TRA" FontSize="10" FontWeight="Bold" Foreground="#DDF3FF"/></Border>
-        <TextBlock Grid.Row="1" x:Name="HeadlineText" Text="Một nơi cho mọi bản dịch" FontSize="26" FontWeight="Bold" Foreground="#F5FAFF" TextWrapping="NoWrap" Margin="0,20,0,8"/>
-        <TextBlock Grid.Row="2" x:Name="SummaryText" Text="Aiko đang kiểm tra phiên bản mới nhất và chuẩn bị không gian làm việc của bạn." FontSize="14" LineHeight="22" Foreground="#C4DCF2" TextWrapping="Wrap" Margin="0,0,20,0"/>
-        <ScrollViewer Grid.Row="3" Margin="0,26,20,0" VerticalScrollBarVisibility="Auto"><ScrollViewer.Resources><Style TargetType="ScrollBar" BasedOn="{StaticResource AikoScrollBar}"/></ScrollViewer.Resources><TextBlock x:Name="NotesText" FontSize="13" LineHeight="21" Foreground="#B9D6EF" TextWrapping="Wrap"/></ScrollViewer>
+        <TextBlock x:Name="VersionText" Text="AIKO" HorizontalAlignment="Left" FontFamily="/Aiko-Launcher;component/Assets/Fonts/#Be Vietnam Pro" FontSize="16" FontWeight="Medium" Foreground="{StaticResource HeadingInk}"/>
+        <TextBlock Grid.Row="1" x:Name="HeadlineText" Text="Một nơi cho mọi bản dịch" FontSize="26" FontWeight="Bold" Foreground="{StaticResource HeadingInk}" TextWrapping="NoWrap" Margin="0,4,0,6"/>
+        <TextBlock Grid.Row="2" x:Name="SummaryText" Text="Aiko đã sẵn sàng. Tiếp tục dự án gần nhất hoặc kiểm tra công cụ server." FontSize="14" LineHeight="22" Foreground="#F2F7FF" TextWrapping="Wrap" Margin="0,0,20,0"/>
+        <Grid x:Name="NotesSlot" Grid.Row="3" Margin="0,12,0,0">
+          <Grid x:Name="NotesCard" Height="206" VerticalAlignment="Top" ClipToBounds="True">
+            <Rectangle Margin="-24" IsHitTestVisible="False">
+              <Rectangle.Fill><VisualBrush x:Name="NotesBackdrop" Visual="{Binding ElementName=BannerSurface}" ViewboxUnits="Absolute" Stretch="Fill"/></Rectangle.Fill>
+              <Rectangle.Effect><BlurEffect Radius="22" RenderingBias="Quality"/></Rectangle.Effect>
+            </Rectangle>
+            <Border Background="#A32A374B" BorderBrush="#38FFFFFF" BorderThickness="1" CornerRadius="12" IsHitTestVisible="False"/>
+            <FlowDocumentScrollViewer x:Name="NotesView" Margin="18,16" Padding="0" Background="Transparent" BorderThickness="0" IsToolBarVisible="False" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><FlowDocumentScrollViewer.Resources><Style TargetType="ScrollBar" BasedOn="{StaticResource AikoScrollBar}"/></FlowDocumentScrollViewer.Resources></FlowDocumentScrollViewer>
+            <StackPanel x:Name="NotesLoading" Margin="18,16">
+              <TextBlock Text="Có gì mới?" FontSize="16" FontWeight="SemiBold" Foreground="#F0F8FF"/>
+              <TextBlock Text="Đang tải thông tin phiên bản" FontSize="13" Margin="0,6,0,0" Foreground="#C4DCF2"/>
+              <StackPanel x:Name="LoadingDots" Orientation="Horizontal" Margin="0,16,0,0">
+                <Ellipse Width="5" Height="5" Margin="0,0,6,0" Fill="#75C5FF" Opacity="1"/>
+                <Ellipse Width="5" Height="5" Margin="0,0,6,0" Fill="#75C5FF" Opacity="0.55"/>
+                <Ellipse Width="5" Height="5" Margin="0,0,6,0" Fill="#75C5FF" Opacity="0.25"/>
+              </StackPanel>
+            </StackPanel>
+          </Grid>
+        </Grid>
       </Grid>
 
       <Border Grid.Row="2" Grid.ColumnSpan="2" Background="#EF07142F" BorderBrush="#3B5F89" BorderThickness="0,1,0,0">
         <Grid Margin="36,18"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="334"/></Grid.ColumnDefinitions>
-          <StackPanel VerticalAlignment="Center"><TextBlock x:Name="StatusText" Text="Đang kiểm tra bản mới nhất…" FontSize="14" FontWeight="SemiBold" Foreground="#F3F9FF"/><TextBlock x:Name="PathText" Text="Thư mục ứng dụng" Margin="0,7,0,0" FontSize="11" Foreground="#A9C5E1" TextTrimming="CharacterEllipsis"/><Grid Margin="0,10,24,0" Height="5"><Border Background="#35506F" CornerRadius="3"/><Border x:Name="ProgressFill" Background="#72C7FF" CornerRadius="3" HorizontalAlignment="Left" Width="0"/></Grid></StackPanel>
+          <StackPanel VerticalAlignment="Center"><DockPanel Margin="0,0,24,0"><Ellipse x:Name="StatusDot" Width="7" Height="7" Fill="#72C7FF" Margin="0,0,9,0" VerticalAlignment="Center"/><TextBlock x:Name="StatusText" Text="Đang kiểm tra bản mới nhất…" FontSize="14" FontWeight="SemiBold" Foreground="#F3F9FF" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/></DockPanel><TextBlock x:Name="PathText" Text="Thư mục ứng dụng" Margin="0,7,0,0" FontSize="11" Foreground="#A9C5E1" TextTrimming="CharacterEllipsis"/><Grid x:Name="ProgressTrack" ClipToBounds="True" Margin="0,10,24,0" Height="5"><Border Background="#35506F" CornerRadius="3"/><Border x:Name="ProgressFill" Background="#72C7FF" CornerRadius="3" HorizontalAlignment="Left" Width="0"><Border.RenderTransform><TranslateTransform x:Name="ProgressMotion"/></Border.RenderTransform></Border></Grid></StackPanel>
           <Grid Grid.Column="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="64"/></Grid.ColumnDefinitions><Button x:Name="PrimaryButton" Content="ĐANG KIỂM TRA…" Style="{StaticResource PrimaryButton}" Click="PrimaryAction"/><Button Grid.Column="1" x:Name="ToolsButton" Content="⋯" Style="{StaticResource IconButton}" Margin="10,0,0,0" Click="OpenTools"/></Grid>
         </Grid>
       </Border>
