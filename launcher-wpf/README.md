@@ -39,14 +39,16 @@ Nút cập nhật trong giao diện web vẫn dùng updater hiện có. Luồng 
 
 ```powershell
 .\build_launcher.ps1
-.\test_launcher_updater.ps1
+.\tests\test_launcher_updater.ps1
+.\tests\test_launcher_artwork.ps1
+.\tests\test_launcher_markdown.ps1
 python -m unittest tests.test_launcher_service tests.test_update_service tests.test_update_ui
 ```
 
 Kiểm tra mạng và runtime thật (tải khoảng 320 MB, lưu trong `release/launcher-tests`):
 
 ```powershell
-.\test_launcher_updater.ps1 -Live
+.\tests\test_launcher_updater.ps1 -Live
 ```
 
 Live test chỉ đổi cổng của bản sao controller/app thử thành 18765, dùng thư mục dữ liệu riêng và không đổi phiên Aiko đang chạy ở cổng 8765. Test thực hiện tải/kiểm tra gói thật, cài mới, khởi động Python, thay file chương trình và phục hồi sau lỗi khởi động có chủ đích. Các ca lỗi ZIP, digest, file khóa và dữ liệu được kiểm tra bằng fixture riêng.

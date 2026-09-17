@@ -1,4 +1,4 @@
-// Opt-in integration test. Run through test_launcher_updater.ps1 -Live.
+// Opt-in integration test. Run through tests/test_launcher_updater.ps1 -Live.
 // Only the test copy of the controller/app uses port 18765.
 using System;
 using System.IO;

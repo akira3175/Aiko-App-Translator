@@ -1,6 +1,6 @@
 param([switch]$Live, [string]$ReuseWork = '')
 $ErrorActionPreference = 'Stop'
-$root = $PSScriptRoot
+$root = Split-Path -Parent $PSScriptRoot
 $compiler = Join-Path $root 'release\cache\roslyn-4.8.0\tasks\net472\csc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) { throw 'Run build_launcher.ps1 first.' }
 $testRoot = Join-Path $root 'release\launcher-tests'
