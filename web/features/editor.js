@@ -95,7 +95,12 @@ export function createEditorFeature({api,escapeHtml,positionPopover,saveChapter,
     return String(markdown||'').split(/\r?\n/).map((line,lineIndex)=>{
       const trimmed=line.trim();
       const isImage=/^!\[[^\]]*\]\([^)]+\)$/.test(trimmed)||/^\[img(?:=[^\]]+)?\].+\[\/img\]$/i.test(trimmed);
-      if(isImage){const image=images[imageIndex++];return image?`<div data-source-line="${lineIndex}"><a href="${escapeHtml(image.url)}" target="_blank" rel="noopener"><img class="inline-story-image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.id)}" loading="lazy"></a><span class="image-caption">${escapeHtml(image.id)}</span></div>`:'';}
+      if(isImage){
+        const local=trimmed.match(/^!\[[^\]]*\]\((?:\.\.\/)?image\/([\w.-]+\.(?:jpg|jpeg|png|gif|webp|svg))\)$/i);
+        const fallback=images?.[imageIndex++];
+        const image=local?{id:local[1].replace(/\.[^.]+$/,''),url:`/api/image/${encodeURIComponent(local[1])}?project=${encodeURIComponent(state.project)}`}:fallback;
+        return image?`<div data-source-line="${lineIndex}"><a href="${escapeHtml(image.url)}" target="_blank" rel="noopener"><img class="inline-story-image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.id)}" loading="lazy"></a><span class="image-caption">${escapeHtml(image.id)}</span></div>`:'';
+      }
       if(!trimmed)return `<div class="paragraph-space" data-source-line="${lineIndex}"></div>`;
       if(trimmed==='* * *')return `<p data-source-line="${lineIndex}">${escapeHtml(line)}</p>`;
       let text=escapeHtml(line).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*([^*]+?)\*/g,'$1<em>$2</em>');

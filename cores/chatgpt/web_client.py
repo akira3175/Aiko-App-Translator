@@ -3,12 +3,10 @@
 import time
 
 from selenium.common.exceptions import (
-    NoSuchElementException,
     StaleElementReferenceException,
     TimeoutException,
 )
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from cores.chatgpt.web_controls import select_chatgpt_model, select_chatgpt_thinking
@@ -23,6 +21,41 @@ from cores.json_output import parse_complete_json_object
 
 
 END_MARKER_SETTLE_SECONDS = 3
+
+INPUT_SELECTORS = (
+    '#pending-home-input', '#prompt-textarea',
+    'div[contenteditable="true"][data-placeholder]',
+    'div[role="textbox"][contenteditable="true"]',
+)
+
+
+class ChatGPTComposerError(ValueError):
+    """Stop before sending when the requested configuration cannot be verified."""
+
+
+def _ready_input(driver):
+    for selector in INPUT_SELECTORS:
+        for element in driver.find_elements(By.CSS_SELECTOR, selector):
+            try:
+                if element.is_displayed() and element.is_enabled():
+                    return element
+            except StaleElementReferenceException:
+                continue
+    return False
+
+
+def _paste_prompt(driver, input_area, prompt, clipboard):
+    from selenium.webdriver.common.keys import Keys
+
+    original = clipboard.paste()
+    try:
+        input_area.click()
+        input_area.send_keys(Keys.CONTROL, 'a')
+        clipboard.copy(prompt)
+        input_area.send_keys(Keys.CONTROL, 'v')
+    finally:
+        if clipboard.paste() == prompt:
+            clipboard.copy(original)
 
 
 def _is_known_structured_response(text):
@@ -73,8 +106,6 @@ def generate_content(
     Gửi prompt đến ChatGPT web và lấy response.
     """
     import pyperclip
-    from selenium.webdriver.common.action_chains import ActionChains
-    from selenium.webdriver.common.keys import Keys
 
     if chatgpt_model is None:
         chatgpt_model = default_model
@@ -89,70 +120,20 @@ def generate_content(
             driver.get(chat_url or link)
             time.sleep(3)
 
-            # ── Bước 0: Chọn model và thinking level ──
-            if chatgpt_model:
-                select_chatgpt_model(driver, chatgpt_model)
-            if chatgpt_thinking:
-                select_chatgpt_thinking(driver, chatgpt_thinking)
-
-            # ── Bước 1: Tìm ô nhập liệu ──
-            input_selectors = [
-                "#prompt-textarea",
-                'div[contenteditable="true"][id="prompt-textarea"]',
-                'div[contenteditable="true"][data-placeholder]',
-                'div[role="textbox"][contenteditable="true"]',
-                'textarea[id="prompt-textarea"]',
-            ]
-            input_area = None
-            for selector in input_selectors:
-                try:
-                    input_area = wait.until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-                    )
-                    if input_area:
-                        break
-                except:
-                    continue
-
-            if not input_area:
-                raise NoSuchElementException("Không tìm thấy ô nhập liệu ChatGPT!")
-
-            # Focus vào ô nhập
-            try:
-                driver.execute_script(
-                    "arguments[0].scrollIntoView({block: 'center'});", input_area
+            input_area = wait.until(_ready_input)
+            if chatgpt_model and not select_chatgpt_model(driver, chatgpt_model):
+                print(
+                    f"⚠️ Không chọn được model ChatGPT '{chatgpt_model}'. "
+                    "Tiếp tục với model hiện tại trên ChatGPT."
                 )
-                time.sleep(0.5)
-                ActionChains(driver).move_to_element(input_area).click().perform()
-            except Exception as e:
-                print(f"⚠️ Lỗi focus input: {e}")
-
-            time.sleep(0.5)
-
-            # ── Bước 2: Nhập prompt ──
-            # ChatGPT dùng ProseMirror/contenteditable, dùng JS paste
-            try:
-                pyperclip.copy(prompt)
-                time.sleep(0.5)
-                # Dùng ActionChains Ctrl+V
-                ActionChains(driver).key_down(Keys.CONTROL).send_keys("v").key_up(
-                    Keys.CONTROL
-                ).perform()
-            except Exception as e:
-                print(f"⚠️ Fallback paste bằng JS: {e}")
-                # Fallback event
-                driver.execute_script(
-                    """
-                    const dt = new DataTransfer();
-                    dt.setData('text/plain', arguments[1]);
-                    const evt = new ClipboardEvent('paste', {
-                        clipboardData: dt, bubbles: true, cancelable: true
-                    });
-                    arguments[0].dispatchEvent(evt);
-                """,
-                    input_area,
-                    prompt,
+            if chatgpt_thinking and not select_chatgpt_thinking(driver, chatgpt_thinking):
+                print(
+                    f"⚠️ Không chọn được mức suy luận '{chatgpt_thinking}'. "
+                    "Tiếp tục với mức suy luận hiện tại trên ChatGPT."
                 )
+            input_area = wait.until(_ready_input)
+            _paste_prompt(driver, input_area, prompt, pyperclip)
+            print(f"📋 Đã thực hiện dán prompt ({len(prompt)} ký tự nguồn).")
 
             print("⏳ Đang chờ ChatGPT nạp xong prompt...")
             send_button = WebDriverWait(driver, 300, poll_frequency=0.25).until(
@@ -168,10 +149,10 @@ def generate_content(
             )
 
             # ── Bước 3: Nhấn nút gửi ──
-            driver.execute_script("arguments[0].click();", send_button)
+            send_button.click()
 
             print(
-                f"📤 Đã gửi prompt ({len(prompt)} ký tự). Đang chờ ChatGPT response..."
+                f"📤 Đã nhấn Gửi ({len(prompt)} ký tự nguồn). Đang chờ ChatGPT response..."
             )
             time.sleep(5)
 
@@ -257,6 +238,9 @@ def generate_content(
                 return copy_response_markdown(driver, response_token, old_assistant_count)
             raise TimeoutException("Timeout chờ ChatGPT response")
 
+        except ChatGPTComposerError:
+            # Keep the browser open for inspection; do not retry a UI mismatch.
+            raise
         except Exception as e:
             print(f"⚠️ Lỗi Selenium lần {attempt + 1}/{max_retries}: {e}")
             close_driver(close_orphans=True)

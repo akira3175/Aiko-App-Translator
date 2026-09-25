@@ -5,6 +5,21 @@ from server.jobs import merge_process_output, timestamp_process_line
 
 
 class ProcessOutputTests(unittest.TestCase):
+    def test_hako_countdown_updates_one_line_and_preserves_chapter_logs(self):
+        output = "[13:34:03] Đã cập nhật chương 1\n"
+        for remaining in range(10, 0, -1):
+            output = merge_process_output(
+                output,
+                f"[13:34:12] Chờ {remaining} giây trước khi cập nhật chương tiếp theo…\n",
+            )
+        self.assertEqual(len(output.splitlines()), 2)
+        self.assertIn("Chờ 1 giây", output)
+        output = merge_process_output(output, "[13:34:13] [2/50]\n")
+        output = merge_process_output(output, "Đã cập nhật chương 2\n")
+        output = merge_process_output(output, "Chờ 10 giây trước khi cập nhật chương tiếp theo…\n")
+        self.assertEqual(len(output.splitlines()), 5)
+        self.assertIn("[2/50]", output)
+
     def test_adds_timestamp_to_non_empty_process_line(self):
         line = timestamp_process_line(
             "Đang dịch chương 1...\n",

@@ -192,7 +192,20 @@ def group_segments_into_chapters(md_files):
 # ============================================================
 
 _CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "image_cache.json")
-_r2_config: dict = {}  # Được khởi tạo từ main()
+_r2_config: dict = {}
+
+
+def configure_r2(config=None):
+    """Load shared image-upload settings for publishing and editing chapters."""
+    global _r2_config
+    keys = ("account_id", "access_key_id", "secret_access_key", "bucket", "public_url")
+    r2_cfg = (
+        {key: option(f"r2_{key}", "") for key in keys}
+        if config is None or web_mode()
+        else config.get("cloudflare_r2", {})
+    )
+    _r2_config = r2_cfg if isinstance(r2_cfg, dict) and all(r2_cfg.get(k) for k in keys) else {}
+    return bool(_r2_config)
 
 
 def _load_cache() -> dict:
@@ -251,7 +264,8 @@ def upload_image_file(local_path: str) -> str:
         return ""
 
     if not _r2_config:
-        print("  [IMG] Lỗi: Chưa cấu hình cloudflare_r2 trong config_md.json")
+        print("  [IMG] Lỗi: Chưa nạp đủ cấu hình Cloudflare R2. "
+              "Kiểm tra Cài đặt > Xuất bản (app) hoặc cloudflare_r2 trong up/config_md.json (script đăng chương).")
         return ""
 
     ext = local_path.rsplit(".", 1)[-1].lower()
@@ -464,10 +478,6 @@ async def upload_chapter_to_site(chapter_key, segments_data, upload_url, page, s
         seg = parse_md_file(filepath)
         if seg_idx == 0:
             chapter_title = seg["title"]
-        else:
-            # Segment sau: n\u1ebfu c\u00f3 title ri\u00eang th\u00ec th\u00eam nh\u01b0 heading
-            if seg["title"]:
-                all_elements.append({"type": "text", "content": f"## {seg['title']}"})
         all_elements.extend(seg["elements"])
 
     if not all_elements and not chapter_title:
@@ -575,18 +585,8 @@ async def main():
         return
 
     # Khởi tạo Cloudflare R2 config
-    global _r2_config
-    r2_cfg = {
-        "account_id": option("r2_account_id", ""),
-        "access_key_id": option("r2_access_key_id", ""),
-        "secret_access_key": option("r2_secret_access_key", ""),
-        "bucket": option("r2_bucket", ""),
-        "public_url": option("r2_public_url", ""),
-    } if web_mode() else config.get("cloudflare_r2", {})
-    required_r2_keys = ["account_id", "access_key_id", "secret_access_key", "bucket", "public_url"]
-    if r2_cfg and all(r2_cfg.get(k) for k in required_r2_keys):
-        _r2_config = r2_cfg
-        print(f"☁️  R2 bucket: {r2_cfg['bucket']} | {r2_cfg['public_url']}")
+    if configure_r2(config):
+        print(f"☁️  R2 bucket: {_r2_config['bucket']} | {_r2_config['public_url']}")
     else:
         print("⚠️  Chưa cấu hình cloudflare_r2 đầy đủ — ảnh sẽ không được upload.")
 

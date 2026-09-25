@@ -1,6 +1,9 @@
 """Locate, read, and submit the current ChatGPT Web conversation turn."""
 
-from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from selenium.common.exceptions import (
+    StaleElementReferenceException, TimeoutException,
+    ElementNotInteractableException, MoveTargetOutOfBoundsException,
+)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
@@ -22,16 +25,23 @@ def copy_response_markdown(driver, token, old_assistant_count, *, require_end=Fa
                     return False
                 scope = turn
                 for _ in range(5):
-                    ActionChains(driver).move_to_element(scope).perform()
-                    buttons = scope.find_elements(By.CSS_SELECTOR,
-                        '[data-testid="copy-turn-action-button"], '
-                        '[aria-label="Copy response"], [aria-label="Copy"], '
-                        '[aria-label="Sao chép"], [aria-label="Sao chép câu trả lời"]')
-                    button = next((item for item in buttons
-                                   if item.is_displayed() and item.is_enabled()
-                                   and not item.find_elements(By.XPATH, 'ancestor::pre | ancestor::code')), None)
-                    if button is not None:
-                        return button
+                    for hover in (False, True):
+                        if hover:
+                            try:
+                                ActionChains(driver).move_to_element(scope).perform()
+                            except (ElementNotInteractableException, MoveTargetOutOfBoundsException):
+                                # Layout-only wrappers may have no box while their
+                                # children and sibling action controls remain visible.
+                                break
+                        buttons = scope.find_elements(By.CSS_SELECTOR,
+                            '[data-testid="copy-turn-action-button"], '
+                            '[aria-label="Copy response"], [aria-label="Copy"], '
+                            '[aria-label="Sao chép"], [aria-label="Sao chép câu trả lời"]')
+                        button = next((item for item in buttons
+                                       if item.is_displayed() and item.is_enabled()
+                                       and not item.find_elements(By.XPATH, 'ancestor::pre | ancestor::code')), None)
+                        if button is not None:
+                            return button
                     parent = scope.find_element(By.XPATH, "..")
                     if parent == scope:
                         break
@@ -64,6 +74,7 @@ def copy_response_markdown(driver, token, old_assistant_count, *, require_end=Fa
 _CHATGPT_SNAPSHOT_SCRIPT = r"""
 const token = arguments[0];
 const rootOf = (el) =>
+    el.closest('[data-chatgpt-search-unit-key]') ||
     el.closest('[data-testid^="conversation-turn-"]') ||
     el.closest('article') ||
     el.closest('.group\\/conversation-turn') ||
@@ -77,9 +88,9 @@ const uniqueRoots = (selector) => {
     }
     return result;
 };
-const users = uniqueRoots('[data-message-author-role="user"]');
+const users = uniqueRoots('[data-message-author-role="user"],[data-chatgpt-search-unit-key$=":user"]');
 const assistants = uniqueRoots(
-    '[data-message-author-role="assistant"],article[data-turn="assistant"],.agent-turn'
+    '[data-message-author-role="assistant"],article[data-turn="assistant"],.agent-turn,[data-chatgpt-search-unit-key$=":assistant"]'
 );
 for (const root of users) root.setAttribute('data-novel-before-user', token);
 for (const root of assistants) {
@@ -93,6 +104,7 @@ _CHATGPT_NEW_RESPONSE_SCRIPT = r"""
 const token = arguments[0];
 const oldAssistantCount = arguments[1];
 const rootOf = (el) =>
+    el.closest('[data-chatgpt-search-unit-key]') ||
     el.closest('[data-testid^="conversation-turn-"]') ||
     el.closest('article') ||
     el.closest('.group\\/conversation-turn') ||
@@ -106,9 +118,9 @@ const uniqueRoots = (selector) => {
     }
     return result;
 };
-const users = uniqueRoots('[data-message-author-role="user"]');
+const users = uniqueRoots('[data-message-author-role="user"],[data-chatgpt-search-unit-key$=":user"]');
 const assistants = uniqueRoots(
-    '[data-message-author-role="assistant"],article[data-turn="assistant"],.agent-turn'
+    '[data-message-author-role="assistant"],article[data-turn="assistant"],.agent-turn,[data-chatgpt-search-unit-key$=":assistant"]'
 );
 
 // Chỉ lấy câu trả lời nằm SAU prompt vừa gửi. Nhờ vậy một bản dịch cũ
@@ -149,7 +161,7 @@ def find_new_response(driver, token, old_assistant_count):
 
 def response_text(response_turn):
     markdown_blocks = response_turn.find_elements(
-        By.CSS_SELECTOR, "div.markdown, div.markdown.prose"
+        By.CSS_SELECTOR, 'div.markdown, div.markdown.prose, [data-markdown-text-style="assistant-message"]'
     )
     for block in reversed(markdown_blocks):
         text = block.text.strip()
@@ -162,9 +174,9 @@ _CHATGPT_SEND_SELECTORS = (
     'button[data-testid="send-button"]',
     'button[aria-label="Send prompt"]',
     'button[aria-label="Gửi tin nhắn"]',
+    'button[aria-label="Gửi"]',
     'button[aria-label="Send message"]',
     'form button[type="submit"]',
-    "button.bottom-0",
 )
 
 

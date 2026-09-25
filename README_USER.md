@@ -9,12 +9,12 @@ https://github.com/akira3175/Aiko-App-Translator. Không trả tiền cho bên t
 
 ## Khởi động
 
-1. Giải nén toàn bộ file ZIP vào một thư mục có quyền ghi.
-2. Nhấp đúp `Aiko-Launcher.exe`.
-3. Lần đầu, chọn **Cài đặt Aiko**. Những lần sau, launcher sẽ kiểm tra cập nhật và mở ứng dụng.
+1. Mở `Aiko-Launcher.exe` được phát hành riêng.
+2. Lần đầu, chọn **Cài đặt Aiko** để launcher tải và cài app. Những lần sau, launcher sẽ kiểm tra cập nhật và mở ứng dụng.
+3. App tự mở tại `http://127.0.0.1:8765`.
 
 Launcher duy nhất này cũng cho phép khởi động lại, tắt server và tạo shortcut. Máy không cần cài Python hoặc Chrome.
-3. App tự mở tại `http://127.0.0.1:8765`.
+Gói ZIP app không kèm launcher. Nếu cài thủ công, giải nén toàn bộ ZIP vào thư mục có quyền ghi và chạy `start_app.bat`.
 
 Lần đầu mở, bạn có thể chọn tạo shortcut ngoài Desktop. Bảng điều khiển launcher cho phép mở app, khởi động lại, tạo shortcut Desktop/Start Menu hoặc tắt server. Đóng bảng điều khiển chỉ ẩn cửa sổ; server vẫn tiếp tục chạy. `start_app.bat` được giữ làm cách khởi động dự phòng khi cần xem lỗi chi tiết.
 

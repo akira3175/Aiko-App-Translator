@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import Mock, patch
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, ElementNotInteractableException
 from cores.chatgpt import web_response, web_client
 
 
@@ -16,7 +16,7 @@ class ImmediateWait:
 
 
 class ChatGPTCopyTests(unittest.TestCase):
-    def copy(self, markdown, *, button_present=True, writes=True, require_end=True, button_on_parent=False):
+    def copy(self, markdown, *, button_present=True, writes=True, require_end=True, button_on_parent=False, hover_fails=False):
         clipboard = Mock()
         value = ['original clipboard']
         clipboard.paste.side_effect = lambda: value[0]
@@ -34,7 +34,9 @@ class ChatGPTCopyTests(unittest.TestCase):
         parent.find_elements.return_value = [button] if button_present and button_on_parent else []
         parent.find_element.return_value = parent
         driver = Mock()
-        with patch.object(web_response, 'find_new_response', return_value=turn) as locate, patch.object(web_response, 'ActionChains'), patch.object(web_response, 'WebDriverWait', ImmediateWait):
+        with patch.object(web_response, 'find_new_response', return_value=turn) as locate, patch.object(web_response, 'ActionChains') as actions, patch.object(web_response, 'WebDriverWait', ImmediateWait):
+            if hover_fails:
+                actions.return_value.move_to_element.return_value.perform.side_effect = ElementNotInteractableException('has no size and location')
             try:
                 result = web_response.copy_response_markdown(driver, 'new-turn', 4, require_end=require_end, clipboard=clipboard)
                 locate.assert_called_with(driver, 'new-turn', 4)
@@ -51,6 +53,14 @@ class ChatGPTCopyTests(unittest.TestCase):
     def test_copy_button_may_live_on_work_turn_parent(self):
         text = 'Nội dung\n\n---\n\n###END###'
         self.assertEqual(text, self.copy(text, button_on_parent=True))
+
+    def test_zero_size_wrapper_does_not_prevent_copy_from_parent(self):
+        text = 'markdown ###END###'
+        self.assertEqual(text, self.copy(text, button_on_parent=True, hover_fails=True))
+
+    def test_visible_copy_button_does_not_require_hover(self):
+        text = 'markdown ###END###'
+        self.assertEqual(text, self.copy(text, hover_fails=True))
 
     def test_copy_failure_does_not_return_old_clipboard_or_plain_text(self):
         with self.assertRaises(TimeoutException):

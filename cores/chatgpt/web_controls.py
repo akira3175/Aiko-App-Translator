@@ -7,6 +7,7 @@ from selenium.common.exceptions import (
     NoSuchElementException,
     StaleElementReferenceException,
     TimeoutException,
+    ElementClickInterceptedException,
 )
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
@@ -130,7 +131,8 @@ def _find_visible_chatgpt_choice(driver, keywords):
 def _visible_chatgpt_intelligence_picker(driver):
     try:
         for picker in driver.find_elements(
-            By.CSS_SELECTOR, '[data-testid="composer-intelligence-picker-content"]'
+            By.CSS_SELECTOR, '[data-testid="composer-intelligence-picker-content"], '
+            '[role="menu"]:has([data-model-picker-view])'
         ):
             if picker.is_displayed():
                 return picker
@@ -142,11 +144,16 @@ def _visible_chatgpt_intelligence_picker(driver):
 def _open_chatgpt_intelligence_picker(driver):
     picker = _visible_chatgpt_intelligence_picker(driver)
     if picker:
-        for _ in range(2):
-            ActionChains(driver).send_keys(Keys.ESCAPE).perform()
-            time.sleep(0.2)
-            if not _visible_chatgpt_intelligence_picker(driver):
-                break
+        return picker
+    button = _find_chatgpt_model_button(driver)
+    if button:
+        try:
+            button.click()
+            return WebDriverWait(driver, 3, poll_frequency=0.2).until(
+                lambda current: _visible_chatgpt_intelligence_picker(current) or False
+            )
+        except (TimeoutException, StaleElementReferenceException, ElementClickInterceptedException):
+            pass
     ActionChains(driver).key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys(
         "m"
     ).key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
@@ -173,6 +180,8 @@ def _select_chatgpt_advanced_option(driver, row_label, target_keywords):
         return False if has_new_picker else None
 
     try:
+        if picker.find_elements(By.CSS_SELECTOR, '[data-model-picker-view]'):
+            return _select_chatgpt_slider_option(driver, picker, row_label, target_keywords)
         advanced = picker.find_element(
             By.CSS_SELECTOR,
             '[data-testid="composer-model-picker-slider-advanced-view"]',
@@ -225,6 +234,53 @@ def _select_chatgpt_advanced_option(driver, row_label, target_keywords):
     except (NoSuchElementException, TimeoutException, StaleElementReferenceException):
         ActionChains(driver).send_keys(Keys.ESCAPE).perform()
         return False
+
+
+def _select_chatgpt_slider_option(driver, picker, row_label, keywords):
+    """Model list and three-position effort slider observed in the new picker."""
+    if row_label == "Mô hình":
+        def target_item():
+            for item in picker.find_elements(By.CSS_SELECTOR, '[role="menuitemradio"]'):
+                labels = item.find_elements(By.CSS_SELECTOR, '.truncate')
+                label = _chatgpt_item_text(labels[0] if labels else item)
+                if label in keywords:
+                    return item
+            return None
+
+        target = target_item()
+        if target is None:
+            return False
+        if target.get_attribute('aria-checked') != 'true':
+            toggle = picker.find_element(By.CSS_SELECTOR, '[data-model-picker-view-toggle]')
+            toggle.click()
+            target = WebDriverWait(driver, 5).until(
+                lambda _: (item if (item := target_item()) is not None and item.is_displayed() else False)
+            )
+            target.click()
+            WebDriverWait(driver, 5).until(
+                lambda _: (item := target_item()) is not None
+                and item.get_attribute('aria-checked') == 'true'
+            )
+    else:
+        levels = {'tuc thi': 0, 'instant': 0, 'vua': 1, 'medium': 1, 'cao': 2, 'high': 2}
+        desired = next((levels[k] for k in keywords if k in levels), None)
+        if desired is None:
+            return False
+        control = picker.find_element(By.CSS_SELECTOR, '[data-reasoning-slider]')
+        slider = control.find_element(By.CSS_SELECTOR, '[role="slider"]')
+        if slider.get_attribute('aria-valuemin') != '0' or slider.get_attribute('aria-valuemax') != '2':
+            return False
+        current = int(slider.get_attribute('aria-valuenow'))
+        key = Keys.ARROW_RIGHT if desired > current else Keys.ARROW_LEFT
+        for _ in range(abs(desired - current)):
+            expected = current + (1 if desired > current else -1)
+            control.send_keys(key)
+            WebDriverWait(driver, 5).until(
+                lambda _: control.find_element(By.CSS_SELECTOR, '[role="slider"]').get_attribute('aria-valuenow') == str(expected)
+            )
+            current = expected
+    ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+    return True
 
 
 def _find_chatgpt_model_button(driver):
@@ -288,7 +344,7 @@ def select_chatgpt_thinking(driver, level="cao"):
         if advanced_result is False:
             print("⚠️ Không thể chọn Mức suy luận trong intelligence picker")
             return False
-        print("⚠️ Ctrl+Shift+M không mở được menu Mô hình/Mức suy luận")
+        print("⚠️ Không mở được menu Mô hình/Mức suy luận bằng nút chọn hoặc Ctrl+Shift+M")
         return False
 
     except Exception as e:
@@ -320,7 +376,7 @@ def select_chatgpt_model(driver, model="gpt-5.6 sol"):
         if advanced_result is False:
             print("⚠️ Không thể chọn Mô hình trong intelligence picker")
             return False
-        print("⚠️ Ctrl+Shift+M không mở được menu Mô hình/Mức suy luận")
+        print("⚠️ Không mở được menu Mô hình/Mức suy luận bằng nút chọn hoặc Ctrl+Shift+M")
         return False
 
     except Exception as e:

@@ -1,6 +1,20 @@
 {
   "versions": [
     {
+      "version": "1.4.6",
+      "date": "2026-09-25",
+      "title": "Cập nhật ChatGPT Web và sửa lỗi đăng Hako",
+      "summary": "Tương thích giao diện ChatGPT mới, cải thiện đăng chương Hako và trình biên tập.",
+      "highlights": [
+        "Cập nhật khả năng tương thích với giao diện ChatGPT mới: chọn model, mức suy luận và sao chép câu trả lời.",
+        "Sửa lỗi cập nhật chương Hako không nhận cấu hình R2 đã lưu, khiến ảnh không tải lên được.",
+        "Khi đăng hoặc cập nhật Hako, chương có nhiều section chỉ giữ tiêu đề của section đầu.",
+        "Bộ đếm chờ giữa các chương Hako cập nhật trên một dòng, giúp log gọn hơn.",
+        "Cải thiện bố cục thanh tìm kiếm và thay thế.",
+        "Sửa lỗi xem trước không hiển thị ảnh chỉ có trong bản dịch."
+      ]
+    },
+    {
       "version": "1.4.5",
       "date": "2026-09-16",
       "title": "ChatGPT Work ổn định hơn và giao diện gọn hơn",

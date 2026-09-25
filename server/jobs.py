@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import threading
 import time
@@ -145,6 +146,14 @@ def _without_timestamp(line: str) -> str:
 def merge_process_output(output: str, line: str) -> str:
     """Replace the latest live counter instead of adding one console line per tick."""
     current = line.rstrip("\r\n")
+    countdown = r"Chờ \d+ giây trước khi cập nhật chương tiếp theo…"
+    if re.fullmatch(countdown, _without_timestamp(current)):
+        lines = output.rstrip("\r\n").splitlines()
+        if lines and re.fullmatch(countdown, _without_timestamp(lines[-1])):
+            lines[-1] = current
+        else:
+            lines.append(current)
+        return ("\n".join(lines) + "\n")[-12000:]
     if _without_timestamp(current).startswith(STREAM_PROGRESS_PREFIXES):
         lines = output.rstrip("\r\n").splitlines()
         if lines and _without_timestamp(lines[-1]).startswith(STREAM_PROGRESS_PREFIXES):

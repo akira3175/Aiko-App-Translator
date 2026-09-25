@@ -53,12 +53,7 @@ if (Test-Path $zipPath) {
 }
 New-Item -ItemType Directory -Force -Path $stageRoot | Out-Null
 
-& (Join-Path $projectRoot "build_launcher.ps1")
-if ($LASTEXITCODE -ne 0) {
-    throw "Build Aiko Launcher that bai"
-}
-Copy-Item -LiteralPath (Join-Path $releaseRoot "Aiko-Launcher.exe") -Destination $stageRoot
-Copy-Item -LiteralPath (Join-Path $releaseRoot "Assets") -Destination $stageRoot -Recurse
+# The standalone launcher is distributed separately from the app payload.
 
 Copy-Item -LiteralPath (Join-Path $projectRoot "app.py") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "start_app.bat") -Destination $stageRoot
@@ -192,13 +187,9 @@ $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerIn
 $hashPath = "$zipPath.sha256"
 "$zipHash  $([IO.Path]::GetFileName($zipPath))" | Set-Content -LiteralPath $hashPath -Encoding ASCII
 
-# Launcher and its artwork are release contents, not standalone release assets.
-# Keep only the portable ZIP and its checksum at the release root.
+# Remove only this build's staging directory; preserve standalone launcher artifacts.
 foreach ($temporaryReleaseItem in @(
-    $stageRoot,
-    (Join-Path $releaseRoot "Aiko-Launcher.exe"),
-    (Join-Path $releaseRoot "Aiko-Launcher.exe.sha256"),
-    (Join-Path $releaseRoot "Assets")
+    $stageRoot
 )) {
     if (-not (Test-Path -LiteralPath $temporaryReleaseItem)) { continue }
     $resolvedTemporary = (Resolve-Path -LiteralPath $temporaryReleaseItem).Path

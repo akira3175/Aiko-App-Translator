@@ -63,8 +63,6 @@ async def update_chapter(page, local_name, chapter_id, expected_title, chapter_d
         parsed = up_md.parse_md_file(filepath)
         if segment_index == 0:
             local_title = parsed["title"]
-        elif parsed["title"]:
-            all_elements.append({"type": "text", "content": f"## {parsed['title']}"})
         all_elements.extend(parsed["elements"])
     if not local_title or not all_elements:
         raise RuntimeError(f"{local_name}: tiêu đề hoặc nội dung local đang trống")
@@ -140,6 +138,7 @@ async def update_chapters(page, targets, local, selectors):
 
 
 async def main():
+    up_md.configure_r2()
     targets = edit_targets()
     local = grouped_local_chapters()
     missing = [name for name, _chapter_id, _title in targets if name not in local]
