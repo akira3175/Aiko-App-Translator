@@ -24,6 +24,18 @@ CHAPTER = {
 
 
 class StagePipelineTests(unittest.TestCase):
+    def test_chatgpt_plan_uses_account_model_when_settings_are_blank(self):
+        values = {"translate_stage_model": "", "chatgpt_plan_model": ""}
+        with patch.object(stage_runtime, "chatgpt_plan_default_model", return_value="account-model") as fallback:
+            self.assertEqual(stage_runtime.stage_model_and_thinking(
+                "translate", "chatgpt-plan", get_option=lambda key, default=None: values.get(key, default)
+            ), ("account-model", "auto"))
+            values["chatgpt_plan_model"] = "chosen-model"
+            self.assertEqual(stage_runtime.stage_model_and_thinking(
+                "translate", "chatgpt-plan", get_option=lambda key, default=None: values.get(key, default)
+            ), ("chosen-model", "auto"))
+            fallback.assert_called_once_with()
+
     def test_generation_logs_effective_stage_provider_and_model(self):
         values = {
             "translate_stage_model": "gemini-test",

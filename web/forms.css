@@ -407,6 +407,36 @@
 .app-browser-card > div { display: grid; gap: 5px; }
 .app-browser-card strong { font-size: 15px; }
 .app-browser-card small { color: var(--muted); line-height: 1.45; }
+.chatgpt-plan-account {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.chatgpt-plan-account-copy { display: grid; gap: 7px; min-width: 0; }
+.chatgpt-plan-account-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.chatgpt-plan-account-title strong { font-size: 15px; }
+.chatgpt-plan-badge { padding: 4px 8px; border-radius: 999px; background: var(--soft); color: var(--accent); font-size: 11px; font-weight: 700; }
+#chatgptPlanStatus { color: var(--ink); overflow-wrap: anywhere; }
+.chatgpt-plan-account-copy small { color: var(--muted); line-height: 1.45; }
+.chatgpt-plan-actions { display: flex; flex: none; gap: 8px; }
+.chatgpt-plan-actions button { min-height: 40px; white-space: nowrap; }
+.chatgpt-plan-actions [hidden] { display: none; }
+.chatgpt-plan-model { min-width: 0; }
+@media (max-width: 980px) {
+  .chatgpt-plan-account { align-items: stretch; flex-direction: column; gap: 16px; }
+}
+@media (max-width: 600px) {
+  .chatgpt-plan-account { padding: 16px; }
+  .chatgpt-plan-actions { flex-wrap: wrap; }
+  .chatgpt-plan-actions button { flex: 1 1 auto; }
+}
 .update-actions { display: flex!important; grid-auto-flow: column; gap: 8px!important; }
 .update-progress { width: min(520px,100%); margin-top: 5px; }
 .update-progress[hidden] { display: none; }

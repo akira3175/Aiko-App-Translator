@@ -9,12 +9,13 @@ const settingsGroups={
   'gemini-web':['Gemini Web','Gem, model và mức suy nghĩ khi tự động hóa trình duyệt Gemini.'],
   'google-ai-studio-web':['Google AI Studio Web','Chọn model qua URL và Thinking level trong Run settings của AI Studio.'],
   'chatgpt-web':['ChatGPT Web','Model và mức suy nghĩ khi tự động hóa trình duyệt ChatGPT.'],
+  'chatgpt-plan':['ChatGPT Plan','Đăng nhập ChatGPT để thử dùng gói của tài khoản qua OpenAI Responses API.'],
   'gpt-api':['OpenAI API','Khóa, model và thông số cho các công đoạn dùng OpenAI API.'],
   publishing:['Xuất bản','Tài khoản Hako và kho ảnh Cloudflare R2.'],
   sharing:['Chia sẻ','Bucket R2 private và Worker phục vụ bản đọc chia sẻ.'],
   general:['Chung','Hành vi chung của workspace và quy trình hậu xử lý.'],
 };
-const PROVIDER_LABELS={'gemini-api':'Gemini API','gemini-web':'Gemini Web','google-ai-studio-web':'Google AI Studio Web','openai-api':'OpenAI API','chatgpt-web':'ChatGPT Web'};
+const PROVIDER_LABELS={'gemini-api':'Gemini API','gemini-web':'Gemini Web','google-ai-studio-web':'Google AI Studio Web','openai-api':'OpenAI API','chatgpt-web':'ChatGPT Web','chatgpt-plan':'ChatGPT Plan'};
 const PIPELINE_OWNED_SETTING_KEYS=new Set([
   'translate_model','polish_model','pronoun_model','review_bg_model','review_model','context_model','gemini_api_thinking',
   'gemini_web_model','gemini_thinking',
@@ -29,7 +30,37 @@ const visibleSettingsForGroup=(items,group)=>items.filter(item=>
 export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toast}) {
   let items=[];
   let activeGroup='pipeline';
+  let chatgptPlanModels=null;
+  let chatgptPlanModelsLoading=false;
   const cloudflareSettingsFeature=createCloudflareSettingsFeature({api,getSettingsItems:()=>items,renderSettings:render,toast});
+
+  function planModelOptions(value) {
+    const models=chatgptPlanModels||[];
+    const fallback=items.find(item=>item.key==='chatgpt_plan_model')?.value||'';
+    const selected=value||fallback||models[0]?.slug||'';
+    if(!models.length)return `<option value="${escapeHtml(selected)}">${selected?escapeHtml(selected):chatgptPlanModels?'Kết nối tài khoản ở tab ChatGPT Plan':'Đang tải model…'}</option>`;
+    const unavailable=selected&&!models.some(model=>model.slug===selected)
+      ? `<option value="${escapeHtml(selected)}" selected>${escapeHtml(selected)} (không có trong tài khoản)</option>`:'';
+    return unavailable+models.map(model=>`<option value="${escapeHtml(model.slug)}" ${model.slug===selected?'selected':''}>${escapeHtml(model.display_name)}</option>`).join('');
+  }
+
+  function refreshPlanStageModels() {
+    $$('[data-plan-stage-model]').forEach(select=>{
+      const selected=select.value;
+      select.innerHTML=planModelOptions(selected);
+    });
+  }
+
+  async function ensurePlanModels() {
+    if(chatgptPlanModels!==null||chatgptPlanModelsLoading)return;
+    chatgptPlanModelsLoading=true;
+    try {
+      const data=await api('/api/chatgpt-plan/status');
+      chatgptPlanModels=data.models||[];
+      refreshPlanStageModels();
+    } catch(error) { toast(`Không tải được danh sách model ChatGPT: ${error.message}`); }
+    finally { chatgptPlanModelsLoading=false; }
+  }
 
   function render(nextItems) {
     items=nextItems;
@@ -66,7 +97,7 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       return `<label class="python-setting ${item.type==='textarea'?'textarea-setting':''}"><span>${escapeHtml(item.label)}${item.overridden?'<em>Đã tùy chỉnh</em>':''}</span>${control}<small>${item.description?escapeHtml(item.description)+' · ':''}${item.type==='textarea'?'Dùng “Khôi phục mặc định” để lấy lại tiêu chí chuẩn.':`Mặc định: ${escapeHtml(item.default||'để trống')}`}</small></label>`;
     };
     const groupItems=visibleSettingsForGroup(items,activeGroup);
-    const settingFields=groupItems.map(renderSetting).join('');
+    const settingFields=groupItems.filter(item=>activeGroup!=='chatgpt-plan'||item.key!=='chatgpt_plan_model').map(renderSetting).join('');
     const settingItem=key=>items.find(item=>item.key===key);
     const providerDefaults={
       'gemini-api':{
@@ -89,8 +120,12 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
         translate:['chatgpt_model','chatgpt_thinking'],polish:['chatgpt_model','chatgpt_thinking'],
         pronouns:['chatgpt_model','chatgpt_thinking'],review:['chatgpt_model','chatgpt_thinking'],context:['chatgpt_model','chatgpt_thinking'],characters:['chatgpt_model','chatgpt_thinking'],
       },
+      'chatgpt-plan':{
+        translate:['chatgpt_plan_model','chatgpt_plan_effort'],polish:['chatgpt_plan_model','chatgpt_plan_effort'],
+        pronouns:['chatgpt_plan_model','chatgpt_plan_effort'],review:['chatgpt_plan_model','chatgpt_plan_effort'],context:['chatgpt_plan_model','chatgpt_plan_effort'],characters:['chatgpt_plan_model','chatgpt_plan_effort'],
+      },
     };
-    const engineOptions=(stage,value)=>[['gemini-api','Gemini API'],['gemini-web','Gemini Web'],['google-ai-studio-web','Google AI Studio Web'],['openai-api','OpenAI API'],['chatgpt-web','ChatGPT Web']].map(([key,label])=>{
+    const engineOptions=(stage,value)=>[['gemini-api','Gemini API'],['gemini-web','Gemini Web'],['google-ai-studio-web','Google AI Studio Web'],['openai-api','OpenAI API'],['chatgpt-web','ChatGPT Web'],['chatgpt-plan','ChatGPT Plan']].map(([key,label])=>{
       const supported=Boolean(providerDefaults[key][stage]);
       return `<option value="${key}" ${key===value?'selected':''} ${supported?'':'disabled'}>${label}${supported?'':' (chưa hỗ trợ)'}</option>`;
     }).join('');
@@ -103,7 +138,10 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       const thinkingValue=settingItem(`pipeline_${stage}_thinking`);
       const model={...modelValue,default:sourceModel?.default||'',overridden:modelValue.value!==(sourceModel?.default||''),description:`Model riêng cho ${label.toLowerCase()}.`};
       const thinking={...thinkingValue,default:sourceThinking?.default||'',overridden:thinkingValue.value!==(sourceThinking?.default||''),description:provider.value==='openai-api'?'Reasoning riêng cho công đoạn này.':'Thinking riêng cho công đoạn này.'};
-      return `<details class="pipeline-stage-setting" data-pipeline-stage="${stage}" ${stage==='translate'?'open':''}><summary><strong>${label}</strong><span>${PROVIDER_LABELS[provider.value]||provider.value}</span></summary><div class="pipeline-stage-body"><label class="python-setting"><span>Engine</span><select data-python-setting="${provider.key}" data-stage-engine="${stage}">${engineOptions(stage,provider.value)}</select><small>Engine dùng riêng cho công đoạn này.</small></label>${renderSetting(model)}${renderSetting(thinking)}</div></details>`;
+      const modelField=provider.value==='chatgpt-plan'
+        ? `<label class="python-setting"><span>Model</span><select data-python-setting="${model.key}" data-plan-stage-model="${stage}">${planModelOptions(model.value)}</select><small>Model của tài khoản ChatGPT dùng riêng cho ${label.toLowerCase()}.</small></label>`
+        : renderSetting(model);
+      return `<details class="pipeline-stage-setting" data-pipeline-stage="${stage}" ${stage==='translate'?'open':''}><summary><strong>${label}</strong><span>${PROVIDER_LABELS[provider.value]||provider.value}</span></summary><div class="pipeline-stage-body"><label class="python-setting"><span>Engine</span><select data-python-setting="${provider.key}" data-stage-engine="${stage}">${engineOptions(stage,provider.value)}</select><small>Engine dùng riêng cho công đoạn này.</small></label>${modelField}${renderSetting(thinking)}</div></details>`;
     };
     $('#pythonSettingsFields').innerHTML=activeGroup==='pipeline'
       ? `<div class="pipeline-stage-list">${pipelineStage('Dịch','translate')}${pipelineStage('Hiệu đính','polish')}${pipelineStage('Xuất xưng hô','pronouns')}${pipelineStage('Review','review')}${pipelineStage('Tạo Context','context')}${pipelineStage('Hồ sơ nhân vật','characters')}</div>`
@@ -111,7 +149,15 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       ? `<details class="publishing-advanced"><summary>Cài đặt nâng cao: tài khoản Hako và kho ảnh</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
       : activeGroup==='sharing'&&settingFields
         ? `<details class="publishing-advanced"><summary>Cài đặt R2 nâng cao</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
-        : settingFields;
+        : activeGroup==='chatgpt-plan'
+          ? `<section class="chatgpt-plan-account"><div class="chatgpt-plan-account-copy"><div class="chatgpt-plan-account-title"><strong>Tài khoản ChatGPT</strong><span id="chatgptPlanBadge" class="chatgpt-plan-badge">Đang kiểm tra</span></div><span id="chatgptPlanStatus">Đang đọc trạng thái…</span><small>Yêu cầu dùng hạn mức của tài khoản ChatGPT. <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">Xem mức sử dụng</a></small></div><div class="chatgpt-plan-actions"><button class="primary" id="chatgptPlanConnect" type="button" disabled>Continue with ChatGPT</button><button class="secondary" id="chatgptPlanDisconnect" type="button" hidden>Đăng xuất</button></div></section><label class="python-setting chatgpt-plan-model"><span>Model mặc định</span><select id="chatgptPlanModels" data-python-setting="chatgpt_plan_model">${planModelOptions(settingItem('chatgpt_plan_model')?.value)}</select><small>Dùng khi công đoạn dịch chưa chọn model riêng.</small></label>${settingFields}`
+          : settingFields;
+    if(activeGroup==='chatgpt-plan'){
+      $('#chatgptPlanConnect').onclick=connectChatgptPlan;
+      $('#chatgptPlanDisconnect').onclick=disconnectChatgptPlan;
+      loadChatgptPlanStatus();
+    }
+    if(activeGroup==='pipeline'&&$$('[data-plan-stage-model]').length)ensurePlanModels();
     $$('[data-settings-tab]').forEach(button=>button.onclick=()=>{
       $$('[data-python-setting]').forEach(input=>{ const item=items.find(entry=>entry.key===input.dataset.pythonSetting); if(item)item.value=settingValue(input); });
       activeGroup=button.dataset.settingsTab;
@@ -133,6 +179,48 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
 
   async function load() {
     try { render((await api('/api/settings')).items); }
+    catch(error) { toast(error.message); }
+  }
+
+  async function loadChatgptPlanStatus() {
+    const label=$('#chatgptPlanStatus'); if(!label)return;
+    try {
+      const data=await api('/api/chatgpt-plan/status');
+      if(!$('#chatgptPlanStatus'))return;
+      chatgptPlanModels=data.models||[];
+      label.textContent=data.error|| (data.connected?(data.email||'Tài khoản ChatGPT'):'Kết nối để xem model của tài khoản.');
+      $('#chatgptPlanBadge').textContent=data.connected?'Đã kết nối':data.error?'Có lỗi':'Chưa kết nối';
+      const connect=$('#chatgptPlanConnect');
+      connect.disabled=false;
+      connect.textContent=data.connected?'Kết nối lại':'Continue with ChatGPT';
+      connect.classList.toggle('primary',!data.connected);
+      connect.classList.toggle('secondary',Boolean(data.connected));
+      $('#chatgptPlanDisconnect').hidden=!data.connected;
+      const picker=$('#chatgptPlanModels');
+      const selected=picker.value||items.find(item=>item.key==='chatgpt_plan_model')?.value||'';
+      picker.innerHTML=planModelOptions(selected);
+    } catch(error) { label.textContent=error.message; $('#chatgptPlanBadge').textContent='Có lỗi'; $('#chatgptPlanConnect').disabled=false; }
+  }
+
+  async function connectChatgptPlan() {
+    const popup=window.open('about:blank','_blank');
+    if(!popup){ toast('Trình duyệt chặn cửa sổ đăng nhập.'); return; }
+    try {
+      const result=await api('/api/chatgpt-plan/connect',{method:'POST',body:'{}'});
+      chatgptPlanModels=null;
+      popup.location.href=result.url;
+      let attempts=0;
+      const poll=async()=>{
+        if(!$('#chatgptPlanStatus')||attempts++>=60)return;
+        await loadChatgptPlanStatus();
+        if($('#chatgptPlanDisconnect')?.hidden && attempts<60)setTimeout(poll,3000);
+      };
+      setTimeout(poll,3000);
+    } catch(error) { popup.close(); toast(error.message); }
+  }
+
+  async function disconnectChatgptPlan() {
+    try { const result=await api('/api/chatgpt-plan/disconnect',{method:'POST',body:'{}'}); chatgptPlanModels=null; await loadChatgptPlanStatus(); toast(result.warning||'Đã đăng xuất ChatGPT'); }
     catch(error) { toast(error.message); }
   }
 

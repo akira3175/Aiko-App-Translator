@@ -401,9 +401,9 @@ def elements_to_html_parts(elements: list, chapter_title: str) -> list:
                     )
                     image_count += 1
                 else:
-                    html_parts.append('<p style="text-align:center;color:red">[L\u1ed7i t\u1ea3i \u1ea3nh]</p>')
+                    raise RuntimeError(f"Không tải được ảnh để xuất bản: {local_path}")
             else:
-                html_parts.append('<p style="text-align:center;color:red">[Kh\u00f4ng t\u00ecm th\u1ea5y \u1ea3nh]</p>')
+                raise RuntimeError(f"Không tìm thấy ảnh để xuất bản: {elem['content']}")
 
         elif elem["type"] == "text":
             # M\u1ed7i d\u00f2ng trong block th\u00e0nh 1 <p>
@@ -419,6 +419,8 @@ def elements_to_html_parts(elements: list, chapter_title: str) -> list:
                 stripped = line.strip()
                 if not stripped:
                     html_parts.append("<p><br></p>")
+                elif stripped in {"* * *", "***"}:
+                    html_parts.append(f"<p>{stripped}</p>")
                 elif stripped.startswith("#"):
                     # Heading trong n\u1ed9i dung
                     converted = re.sub(r'^### (.+)$', r'<h3>\1</h3>', stripped, flags=re.MULTILINE)

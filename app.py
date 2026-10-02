@@ -20,6 +20,7 @@ from services.importing import ChapterImportService
 from services.ai_logs import AiLogService
 from services import api_keys as api_key_service
 from services.settings import ConfigurationService
+from services.chatgpt_plan import ChatGptPlanService
 from services.app_browser import AppBrowserService
 from services.source_translation import SourceTranslationService
 from services.publishing import PublishingService
@@ -238,6 +239,7 @@ settings_routes = SettingsRoutes(
     open_app_browser=app_browser_service.open,
     active_translation=active_translation,
     launcher=launcher_service,
+    chatgpt_plan=ChatGptPlanService(),
 )
 job_runner = JobRunner(
     root=ROOT,

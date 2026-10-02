@@ -77,6 +77,23 @@ class SettingsRouteTests(unittest.TestCase):
         self.assertTrue(handler.responses[0][1]["checked"])
         self.assertEqual(25, handler.responses[1][1]["limit"])
 
+    def test_chatgpt_plan_account_routes_are_local_and_same_origin(self):
+        plan = SimpleNamespace(status=lambda: {"connected": False},
+                               connect=lambda: {"url": "https://auth.openai.com/"},
+                               disconnect=lambda: {"ok": True})
+        routes = self._routes(chatgpt_plan=plan)
+        remote = _Handler(loopback=False)
+        routes.handle_get(remote, "/api/chatgpt-plan/status", {})
+        self.assertEqual(remote.responses[0][0], 403)
+        foreign = _Handler()
+        foreign.headers = {"Origin": "https://other.example", "Host": "127.0.0.1:8765"}
+        routes.handle_post(foreign, "/api/chatgpt-plan/connect", {})
+        self.assertEqual(foreign.responses[0][0], 403)
+        local = _Handler()
+        local.headers = {"Origin": "http://127.0.0.1:8765", "Host": "127.0.0.1:8765"}
+        routes.handle_post(local, "/api/chatgpt-plan/connect", {})
+        self.assertIn("url", local.responses[0][1])
+
     def test_active_key_is_blocked_while_translation_runs(self):
         called = []
         routes = self._routes(

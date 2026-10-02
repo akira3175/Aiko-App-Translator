@@ -2,6 +2,7 @@
 
 from providers.base import ProviderCapabilities
 from providers.chatgpt_web import ChatGptWebProvider
+from providers.chatgpt_plan import ChatGptPlanProvider
 from providers.gemini_api import GeminiApiProvider
 from providers.gemini_web import GeminiWebProvider
 from providers.google_ai_studio_web import GoogleAiStudioWebProvider
@@ -43,6 +44,13 @@ PROVIDERS = {
             browser=True, batch=True, attachments=True, thinking=True,
         ),
     },
+    "chatgpt-plan": {
+        "label": "ChatGPT Plan",
+        "capabilities": ProviderCapabilities(
+            ("translate", "polish", "pronouns", "review", "glossary", "characters"),
+            attachments=True, thinking=True, streaming=True,
+        ),
+    },
 }
 
 PROVIDER_CLASSES = {
@@ -51,6 +59,7 @@ PROVIDER_CLASSES = {
     "google-ai-studio-web": GoogleAiStudioWebProvider,
     "openai-api": OpenAiApiProvider,
     "chatgpt-web": ChatGptWebProvider,
+    "chatgpt-plan": ChatGptPlanProvider,
 }
 
 
@@ -124,13 +133,13 @@ def pipeline_config(config):
     if models["translate"]:
         key = {
             "gemini-api": "translate_model", "gemini-web": "gemini_web_model", "google-ai-studio-web": "ai_studio_model",
-            "openai-api": "gpt_api_translate_model", "chatgpt-web": "chatgpt_model",
+            "openai-api": "gpt_api_translate_model", "chatgpt-web": "chatgpt_model", "chatgpt-plan": "chatgpt_plan_model",
         }[translate]
         result[key] = models["translate"]
     if thinking["translate"]:
         key = {
             "gemini-api": "gemini_api_thinking", "gemini-web": "gemini_thinking", "google-ai-studio-web": "ai_studio_thinking",
-            "openai-api": "gpt_api_translate_effort", "chatgpt-web": "chatgpt_thinking",
+            "openai-api": "gpt_api_translate_effort", "chatgpt-web": "chatgpt_thinking", "chatgpt-plan": "chatgpt_plan_effort",
         }[translate]
         result[key] = thinking["translate"]
     return result

@@ -46,6 +46,16 @@ class ProviderRegistryTests(unittest.TestCase):
         self.assertEqual("polish-model", config["polish_stage_model"])
         self.assertEqual("high", config["polish_stage_thinking"])
 
+    def test_chatgpt_plan_keeps_each_stage_model(self):
+        config = pipeline_config({
+            "pipeline_translate_provider": "chatgpt-plan",
+            "pipeline_translate_model": "gpt-5.6-sol",
+            "pipeline_polish_provider": "chatgpt-plan",
+            "pipeline_polish_model": "gpt-5.6-luna",
+        })
+        self.assertEqual("gpt-5.6-sol", config["translate_stage_model"])
+        self.assertEqual("gpt-5.6-luna", config["polish_stage_model"])
+
     def test_explicit_polish_settings_override_saved_pipeline_settings(self):
         config = pipeline_config({
             "pipeline_polish_provider": "google-ai-studio-web",
@@ -77,7 +87,7 @@ class ProviderRegistryTests(unittest.TestCase):
 
     def test_all_provider_stage_combinations_use_shared_transport_contract(self):
         stages = ("translate", "polish", "pronouns", "review")
-        for provider in ("gemini-api", "gemini-web", "google-ai-studio-web", "openai-api", "chatgpt-web"):
+        for provider in ("gemini-api", "gemini-web", "google-ai-studio-web", "openai-api", "chatgpt-web", "chatgpt-plan"):
             calls = []
 
             def transport(prompt, **kwargs):

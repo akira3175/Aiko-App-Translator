@@ -5,6 +5,7 @@ import threading
 import zipfile
 from dataclasses import dataclass
 from http import HTTPStatus
+from urllib.parse import urlparse
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,7 @@ class SettingsRoutes:
     open_app_browser: object
     active_translation: object
     launcher: object = None
+    chatgpt_plan: object = None
 
     def handle_get(self, handler, path, query):
         project = query.get("project", [""])[0]
@@ -30,6 +32,12 @@ class SettingsRoutes:
             return True
         if path == "/api/providers":
             handler.json_response({"items": self.providers_payload()})
+            return True
+        if path == "/api/chatgpt-plan/status" and self.chatgpt_plan is not None:
+            if not handler.is_loopback():
+                handler.json_response({"error": "Chỉ quản lý ChatGPT trên máy đang chạy app."}, HTTPStatus.FORBIDDEN)
+            else:
+                handler.json_response(self.chatgpt_plan.status())
             return True
         if path == "/api/ui-preferences":
             handler.json_response(self.configuration.ui_preferences())
@@ -68,6 +76,17 @@ class SettingsRoutes:
 
     def handle_post(self, handler, path, query):
         project = query.get("project", [""])[0]
+        if path in ("/api/chatgpt-plan/connect", "/api/chatgpt-plan/disconnect") and self.chatgpt_plan is not None:
+            if not handler.is_loopback():
+                handler.json_response({"error": "Chỉ quản lý ChatGPT trên máy đang chạy app."}, HTTPStatus.FORBIDDEN)
+                return True
+            origin = getattr(handler, "headers", {}).get("Origin", "")
+            host = getattr(handler, "headers", {}).get("Host", "")
+            if origin and (urlparse(origin).scheme != "http" or urlparse(origin).netloc != host):
+                handler.json_response({"error": "Nguồn yêu cầu không hợp lệ."}, HTTPStatus.FORBIDDEN)
+                return True
+            action = self.chatgpt_plan.connect if path == "/api/chatgpt-plan/connect" else self.chatgpt_plan.disconnect
+            return self._json_call(handler, action, (RuntimeError, ValueError, OSError))
         if path == "/api/ui-preferences":
             return self._json_call(
                 handler,

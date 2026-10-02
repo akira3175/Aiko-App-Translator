@@ -181,6 +181,7 @@ class JobController:
             "google-ai-studio-web",
             "openai-api",
             "chatgpt-web",
+            "chatgpt-plan",
             "interactions",
         }:
             raise JobRequestError("Invalid translation engine")

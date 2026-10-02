@@ -1,11 +1,32 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from up.up_md import parse_md_file
+from up import up_md
+from up.up_md import elements_to_html_parts, parse_md_file
 
 
 class HakoUploadTests(unittest.TestCase):
+    def test_publish_preserves_scene_separator_and_inline_italics(self):
+        parts, images = elements_to_html_parts(
+            [{"type": "text", "content": "Trước.\n* * *\n***\nSau *in nghiêng*."}],
+            "Tiêu đề",
+        )
+        self.assertEqual(
+            ["<p>Trước.</p>", "<p>* * *</p>", "<p>***</p>", "<p>Sau <em>in nghiêng</em>.</p>"],
+            parts,
+        )
+        self.assertEqual(0, images)
+
+    def test_failed_image_upload_stops_publishing(self):
+        with patch.object(up_md, "upload_image_file", return_value=""):
+            with self.assertRaisesRegex(RuntimeError, "Không tải được ảnh"):
+                elements_to_html_parts(
+                    [{"type": "image", "content": "![Ảnh](../image/missing.png)"}],
+                    "Tiêu đề",
+                )
+
     def test_parse_removes_first_body_line_when_it_repeats_title(self):
         title = "[Thông Báo] ✋❗ Minh Họa Bìa Mới!"
         with tempfile.TemporaryDirectory() as directory:

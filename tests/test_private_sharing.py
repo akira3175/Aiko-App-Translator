@@ -21,6 +21,19 @@ class FakeR2Client:
 
 
 class PrivateSharingTests(unittest.TestCase):
+    def test_shared_chapter_keeps_scene_separators(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output, images = _chapter_html(
+                Path(directory), "Trước.\n* * *\n***\nSau *in nghiêng*.", "share-id"
+            )
+        self.assertEqual(output, "<p>Trước.</p><p>* * *</p><p>***</p><p>Sau <em>in nghiêng</em>.</p>")
+        self.assertEqual(images, [])
+
+    def test_missing_local_image_stops_share(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "Thiếu ảnh để chia sẻ: missing.png"):
+                _chapter_html(Path(directory), "![Ảnh](../image/missing.png)", "share-id")
+
     def test_shared_chapter_preserves_markdown_emphasis(self):
         with tempfile.TemporaryDirectory() as directory:
             output, images = _chapter_html(

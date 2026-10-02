@@ -13,6 +13,8 @@ from cores.browser import (
 )
 from cores.gemini import call_gemini
 from providers.openai_client import call_gpt_api
+from providers.chatgpt_plan_client import call_chatgpt_plan
+from services.chatgpt_plan import default_model as chatgpt_plan_default_model
 from cores.config.runtime import option
 from cores.stages.transport import generate_for_stage
 
@@ -37,6 +39,7 @@ MODEL_DEFAULTS = {
         "characters": ("gpt_api_translate_model", "gpt-5.6-luna"),
     },
     "chatgpt-web": {},
+    "chatgpt-plan": {},
 }
 
 
@@ -56,6 +59,7 @@ PROVIDER_LABELS = {
     "google-ai-studio-web": "Google AI Studio Web",
     "openai-api": "OpenAI API",
     "chatgpt-web": "ChatGPT Web",
+    "chatgpt-plan": "ChatGPT Plan",
 }
 
 
@@ -103,6 +107,11 @@ def stage_model_and_thinking(stage, provider, *, get_option=option):
             model or str(get_option("chatgpt_model", "gpt-5.6 sol")),
             thinking or str(get_option("chatgpt_thinking", "cao")),
         )
+    if provider == "chatgpt-plan":
+        return (
+            model or str(get_option("chatgpt_plan_model", "")).strip() or chatgpt_plan_default_model(),
+            thinking or str(get_option("chatgpt_plan_effort", "auto")),
+        )
     raise ValueError(f"Provider không hợp lệ cho công đoạn {stage}: {provider}")
 
 
@@ -113,6 +122,7 @@ def stage_transports(overrides=None):
         "google-ai-studio-web": generate_content_with_ai_studio,
         "openai-api": call_gpt_api,
         "chatgpt-web": generate_content_with_chatgpt,
+        "chatgpt-plan": call_chatgpt_plan,
     }
     transports.update(overrides or {})
     return transports

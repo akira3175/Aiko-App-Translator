@@ -193,12 +193,14 @@ def _chapter_html(project_path: Path, text: str, share_id: str):
                     f'<figure><img data-share-image="{html.escape(name, quote=True)}" '
                     f'alt="{caption}" loading="lazy"><figcaption>{caption}</figcaption></figure>'
                 )
+            else:
+                raise ValueError(f"Thiếu ảnh để chia sẻ: {name}")
             continue
         if remote:
             url = html.escape(remote.group(1).strip(), quote=True)
             output.append(f'<figure><img src="{url}" alt="" loading="lazy"></figure>')
             continue
-        escaped = inline_html(raw_line)
+        escaped = html.escape(raw_line) if line in {"* * *", "***"} else inline_html(raw_line)
         if escaped.startswith("### "):
             output.append(f"<h3>{escaped[4:]}</h3>")
         elif escaped.startswith("## "):
