@@ -2,7 +2,11 @@ import unittest
 from unittest.mock import patch
 
 from cores.browser import content
-from cores.gemini.web_client import normalize_web_model
+from cores.gemini.web_client import (
+    _has_end_marker,
+    _is_known_structured_response,
+    normalize_web_model,
+)
 
 
 class GeminiWebClientTests(unittest.TestCase):
@@ -10,6 +14,11 @@ class GeminiWebClientTests(unittest.TestCase):
         self.assertEqual(normalize_web_model("flash"), "flash")
         self.assertEqual(normalize_web_model("Fast"), "flash")
         self.assertEqual(normalize_web_model("Gemini 3 Flash"), "flash")
+
+    def test_argon_names_use_thinking_mode(self):
+        self.assertEqual(normalize_web_model("argon"), "thinking")
+        self.assertEqual(normalize_web_model("4 Argon"), "thinking")
+        self.assertEqual(normalize_web_model("Gemini Argon"), "thinking")
 
     def test_compatibility_wrapper_forwards_runtime_configuration(self):
         with patch.object(
@@ -35,6 +44,22 @@ class GeminiWebClientTests(unittest.TestCase):
             web_model="thinking",
             thinking_level="high",
         )
+
+    def test_has_end_marker_detects_standard_and_character_markers(self):
+        self.assertTrue(_has_end_marker("Văn bản kết thúc bằng ###END###"))
+        self.assertTrue(_has_end_marker("Hồ sơ kết thúc bằng ###CHAR_END###"))
+        self.assertFalse(_has_end_marker("Chỉ có ###TITLE### và ###CONTENT###"))
+        self.assertFalse(_has_end_marker("Văn bản bình thường 257 ký tự"))
+
+    def test_is_known_structured_response_identifies_json(self):
+        self.assertTrue(
+            _is_known_structured_response('{"character_pairs": [{"name": "A"}]}')
+        )
+        self.assertTrue(
+            _is_known_structured_response('{"overall_score": 9.5, "issues": []}')
+        )
+        self.assertFalse(_is_known_structured_response("Chỉ là văn bản thường"))
+
 
 
 if __name__ == "__main__":

@@ -19,6 +19,28 @@ from cores.gemini.web_controls import (
     select_thinking_level,
     select_thinking_model,
 )
+from cores.gemini.web_response import (
+    copy_response_text,
+    find_new_response as _find_new_gemini_response,
+    response_text as _gemini_response_text,
+    snapshot_conversation as _snapshot_gemini_conversation,
+)
+from cores.json_output import parse_complete_json_object
+
+
+def _is_known_structured_response(text):
+    parsed = parse_complete_json_object(text)
+    if parsed is None:
+        return False
+    if isinstance(parsed.get("character_pairs"), list):
+        return True
+    return isinstance(parsed.get("overall_score"), (int, float)) and isinstance(
+        parsed.get("issues"), list
+    )
+
+
+def _has_end_marker(text):
+    return "###END###" in text or "###CHAR_END###" in text
 
 
 def normalize_web_model(value):
@@ -28,14 +50,13 @@ def normalize_web_model(value):
         "gemini flash": "flash",
         "gemini 3 flash": "flash",
         "3 flash": "flash",
+        "3.8 flash": "flash",
+        "3.1 pro": "pro",
+        "argon": "thinking",
+        "4 argon": "thinking",
+        "gemini argon": "thinking",
     }
     return aliases.get(model, model)
-from cores.gemini.web_response import (
-    copy_response_text,
-    find_new_response as _find_new_gemini_response,
-    response_text as _gemini_response_text,
-    snapshot_conversation as _snapshot_gemini_conversation,
-)
 
 
 def generate_content(
@@ -196,12 +217,13 @@ def generate_content(
             print(f"📤 Đã gửi prompt ({len(prompt)} ký tự). Đang chờ response...")
             time.sleep(5)
 
-            max_wait = 1600
+            max_wait = 1800
             min_response_length = 100
             start_time = time.time()
             last_text = ""
             stable_count = 0
             response_root = None
+            require_end = "###END###" in prompt or "###CHAR_END###" in prompt
 
             while time.time() - start_time < max_wait:
                 current_text = ""
@@ -223,12 +245,67 @@ def generate_content(
                     print(f"\r✍️ Đang nhận: {current_len} ký tự...", end="", flush=True)
                     stable_count = 0
 
+                # 1. Nếu đã thấy marker kết thúc, đợi ổn định 3s rồi trả kết quả
+                if _has_end_marker(current_text):
+                    print(
+                        "\n⏳ Đã thấy ###END###, đợi thêm 3 giây để response ổn định..."
+                    )
+                    time.sleep(3)
+                    try:
+                        if response_root is not None:
+                            current_text = _gemini_response_text(response_root)
+                    except StaleElementReferenceException:
+                        response_root = _find_new_gemini_response(
+                            driver, response_token, old_response_count
+                        )
+                        if response_root is not None:
+                            current_text = _gemini_response_text(response_root)
+                    final_text = copy_response_text(driver)
+                    result = final_text if final_text else current_text
+                    print("✅ Streaming hoàn tất.")
+                    return result
+
+                # 2. Nếu prompt không yêu cầu ###END### nhưng đã có JSON hợp lệ
+                if not require_end and _is_known_structured_response(current_text):
+                    print(
+                        "\n⏳ Đã nhận đủ JSON, đợi thêm 3 giây để response ổn định..."
+                    )
+                    time.sleep(3)
+                    try:
+                        if response_root is not None:
+                            current_text = _gemini_response_text(response_root)
+                    except StaleElementReferenceException:
+                        response_root = _find_new_gemini_response(
+                            driver, response_token, old_response_count
+                        )
+                        if response_root is not None:
+                            current_text = _gemini_response_text(response_root)
+                    if _is_known_structured_response(current_text):
+                        final_text = copy_response_text(driver)
+                        result = final_text if final_text else current_text
+                        print("✅ Streaming hoàn tất, JSON hợp lệ.")
+                        return result
+
+                # 3. Quản lý trạng thái dừng khi text không đổi
                 if current_text and current_text == last_text:
                     stable_count += 1
-                    if stable_count >= 5 and current_len >= min_response_length:
-                        print("\n✅ Streaming hoàn tất.")
-                        final_text = copy_response_text(driver)
-                        return final_text if final_text else current_text
+                    if require_end:
+                        if stable_count % 30 == 0:
+                            print(
+                                f"\n⏳ Đang đợi ###END### (đã nhận {current_len} ký tự, tạm dừng {stable_count}s)...",
+                                flush=True,
+                            )
+                        if stable_count >= 1800 and current_len >= min_response_length:
+                            print(
+                                "\n⚠️ Đã đợi 30 phút nhưng không thấy ###END###, kết thúc streaming."
+                            )
+                            final_text = copy_response_text(driver)
+                            return final_text if final_text else current_text
+                    else:
+                        if stable_count >= 30 and current_len >= min_response_length:
+                            print("\n✅ Streaming hoàn tất.")
+                            final_text = copy_response_text(driver)
+                            return final_text if final_text else current_text
                 else:
                     stable_count = 0
                     last_text = current_text

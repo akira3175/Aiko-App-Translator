@@ -1,307 +1,329 @@
-"""Gemini Web model controls."""
+"""Gemini Web model controls.
+
+Giao diện Gemini (2026-10):
+  - Nút chọn: button[data-test-id="bard-mode-menu-button"]
+      .picker-primary-text   -> tên model ("Argon", "3.1 Pro", "3.8 Flash"...)
+      .picker-secondary-text -> cấp độ tư duy ("Thấp" / "Trung bình" / "Cao")
+  - Menu model: gem-menu[data-test-id="gem-mode-menu"] > gem-menu-item[data-mode-id]
+      "3.5 Flash-Lite", "3.8 Flash", "3.1 Pro", "4 Argon"
+  - Cấp độ tư duy: gem-menu-item[value="thinking_level"] mở submenu
+      .submenu-container gem-menu-item -> "Thấp", "Trung bình", "Cao"
+"""
 
 import time
 
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 
 
-def open_model_dropdown(driver):
-    selectors = [
-        '[data-test-id="bard-mode-menu-button"]',
-        "bard-mode-switcher button.input-area-switch",
-        "bard-mode-switcher button",
-        ".pill-ui-logo-container button",
-    ]
-    model_button = None
-    for selector in selectors:
-        try:
-            model_button = next(
-                (
-                    element
-                    for element in driver.find_elements(By.CSS_SELECTOR, selector)
-                    if element.is_displayed()
-                ),
-                None,
-            )
-            if model_button:
-                break
-        except Exception:
-            continue
-    if not model_button:
-        print("⚠️ Không tìm thấy dropdown model, tiếp tục với model mặc định")
-        return None, None
+MODEL_BUTTON_SELECTORS = (
+    '[data-test-id="bard-mode-menu-button"]',
+    "button.input-area-switch",
+    "bard-mode-switcher button",
+    ".pill-ui-logo-container button",
+)
+MENU_ITEM_SELECTORS = (
+    '[data-test-id="gem-mode-menu"] gem-menu-item[role="menuitem"]',
+    '.cdk-overlay-pane gem-menu-item[role="menuitem"]',
+    'gem-menu[role="menu"] gem-menu-item[role="menuitem"]',
+)
+THINKING_MENU_SELECTOR = 'gem-menu-item[value="thinking_level"]'
+SUBMENU_ITEM_SELECTOR = '.submenu-container gem-menu-item[role="menuitem"]'
 
-    current_text = ""
+THINKING_KEYWORDS = ("argon", "thinking", "tư duy")
+
+# Nhãn submenu cấp độ tư duy (so khớp chính xác, không dùng substring).
+LEVEL_LABELS = {
+    "low": ("thấp", "low"),
+    "medium": ("trung bình", "medium"),
+    "high": ("cao", "high"),
+}
+LEVEL_ALIASES = {
+    "low": "low", "thấp": "low", "off": "low",
+    "medium": "medium", "trung bình": "medium",
+    "standard": "medium", "tiêu chuẩn": "medium",
+    "high": "high", "cao": "high", "extended": "high", "mở rộng": "high",
+}
+# Giao diện cũ: một item bật/tắt "Mở rộng" nằm phẳng trong menu chính.
+LEGACY_EXTENDED_LABELS = ("mở rộng", "extended")
+
+
+def _safe_text(element, selector):
     try:
-        current_text = model_button.find_element(
-            By.CSS_SELECTOR, ".picker-primary-text"
-        ).text.strip().lower()
+        return element.find_element(By.CSS_SELECTOR, selector).text.strip().lower()
     except Exception:
-        pass
-    if not current_text:
-        try:
-            aria = model_button.get_attribute("aria-label") or ""
-            if "hiện tại là" in aria:
-                current_text = aria.split("hiện tại là")[-1].strip().lower()
-            elif "currently" in aria.lower():
-                current_text = aria.lower().split("currently")[-1].strip()
-        except Exception:
-            pass
-    if not current_text:
-        current_text = model_button.text.strip().lower()
-    return model_button, current_text
+        return ""
 
 
-def click_menu_item(driver, keywords, label):
-    selectors = [
-        '[data-test-id="gem-mode-menu"] gem-menu-item[role="menuitem"]',
-        '.cdk-overlay-pane gem-menu-item[role="menuitem"]',
-        'gem-menu[role="menu"] gem-menu-item[role="menuitem"]',
-        '[role="menuitem"]',
-    ]
-    target = None
+def _label(element):
+    return _safe_text(element, "span.label") or (element.text or "").strip().lower()
+
+
+def _attr(element, name):
+    try:
+        return element.get_attribute(name) or ""
+    except Exception:
+        return ""
+
+
+def _is_selected(element):
+    if "selected" in _attr(element, "class").split():
+        return True
+    try:
+        content = element.find_element(By.CSS_SELECTOR, "gem-menu-item-content")
+        return "selected" in _attr(content, "class").split()
+    except Exception:
+        return False
+
+
+def _visible(driver, selectors):
+    found = []
     for selector in selectors:
         try:
             for element in driver.find_elements(By.CSS_SELECTOR, selector):
-                if not element.is_displayed():
-                    continue
-                try:
-                    text = element.find_element(
-                        By.CSS_SELECTOR, "span.label"
-                    ).text.strip().lower()
-                except Exception:
-                    text = element.text.strip().lower()
-                if (element.get_attribute("value") or "") == "thinking_level":
-                    continue
-                if any(keyword.strip().lower() in text for keyword in keywords):
-                    target = element
-                    break
-            if target:
-                break
+                if element not in found and element.is_displayed():
+                    found.append(element)
         except Exception:
             continue
+    return found
+
+
+def _click(driver, element, pause=1.0):
+    driver.execute_script("arguments[0].click();", element)
+    time.sleep(pause)
+
+
+def _close_menu(driver):
+    try:
+        driver.execute_script("document.body.click();")
+    except Exception:
+        pass
+
+
+def _find_model_button(driver):
+    buttons = _visible(driver, MODEL_BUTTON_SELECTORS)
+    return buttons[0] if buttons else None
+
+
+def _current_level(button):
+    """Đọc cấp độ tư duy đang hiển thị trên nút chọn ("thấp"/"trung bình"/"cao")."""
+    return _safe_text(button, ".picker-secondary-text")
+
+
+def open_model_dropdown(driver):
+    """Tìm nút chọn model và trả về (button, text mô tả model hiện tại).
+
+    Hàm không mở menu; tên giữ nguyên để tương thích với code cũ.
+    """
+    button = _find_model_button(driver)
+    if not button:
+        print("⚠️ Không tìm thấy dropdown model, tiếp tục với model mặc định")
+        return None, None
+
+    primary = _safe_text(button, ".picker-primary-text")
+    secondary = _current_level(button)
+    current = " ".join(part for part in (primary, secondary) if part)
+    if primary and secondary == primary:
+        current = primary
+    if not current:
+        aria = _attr(button, "aria-label")
+        lowered = aria.lower()
+        for marker in ("hiện tại là", "currently"):
+            if marker in lowered:
+                current = lowered.split(marker)[-1].strip()
+                break
+    if not current:
+        current = (button.text or "").strip().lower()
+    return button, current
+
+
+def click_menu_item(driver, keywords, label, exclude=()):
+    """Click item model đầu tiên khớp từ khóa, ưu tiên theo thứ tự `keywords`.
+
+    `exclude` loại các item có nhãn chứa chuỗi tương ứng (vd: "lite").
+    """
+    items = [
+        item
+        for item in _visible(driver, MENU_ITEM_SELECTORS)
+        if _attr(item, "value") != "thinking_level"
+    ]
+    labels = [(item, _label(item)) for item in items]
+    excluded = tuple(word.lower() for word in exclude)
+    target = None
+    for keyword in keywords:
+        keyword = keyword.strip().lower()
+        target = next(
+            (
+                item
+                for item, text in labels
+                if keyword in text and not any(word in text for word in excluded)
+            ),
+            None,
+        )
+        if target:
+            break
     if not target:
         print(f"⚠️ Không tìm thấy option '{label}' trong menu")
-        driver.execute_script("document.body.click();")
+        _close_menu(driver)
         return False
-    driver.execute_script("arguments[0].click();", target)
-    time.sleep(1)
+    _click(driver, target)
     print(f"✅ Đã chọn: {label}")
     return True
 
 
-def select_thinking_model(driver, max_wait=10):
-    del max_wait
+def _select_model(driver, is_current, keywords, label, exclude=()):
     try:
         button, current = open_model_dropdown(driver)
         if not button:
             return False
-        if "thinking" in current or "tư duy" in current:
-            print("✅ Đã chọn model Thinking")
+        if is_current(current):
+            print(f"✅ Đã chọn model {label}")
             return True
-        print(f"📌 Model hiện tại: {current}. Đang chuyển sang Thinking...")
-        driver.execute_script("arguments[0].click();", button)
-        time.sleep(1.5)
-        return click_menu_item(driver, ["Thinking", "Tư duy"], "Thinking")
+        print(f"📌 Model hiện tại: {current}. Đang chuyển sang {label}...")
+        _click(driver, button, 1.5)
+        return click_menu_item(driver, keywords, label, exclude)
     except Exception as error:
         print(f"⚠️ Lỗi khi chọn model: {error}")
+        _close_menu(driver)
         return False
+
+
+def _is_thinking(current):
+    return any(word in current for word in THINKING_KEYWORDS)
+
+
+def select_thinking_model(driver, max_wait=10):
+    del max_wait
+    return _select_model(
+        driver,
+        _is_thinking,
+        ["4 Argon", "Argon", "Thinking", "Tư duy"],
+        "Thinking/Argon",
+    )
 
 
 def select_pro_model(driver, max_wait=10):
     del max_wait
-    try:
-        button, current = open_model_dropdown(driver)
-        if not button:
-            return False
-        if "pro" in current and "thinking" not in current and "tư duy" not in current:
-            print("✅ Đã chọn model Pro")
-            return True
-        print(f"📌 Model hiện tại: {current}. Đang chuyển sang Pro...")
-        driver.execute_script("arguments[0].click();", button)
-        time.sleep(1.5)
-        return click_menu_item(driver, ["Pro"], "Pro")
-    except Exception as error:
-        print(f"⚠️ Lỗi khi chọn model: {error}")
-        return False
+    return _select_model(
+        driver,
+        lambda current: "pro" in current and not _is_thinking(current),
+        ["3.1 Pro", "Pro"],
+        "Pro",
+    )
 
 
 def select_flash_model(driver, max_wait=10):
     del max_wait
-    try:
-        button, current = open_model_dropdown(driver)
-        if not button:
-            return False
-        if any(label in current for label in ("fast", "nhanh", "flash")):
-            print("✅ Đã chọn model Flash/Fast")
-            return True
-        print(f"📌 Model hiện tại: {current}. Đang chuyển sang Flash/Fast...")
-        driver.execute_script("arguments[0].click();", button)
-        time.sleep(1.5)
-        return click_menu_item(
-            driver,
-            ["Fast", "Nhanh", "Flash"],
-            "Flash/Fast",
-        )
-    except Exception as error:
-        print(f"⚠️ Lỗi khi chọn model: {error}")
+    return _select_model(
+        driver,
+        lambda current: (
+            ("flash" in current and "lite" not in current)
+            or "fast" in current
+            or "nhanh" in current
+        ),
+        ["3.8 Flash", "Flash", "Fast", "Nhanh"],
+        "Flash/Fast",
+        exclude=("lite",),
+    )
+
+
+def _open_thinking_submenu(driver):
+    items = _visible(driver, (THINKING_MENU_SELECTOR,))
+    if not items:
+        items = [
+            item
+            for item in _visible(driver, MENU_ITEM_SELECTORS)
+            if _label(item) in ("cấp độ tư duy", "thinking level")
+        ]
+    if not items:
         return False
+    thinking_item = items[0]
+    _click(driver, thinking_item)
+    if not _visible(driver, (SUBMENU_ITEM_SELECTOR,)):
+        # Một số phiên bản chỉ mở submenu khi hover.
+        try:
+            ActionChains(driver).move_to_element(thinking_item).perform()
+            time.sleep(1)
+        except Exception:
+            pass
+    return True
+
+
+def _select_submenu_level(driver, target, level_label):
+    wanted = LEVEL_LABELS[target]
+    for item in _visible(driver, (SUBMENU_ITEM_SELECTOR,)):
+        text = _label(item)
+        if text not in wanted:
+            continue
+        if _is_selected(item):
+            print(f"✅ Đã ở cấp độ tư duy: {text}")
+        else:
+            _click(driver, item)
+            print(f"✅ Đã chọn cấp độ tư duy: {level_label}")
+        _close_menu(driver)
+        return True
+    print(f"⚠️ Không tìm thấy cấp độ '{level_label}' trong submenu")
+    _close_menu(driver)
+    return False
+
+
+def _select_legacy_level(driver, target, level_label):
+    toggle = next(
+        (
+            item
+            for item in _visible(driver, MENU_ITEM_SELECTORS)
+            if not _attr(item, "data-mode-id")
+            and _label(item) in LEGACY_EXTENDED_LABELS
+        ),
+        None,
+    )
+    if toggle is None:
+        return None
+    want_extended = target == "high"
+    if want_extended == _is_selected(toggle):
+        print(f"✅ Đã ở cấp độ: {'Mở rộng' if want_extended else 'Tiêu chuẩn'}")
+        _close_menu(driver)
+    else:
+        _click(driver, toggle)
+        print(f"✅ Đã chọn cấp độ tư duy: {level_label}")
+    return True
 
 
 def select_thinking_level(driver, level="extended", max_wait=10):
-    """
-    Chọn cấp độ tư duy. Chỉ có 2 level: "Tiêu chuẩn" và "Mở rộng".
+    """Chọn cấp độ tư duy (Thấp / Trung bình / Cao).
 
-    Giao diện mới (2025-07):
-      - "Mở rộng" nằm ngay trong menu chính, sau mat-divider
-      - Không còn submenu con value="thinking_level"
-      - Là gem-menu-item thường, không có data-mode-id
+    Chấp nhận cả giá trị cũ: standard/tiêu chuẩn -> Trung bình,
+    extended/mở rộng -> Cao. Model không có cấp độ tư duy thì bỏ qua.
     """
-    level_keywords = {
-        "off": ["Tiêu chuẩn", "Standard"],
-        "standard": ["Tiêu chuẩn", "Standard"],
-        "low": ["Tiêu chuẩn", "Standard"],
-        "medium": ["Tiêu chuẩn", "Standard"],
-        "high": ["Mở rộng", "Extended"],
-        "extended": ["Mở rộng", "Extended"],
-    }
-    keywords = level_keywords.get(level, ["Mở rộng", "Extended"])
-    level_label = level.upper()
-    want_extended = level in ("high", "extended")
+    del max_wait
+    normalized = str(level or "").strip().lower()
+    target = LEVEL_ALIASES.get(normalized, "high")
+    level_label = normalized.upper() or target.upper()
 
     try:
         print(f"🧠 Đang chọn cấp độ tư duy: {level_label}...")
-
-        # Mở dropdown model
-        model_button, _ = open_model_dropdown(driver)
-        if model_button:
-            driver.execute_script("arguments[0].click();", model_button)
-            time.sleep(1.5)
-
-        # --- Giao diện mới: "Mở rộng" là item phẳng sau divider ---
-        # Tìm tất cả gem-menu-item trong menu chính
-        thinking_item = None
-        item_selectors = [
-            '[data-test-id="gem-mode-menu"] gem-menu-item[role="menuitem"]',
-            '.cdk-overlay-pane gem-menu-item[role="menuitem"]',
-            'gem-menu[role="menu"] gem-menu-item[role="menuitem"]',
-        ]
-
-        for selector in item_selectors:
-            try:
-                elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                for el in elements:
-                    if not el.is_displayed():
-                        continue
-                    # Bỏ qua các model item (có data-mode-id)
-                    if el.get_attribute("data-mode-id"):
-                        continue
-                    # Đọc label
-                    try:
-                        lbl = el.find_element(By.CSS_SELECTOR, "span.label")
-                        text = lbl.text.strip().lower()
-                    except:
-                        text = el.text.strip().lower()
-                    # Match với keywords
-                    for kw in keywords:
-                        if kw.strip().lower() in text:
-                            thinking_item = el
-                            break
-                    if thinking_item:
-                        break
-                if thinking_item:
-                    break
-            except:
-                continue
-
-        # --- Fallback: giao diện cũ với value="thinking_level" ---
-        if not thinking_item:
-            try:
-                elements = driver.find_elements(
-                    By.CSS_SELECTOR, 'gem-menu-item[value="thinking_level"]'
-                )
-                for el in elements:
-                    if el.is_displayed():
-                        thinking_item = el
-                        # Giao diện cũ: cần check sublabel và mở submenu
-                        try:
-                            sublabel = el.find_element(By.CSS_SELECTOR, ".sublabel")
-                            current = sublabel.text.strip().lower()
-                            target_kw = keywords[0].strip().lower()
-                            if target_kw in current:
-                                print(f"✅ Đã ở cấp độ: {sublabel.text.strip()}")
-                                driver.execute_script("document.body.click();")
-                                return True
-                        except:
-                            pass
-                        # Click mở submenu cũ
-                        driver.execute_script("arguments[0].click();", el)
-                        time.sleep(1)
-                        # Tìm option trong submenu cũ
-                        sub_items = driver.find_elements(
-                            By.CSS_SELECTOR,
-                            '.cdk-overlay-pane gem-menu-item[role="menuitem"]',
-                        )
-                        for sub_el in sub_items:
-                            if sub_el.is_displayed():
-                                val = sub_el.get_attribute("value") or ""
-                                if val == "thinking_level":
-                                    continue
-                                try:
-                                    sub_lbl = sub_el.find_element(
-                                        By.CSS_SELECTOR, "span.label"
-                                    )
-                                    sub_text = sub_lbl.text.strip().lower()
-                                except:
-                                    sub_text = sub_el.text.strip().lower()
-                                for kw in keywords:
-                                    if kw.strip().lower() in sub_text:
-                                        driver.execute_script(
-                                            "arguments[0].click();", sub_el
-                                        )
-                                        time.sleep(1)
-                                        print(
-                                            f"✅ Đã chọn cấp độ tư duy: {level_label} (submenu cũ)"
-                                        )
-                                        return True
-                        print(f"⚠️ Không tìm thấy '{level_label}' trong submenu cũ")
-                        driver.execute_script("document.body.click();")
-                        return False
-            except:
-                pass
-
-        if not thinking_item:
-            print("⚠️ Không tìm thấy option cấp độ tư duy trong menu")
-            driver.execute_script("document.body.click();")
+        button = _find_model_button(driver)
+        if not button:
+            print("⚠️ Không tìm thấy dropdown model, bỏ qua cấp độ tư duy")
             return False
 
-        # Check nếu đã chọn (class "selected" trên item hoặc gem-menu-item-content)
-        is_selected = "selected" in (thinking_item.get_attribute("class") or "")
-        if not is_selected:
-            try:
-                content_el = thinking_item.find_element(
-                    By.CSS_SELECTOR, "gem-menu-item-content"
-                )
-                is_selected = "selected" in (content_el.get_attribute("class") or "")
-            except:
-                pass
-
-        if want_extended and is_selected:
-            print(f"✅ Đã ở cấp độ: Mở rộng")
-            driver.execute_script("document.body.click();")
-            return True
-        elif not want_extended and not is_selected:
-            # Muốn Tiêu chuẩn và Mở rộng chưa được chọn → đã ở Tiêu chuẩn
-            print(f"✅ Đã ở cấp độ: Tiêu chuẩn")
-            driver.execute_script("document.body.click();")
+        if _current_level(button) in LEVEL_LABELS[target]:
+            print(f"✅ Đã ở cấp độ tư duy: {_current_level(button)}")
             return True
 
-        # Click toggle
-        driver.execute_script("arguments[0].click();", thinking_item)
-        time.sleep(1)
-        print(f"✅ Đã chọn cấp độ tư duy: {level_label}")
-        return True
+        _click(driver, button, 1.5)
 
-    except Exception as e:
-        print(f"⚠️ Lỗi khi chọn thinking level: {e}")
+        if _open_thinking_submenu(driver):
+            return _select_submenu_level(driver, target, level_label)
+
+        legacy = _select_legacy_level(driver, target, level_label)
+        if legacy is not None:
+            return legacy
+
+        print("ℹ️ Model hiện tại không có tùy chọn cấp độ tư duy, giữ mặc định")
+        _close_menu(driver)
+        return False
+    except Exception as error:
+        print(f"⚠️ Lỗi khi chọn thinking level: {error}")
+        _close_menu(driver)
         return False

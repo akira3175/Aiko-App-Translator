@@ -1,6 +1,19 @@
 {
   "versions": [
     {
+      "version": "1.4.8",
+      "date": "2026-10-14",
+      "title": "Cập nhật tương thích Gemini Web mới",
+      "summary": "Tương thích giao diện Gemini Web mới, hỗ trợ model Argon và cấp độ tư duy.",
+      "highlights": [
+        "Tương thích giao diện Gemini Web mới: sửa lỗi kẹt nút chọn model và menu.",
+        "Hỗ trợ model tư duy mới 4 Argon (Argon) cùng các model 3.1 Pro và 3.8 Flash.",
+        "Hỗ trợ submenu Cấp độ tư duy mới: Thấp, Trung bình, Cao.",
+        "Tự động ưu tiên bản 3.8 Flash đầy đủ, tránh chọn nhầm bản 3.5 Flash-Lite.",
+        "Sửa lỗi kết thúc streaming sớm khi Gemini Web tạm dừng sinh text: luôn đợi đầy đủ marker ###END### trước khi hoàn tất."
+      ]
+    },
+    {
       "version": "1.4.6",
       "date": "2026-09-25",
       "title": "Cập nhật ChatGPT Web và sửa lỗi đăng Hako",
