@@ -16,6 +16,10 @@ DEFAULT_REVIEW_BG_CRITERIA = """1. Thiếu nội dung: chỉ báo khi một ý, 
 4. Phong cách và thuật ngữ: kiểm tra độ tự nhiên của tiếng Việt và tính nhất quán với glossary tham chiếu.
 5. Ngoại ngữ: chỉ báo khi ký tự hoặc câu ngoại ngữ thực sự còn xuất hiện trong bản dịch; không dùng văn bản nguồn làm bằng chứng cho lỗi này.
 6. Chỉ nêu lỗi khi có dẫn chứng cụ thể trong cả bản gốc và bản dịch; không suy đoán hoặc bắt lỗi khác biệt diễn đạt thuần túy."""
+DEFAULT_GEMINI_WEB_UPLOAD_INSTRUCTION = (
+    "Đọc toàn bộ file prompt.md đính kèm và thực hiện CHÍNH XÁC mọi yêu cầu "
+    "trong đó. Chỉ xuất kết quả đúng định dạng file yêu cầu, không giải thích thêm."
+)
 SETTING_DEFAULTS = {
     "image_markers": "off",
     "pipeline_translate_provider": "gemini-api",
@@ -50,6 +54,8 @@ SETTING_DEFAULTS = {
     "gemini_api_streaming": "off",
     "gemini_web_model": "pro",
     "gemini_thinking": "extended",
+    "gemini_web_upload_threshold": 15000,
+    "gemini_web_upload_instruction": DEFAULT_GEMINI_WEB_UPLOAD_INSTRUCTION,
     "ai_studio_model": "gemini-flash-latest",
     "ai_studio_pronoun_model": "gemini-flash-lite-latest",
     "ai_studio_review_model": "gemini-flash-lite-latest",
@@ -124,6 +130,8 @@ SETTING_LABELS = {
     "gemini_api_streaming": "Streaming thử nghiệm",
     "gemini_web_model": "Model Gemini Web (flash/pro/thinking)",
     "gemini_thinking": "Mức thinking Gemini Web",
+    "gemini_web_upload_threshold": "Số ký tự chuyển prompt thành file .md",
+    "gemini_web_upload_instruction": "Câu lệnh gửi kèm file prompt.md",
     "ai_studio_model": "Model Google AI Studio Web",
     "ai_studio_pronoun_model": "Model AI Studio xuất xưng hô",
     "ai_studio_review_model": "Model AI Studio review",
@@ -168,6 +176,7 @@ SECRET_SETTINGS = {"hako_password", "r2_access_key_id", "r2_secret_access_key", 
 SETTING_RANGES = {
     "fix_max_retry": (1, 20),
     "previous_context_chapters": (0, 20),
+    "gemini_web_upload_threshold": (0, 2000000),
     "gpt_api_max_output_tokens": (1000, 128000),
     "gpt_api_timeout": (30, 3600),
     "gpt_api_retries": (1, 10),
@@ -213,6 +222,8 @@ SETTING_META = {
     "gemini_api_streaming": {"group": "gemini-api", "type": "select", "options": [["off", "Tắt"], ["on", "Bật"]], "description": "Hiển thị bản dịch trực tiếp trong editor qua Gemini Interactions. Một số tùy chọn API có thể không được áp dụng."},
     "gemini_web_model": {"group": "gemini-web"},
     "gemini_thinking": {"group": "gemini-web"},
+    "gemini_web_upload_threshold": {"group": "gemini-web", "inputmode": "numeric", "description": "Prompt dài hơn số ký tự này sẽ được đính kèm dạng file prompt.md thay vì dán vào ô chat. Nhập 0 để tắt."},
+    "gemini_web_upload_instruction": {"group": "gemini-web", "type": "textarea", "description": "Nội dung gõ vào ô chat khi prompt được gửi dạng file. Để trống để dùng câu mặc định."},
     "ai_studio_model": {"group": "google-ai-studio-web", "description": "Tên model được truyền qua tham số ?model= trên URL AI Studio."},
     "ai_studio_pronoun_model": {"group": "google-ai-studio-web", "description": "Model mặc định cho công đoạn xuất xưng hô."},
     "ai_studio_review_model": {"group": "google-ai-studio-web", "description": "Model mặc định cho review nền và review toàn bộ."},

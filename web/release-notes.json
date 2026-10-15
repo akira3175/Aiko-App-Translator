@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "1.4.9",
+      "date": "2026-10-15",
+      "title": "Tối ưu Gemini Web với file đính kèm",
+      "summary": "Tự động gửi prompt dài dưới dạng file .md đính kèm, khắc phục lỗi treo trình duyệt Chrome.",
+      "highlights": [
+        "Tự động chuyển prompt dài thành file prompt.md đính kèm trên Gemini Web, tránh đơ khung chat và lỗi kết nối timeout.",
+        "Thêm tùy chọn 'Số ký tự chuyển prompt thành file .md' (mặc định 15.000 ký tự, nhập 0 để tắt).",
+        "Thêm tùy chọn 'Câu lệnh gửi kèm file prompt.md' cho phép tùy chỉnh lời nhắc gửi cùng file theo ý muốn.",
+        "Cơ chế dự phòng tự động chuyển về dán text truyền thống nếu việc đính kèm file không thành công."
+      ]
+    },
+    {
       "version": "1.4.8",
       "date": "2026-10-14",
       "title": "Cập nhật tương thích Gemini Web mới",

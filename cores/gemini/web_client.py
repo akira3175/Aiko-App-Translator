@@ -26,6 +26,93 @@ from cores.gemini.web_response import (
     snapshot_conversation as _snapshot_gemini_conversation,
 )
 from cores.json_output import parse_complete_json_object
+from cores.config.runtime import option
+
+
+# Prompt dài hơn ngưỡng này (ký tự) sẽ được gửi dưới dạng file .md đính kèm.
+# Đặt gemini_web_upload_threshold = 0 để tắt tính năng upload.
+DEFAULT_UPLOAD_THRESHOLD = 15000
+UPLOAD_FILE_NAME = "prompt.md"
+UPLOAD_INSTRUCTION = (
+    "Đọc toàn bộ file prompt.md đính kèm và thực hiện CHÍNH XÁC mọi yêu cầu "
+    "trong đó. Chỉ xuất kết quả đúng định dạng file yêu cầu, không giải thích thêm."
+)
+ATTACHMENT_SELECTORS = (
+    "uploader-file-preview",
+    "uploader-file-preview-container",
+    '[data-test-id="file-preview"]',
+    ".file-preview-container",
+    ".attachment-preview-wrapper",
+    "file-preview",
+)
+PASTE_FILE_SCRIPT = r"""
+const inputArea = arguments[0];
+const content = arguments[1];
+const name = arguments[2];
+inputArea.focus();
+const file = new File([content], name, {type: 'text/markdown'});
+const dt = new DataTransfer();
+dt.items.add(file);
+const evt = new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true});
+inputArea.dispatchEvent(evt);
+return true;
+"""
+
+
+def _upload_instruction():
+    value = str(option("gemini_web_upload_instruction", "") or "").strip()
+    return value or UPLOAD_INSTRUCTION
+
+
+def _upload_threshold():
+    try:
+        return int(option("gemini_web_upload_threshold", DEFAULT_UPLOAD_THRESHOLD) or 0)
+    except (TypeError, ValueError):
+        return DEFAULT_UPLOAD_THRESHOLD
+
+
+def _attachment_count(driver):
+    total = 0
+    for selector in ATTACHMENT_SELECTORS:
+        try:
+            total = max(total, len(driver.find_elements(By.CSS_SELECTOR, selector)))
+        except Exception:
+            continue
+    return total
+
+
+def _upload_prompt_file(driver, input_area, content, timeout=60):
+    """Dán prompt như một file .md vào ô chat. Trả về True nếu thấy file đã gắn."""
+    before = _attachment_count(driver)
+    driver.execute_script(PASTE_FILE_SCRIPT, input_area, content, UPLOAD_FILE_NAME)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _attachment_count(driver) > before:
+            # Đợi thêm để Gemini tải file lên server xong.
+            time.sleep(3)
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def _insert_text(driver, input_area, text):
+    driver.execute_script(
+        """
+        const inputArea = arguments[0];
+        const text = arguments[1];
+        inputArea.focus();
+        if (!document.execCommand('insertText', false, text)) {
+            const dt = new DataTransfer();
+            dt.setData('text/plain', text);
+            const evt = new ClipboardEvent('paste', {
+                clipboardData: dt, bubbles: true, cancelable: true
+            });
+            inputArea.dispatchEvent(evt);
+        }
+        """,
+        input_area,
+        text,
+    )
 
 
 def _is_known_structured_response(text):
@@ -143,29 +230,18 @@ def generate_content(
                 print(f"⚠️ Lỗi focus input: {e}")
 
             time.sleep(0.5)
+            threshold = _upload_threshold()
+            uploaded = False
+            if threshold and len(prompt) > threshold:
+                print(f"📎 Prompt dài {len(prompt)} ký tự → gửi dưới dạng {UPLOAD_FILE_NAME}...")
+                try:
+                    uploaded = _upload_prompt_file(driver, input_area, prompt)
+                except Exception as e:
+                    print(f"⚠️ Upload file lỗi: {e}")
+                if not uploaded:
+                    print("⚠️ Không xác nhận được file đã gắn, quay về dán text.")
             # Thay vì dùng pyperclip và phím tắt dán (chiếm OS clipboard), ta dùng js execCommand
-            driver.execute_script(
-                """
-                const inputArea = arguments[0];
-                const text = arguments[1];
-                inputArea.focus();
-                
-                // Thử dùng insertText
-                if (!document.execCommand('insertText', false, text)) {
-                    // Fallback nếu sự kiện không hoạt động
-                    const dt = new DataTransfer();
-                    dt.setData('text/plain', text);
-                    const evt = new ClipboardEvent('paste', {
-                        clipboardData: dt,
-                        bubbles: true,
-                        cancelable: true
-                    });
-                    inputArea.dispatchEvent(evt);
-                }
-            """,
-                input_area,
-                prompt,
-            )
+            _insert_text(driver, input_area, _upload_instruction() if uploaded else prompt)
             time.sleep(1)
 
             # Đánh dấu lịch sử ngay trước khi gửi để không nhận lại câu trả lời
@@ -302,7 +378,7 @@ def generate_content(
                             final_text = copy_response_text(driver)
                             return final_text if final_text else current_text
                     else:
-                        if stable_count >= 30 and current_len >= min_response_length:
+                        if stable_count >= 20 and current_len >= min_response_length:
                             print("\n✅ Streaming hoàn tất.")
                             final_text = copy_response_text(driver)
                             return final_text if final_text else current_text
