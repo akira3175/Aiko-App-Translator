@@ -28,6 +28,13 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
     {id:'night-owl',name:'Night Owl',description:'Xanh đêm sắc nét',color:'#011627'},
     {id:'catppuccin-mocha',name:'Catppuccin Mocha',description:'Mocha tím pastel',color:'#1e1e2e'},
     {id:'aiko-anime',name:'Aiko Midnight',description:'Midnight Slate',color:'#0f1218'},
+    {id:'cinnamoroll-sky',name:'Cinnamoroll Sky',description:'Xanh mây kem sữa (Sáng)',color:'#f4f9ff'},
+    {id:'cinnamoroll-night',name:'Cinnamoroll Night',description:'Đêm kẹo bông tím hồng (Tối)',color:'#221f38'},
+    {id:'schale-daylight',name:'Schale Daylight',description:'Blue Archive xanh sáng',color:'#edf5fc'},
+    {id:'sakura-latte',name:'Sakura Latte',description:'Kem hồng hoa anh đào',color:'#fdf5f7'},
+    {id:'astral-express',name:'Astral Express',description:'Star Rail đêm ánh kim',color:'#111320'},
+    {id:'elven-grimoire',name:'Elven Grimoire',description:'Frieren giấy cổ lục bảo',color:'#f6f1e7'},
+    {id:'mikan-breeze',name:'Mikan Breeze',description:'Cam quýt tươi sáng',color:'#f6f7f9'},
   ];
   const views = { workspace: ['BÀN DỊCH','Không gian dịch'], chapters: ['THƯ VIỆN','Kho chương'], sharing: ['R2 PRIVATE','Chia sẻ & đọc truyện'], hakoEdit: ['XUẤT BẢN','Edit chương Hako'], pipeline: ['TỰ ĐỘNG HÓA','Quy trình AI'], terminology: ['BỘ NHỚ','Thuật ngữ'], characters: ['BỘ NHỚ','Hồ sơ nhân vật'], pronouns: ['BỘ NHỚ','Xưng hô'], r19: ['BỘ LỌC TOÀN CỤC','Quản lý Dịch R19'], help: ['TRỢ GIÚP','Hướng dẫn sử dụng'], settings: ['HỆ THỐNG','Cài đặt'] };
   const featureDefinitions=[
@@ -88,13 +95,20 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
   function ensureAnimeIllustrationControl(){
     const themeSetting=$('#workspaceSettings .theme-setting');
     if(!$('#animeIllustrationSetting'))themeSetting?.insertAdjacentHTML('afterend','<section class="anime-illustration-setting" id="animeIllustrationSetting"><span><strong>Minh họa Aiko</strong><small>Bật mascot, icon và mũi tên anime. Khi tắt, giao diện dùng biểu tượng mặc định.</small></span><label class="switch"><input id="animeIllustrations" type="checkbox"><i></i></label></section>');
-    if(!$('#brushCursorSetting'))$('#animeIllustrationSetting')?.insertAdjacentHTML('afterend','<section class="anime-illustration-setting" id="brushCursorSetting"><span><strong>Con trỏ bút lông</strong><small>Đổi con trỏ chuột trên vùng soạn thảo; caret và thao tác bôi đen vẫn giữ nguyên.</small></span><label class="switch"><input id="brushCursor" type="checkbox"><i></i></label></section>');
+    if(!$('#animeUiStyleSetting'))$('#animeIllustrationSetting')?.insertAdjacentHTML('afterend','<section class="anime-illustration-setting" id="animeUiStyleSetting"><span><strong>Nút bấm &amp; khung Pastel dễ thương</strong><small>Bo tròn mềm mại kiểu kẹo bông, nút bấm phân tầng dịu nhẹ và bóng đổ màu pastel.</small></span><label class="switch"><input id="animeUiStyle" type="checkbox"><i></i></label></section>');
+    if(!$('#brushCursorSetting'))($('#animeUiStyleSetting')||$('#animeIllustrationSetting'))?.insertAdjacentHTML('afterend','<section class="anime-illustration-setting" id="brushCursorSetting"><span><strong>Con trỏ bút lông</strong><small>Đổi con trỏ chuột trên vùng soạn thảo; caret và thao tác bôi đen vẫn giữ nguyên.</small></span><label class="switch"><input id="brushCursor" type="checkbox"><i></i></label></section>');
   }
 
   function applyAnimeIllustrationPreference(){
     const enabled=localStorage.getItem('novel-anime-illustrations')==='on';
     document.documentElement.dataset.animeIllustrations=enabled?'on':'off';
     if($('#animeIllustrations'))$('#animeIllustrations').checked=enabled;
+  }
+
+  function applyAnimeUiPreference(){
+    const enabled=localStorage.getItem('novel-anime-ui')==='on';
+    document.documentElement.dataset.animeUi=enabled?'on':'off';
+    if($('#animeUiStyle'))$('#animeUiStyle').checked=enabled;
   }
 
   function applyBrushCursorPreference(){
@@ -151,16 +165,29 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
   function closeFeatureMenu(){$('#featureMenuModal').classList.remove('open');}
   pinnedFeatures=[...defaultPinnedFeatures];
   
+  let themesExpanded=false;
   function renderThemeOptions() {
     const current=document.documentElement.dataset.theme||'aiko-anime';
-    $('#themeOptions').innerHTML=appThemes.map(theme=>`<button class="theme-option ${theme.id===current?'active':''}" type="button" data-theme-option="${theme.id}" aria-pressed="${theme.id===current}"><span class="theme-swatch" aria-hidden="true"></span><span><strong>${theme.name}</strong><small>${theme.description}</small></span></button>`).join('');
-    $$('[data-theme-option]').forEach(button=>button.onclick=()=>applyTheme(button.dataset.themeOption));
+    const activeTheme=appThemes.find(item=>item.id===current)||appThemes[0];
+    const visibleThemes=themesExpanded?appThemes:[activeTheme];
+    const toggleCard=`<button class="theme-option theme-toggle-all" type="button" id="toggleAllThemes" aria-expanded="${themesExpanded}"><span class="theme-swatch theme-swatch-all" aria-hidden="true"></span><span><strong>${themesExpanded?'Thu gọn':'Hiện tất cả'}</strong><small>${themesExpanded?'Chỉ hiện giao diện đang dùng':`${appThemes.length} bảng màu giao diện`}</small></span></button>`;
+    $('#themeOptions').classList.toggle('collapsed',!themesExpanded);
+    $('#themeOptions').innerHTML=visibleThemes.map(theme=>`<button class="theme-option ${theme.id===current?'active':''}" type="button" data-theme-option="${theme.id}" aria-pressed="${theme.id===current}"><span class="theme-swatch" aria-hidden="true"></span><span><strong>${theme.name}</strong><small>${theme.description}</small></span></button>`).join('')+toggleCard;
+    $$('[data-theme-option]').forEach(button=>button.onclick=()=>{if(!themesExpanded){themesExpanded=true;renderThemeOptions();return;}applyTheme(button.dataset.themeOption);});
+    if($('#toggleAllThemes'))$('#toggleAllThemes').onclick=()=>{themesExpanded=!themesExpanded;renderThemeOptions();};
   }
   
   function applyTheme(themeId) {
     const theme=appThemes.find(item=>item.id===themeId)||appThemes[1];
     document.documentElement.dataset.theme=theme.id;
     localStorage.setItem('novel-theme',theme.id);
+    const isCuteTheme=theme.id==='cinnamoroll-sky'||theme.id==='cinnamoroll-night';
+    localStorage.setItem('novel-anime-ui',isCuteTheme?'on':'off');
+    applyAnimeUiPreference();
+    if(isCuteTheme){
+      localStorage.setItem('novel-anime-illustrations','on');
+      applyAnimeIllustrationPreference();
+    }
     $('#themeColor').setAttribute('content',theme.color);
     renderThemeOptions();
     requestAnimationFrame(()=>refreshEditors());
@@ -172,9 +199,11 @@ export function createAppShellFeature({api,escapeHtml,navigationCounts,openAiLog
   function bind() {
     ensureAnimeIllustrationControl();
     applyAnimeIllustrationPreference();
+    applyAnimeUiPreference();
     applyBrushCursorPreference();
     ensureEditorAppearanceControls();
     $('#animeIllustrations').onchange=event=>{const enabled=event.target.checked;localStorage.setItem('novel-anime-illustrations',enabled?'on':'off');applyAnimeIllustrationPreference();};
+    $('#animeUiStyle').onchange=event=>{const enabled=event.target.checked;localStorage.setItem('novel-anime-ui',enabled?'on':'off');applyAnimeUiPreference();};
     $('#brushCursor').onchange=event=>{const enabled=event.target.checked;localStorage.setItem('novel-brush-cursor',enabled?'on':'off');applyBrushCursorPreference();};
     $('#editorFont').onchange=changeEditorAppearance;
     $('#editorFontSize').oninput=changeEditorAppearance;

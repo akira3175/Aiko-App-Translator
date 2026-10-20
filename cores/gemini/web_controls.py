@@ -29,6 +29,12 @@ MENU_ITEM_SELECTORS = (
 )
 THINKING_MENU_SELECTOR = 'gem-menu-item[value="thinking_level"]'
 SUBMENU_ITEM_SELECTOR = '.submenu-container gem-menu-item[role="menuitem"]'
+SPARK_SEGMENT_SELECTORS = (
+    "chat-spark-toggle gem-segmented-button",
+    "gem-segmented-button-row gem-segmented-button",
+)
+SPARK_TASK_KEYWORDS = ("nhiệm vụ", "tác vụ", "task", "tasks", "spark")
+SPARK_CHAT_KEYWORDS = ("cuộc trò chuyện", "trò chuyện", "chat")
 
 THINKING_KEYWORDS = ("argon", "thinking", "tư duy")
 
@@ -73,6 +79,62 @@ def _is_selected(element):
         content = element.find_element(By.CSS_SELECTOR, "gem-menu-item-content")
         return "selected" in _attr(content, "class").split()
     except Exception:
+        return False
+
+
+def _segment_label(segment):
+    return _safe_text(segment, ".gds-body-m") or (segment.text or "").strip().lower()
+
+
+def _is_segment_selected(segment):
+    classes = _attr(segment, "class").split()
+    return "gem-segmented-button-selected" in classes or "selected" in classes
+
+
+def _find_spark_segment(segments, want_task):
+    wanted_value = "40" if want_task else "0"
+    wanted_keywords = SPARK_TASK_KEYWORDS if want_task else SPARK_CHAT_KEYWORDS
+    for segment in segments:
+        if _attr(segment, "data-value") == wanted_value:
+            return segment
+    for segment in segments:
+        text = _segment_label(segment)
+        if any(keyword in text for keyword in wanted_keywords):
+            return segment
+    return None
+
+
+def select_task_mode(driver, enabled=False):
+    """Chuyển đổi giữa chế độ 'Cuộc trò chuyện' và 'Nhiệm vụ' trên Gemini Web."""
+    want_task = bool(enabled)
+    mode_label = "Nhiệm vụ" if want_task else "Cuộc trò chuyện"
+    try:
+        segments = _visible(driver, SPARK_SEGMENT_SELECTORS)
+        if not segments:
+            if want_task:
+                print("⚠️ Không tìm thấy thanh chọn Nhiệm vụ trên giao diện, giữ mặc định")
+            return False
+        target = _find_spark_segment(segments, want_task)
+        if not target:
+            if want_task:
+                print(f"⚠️ Không tìm thấy tùy chọn '{mode_label}' trên thanh chuyển đổi")
+            return False
+        if _is_segment_selected(target):
+            if want_task:
+                print(f"✅ Đã ở chế độ: {mode_label}")
+            return True
+        action = target
+        try:
+            action = target.find_element(
+                By.CSS_SELECTOR, "button.gem-segmented-button-action, button"
+            )
+        except Exception:
+            pass
+        _click(driver, action, 1.0)
+        print(f"✅ Đã chọn chế độ: {mode_label}")
+        return True
+    except Exception as error:
+        print(f"⚠️ Lỗi khi chọn chế độ {mode_label}: {error}")
         return False
 
 

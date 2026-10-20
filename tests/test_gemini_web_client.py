@@ -5,6 +5,7 @@ from cores.browser import content
 from cores.gemini.web_client import (
     _has_end_marker,
     _is_known_structured_response,
+    _task_mode_enabled,
     normalize_web_model,
 )
 
@@ -59,6 +60,16 @@ class GeminiWebClientTests(unittest.TestCase):
             _is_known_structured_response('{"overall_score": 9.5, "issues": []}')
         )
         self.assertFalse(_is_known_structured_response("Chỉ là văn bản thường"))
+
+    def test_task_mode_enabled_reads_explicit_and_configured_values(self):
+        self.assertTrue(_task_mode_enabled("on"))
+        self.assertTrue(_task_mode_enabled(True))
+        self.assertFalse(_task_mode_enabled("off"))
+        self.assertFalse(_task_mode_enabled(False))
+        with patch("cores.gemini.web_client.option", return_value="on"):
+            self.assertTrue(_task_mode_enabled())
+        with patch("cores.gemini.web_client.option", return_value="off"):
+            self.assertFalse(_task_mode_enabled())
 
 
 

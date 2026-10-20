@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "1.4.10",
+      "date": "2026-10-20",
+      "title": "Chủ đề Anime Pastel & Nâng cấp Gemini Web",
+      "summary": "Thêm 7 theme phong cách Anime & Light Novel, tùy chọn giao diện Pastel dễ thương và nâng cấp chế độ Nhiệm vụ cùng sao chép Markdown trên Gemini Web.",
+      "highlights": [
+        "Thêm 7 theme mới phong cách Anime & Light Novel: Cinnamoroll Sky, Cinnamoroll Night, Schale Daylight, Sakura Latte, Astral Express, Elven Grimoire, Mikan Breeze.",
+        "Thêm tùy chọn 'Nút bấm & khung Pastel dễ thương': bo tròn mềm mại kiểu kẹo bông, hiệu ứng phân tầng dịu nhẹ và bóng đổ màu pastel.",
+        "Thêm tùy chọn cài đặt 'Chọn nhiệm vụ': tự động chuyển sang chế độ Nhiệm vụ trên Gemini Web trước khi gửi prompt.",
+        "Nâng cấp cơ chế sao chép kết quả trực tiếp từ nút Copy chính thức của Gemini Web, đảm bảo giữ chuẩn 100% cấu trúc Markdown và không sót chữ."
+      ]
+    },
+    {
       "version": "1.4.9",
       "date": "2026-10-15",
       "title": "Tối ưu Gemini Web với file đính kèm",

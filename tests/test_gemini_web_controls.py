@@ -6,6 +6,7 @@ from cores.gemini.web_controls import (
     open_model_dropdown,
     select_flash_model,
     select_pro_model,
+    select_task_mode,
     select_thinking_level,
     select_thinking_model,
 )
@@ -38,7 +39,8 @@ class _Element:
         if selector == "span.label" and self.text:
             return _Text(f" {self.text} ")
         if selector in self.children:
-            return _Text(self.children[selector])
+            child = self.children[selector]
+            return child if isinstance(child, _Element) else _Text(child)
         raise LookupError(selector)
 
 
@@ -53,7 +55,13 @@ def _model_button(primary, secondary=""):
 
 
 class _GeminiDriver:
-    def __init__(self, primary="Argon", secondary="Trung bình", level="Trung bình"):
+    def __init__(
+        self,
+        primary="Argon",
+        secondary="Trung bình",
+        level="Trung bình",
+        spark_selected="0",
+    ):
         self.button = _model_button(primary, secondary)
         self.models = [
             _Element(label, {"data-mode-id": mode_id})
@@ -69,11 +77,44 @@ class _GeminiDriver:
             _Element(label, classes="ng-star-inserted selected" if label == level else "")
             for label in ("Thấp", "Trung bình", "Cao")
         ]
+        self.spark_chat_button = _Element("Cuộc trò chuyện")
+        self.spark_task_button = _Element("Nhiệm vụ")
+        self.spark_segments = [
+            _Element(
+                "Cuộc trò chuyện",
+                {"data-value": "0"},
+                classes=(
+                    "gem-segmented-button gem-segmented-button-selected"
+                    if spark_selected == "0"
+                    else "gem-segmented-button"
+                ),
+                children={
+                    ".gds-body-m": "Cuộc trò chuyện",
+                    "button.gem-segmented-button-action, button": self.spark_chat_button,
+                },
+            ),
+            _Element(
+                "Nhiệm vụ",
+                {"data-value": "40"},
+                classes=(
+                    "gem-segmented-button gem-segmented-button-selected"
+                    if spark_selected == "40"
+                    else "gem-segmented-button"
+                ),
+                children={
+                    ".gds-body-m": "Nhiệm vụ",
+                    "button.gem-segmented-button-action, button": self.spark_task_button,
+                },
+            ),
+        ]
+        self.has_spark_toggle = True
         self.has_thinking = True
         self.submenu_open = False
         self.clicked = []
 
     def find_elements(self, _by, selector):
+        if "gem-segmented-button" in selector:
+            return list(self.spark_segments) if self.has_spark_toggle else []
         if "bard-mode-menu-button" in selector:
             return [self.button]
         if 'value="thinking_level"' in selector:
@@ -164,6 +205,27 @@ class GeminiWebControlsTests(unittest.TestCase):
         driver.models.append(_Element("Mở rộng", classes="selected"))
         self.assertTrue(select_thinking_level(driver, "extended"))
         self.assertNotIn(driver.models[-1], driver.clicked)
+
+    def test_selects_task_mode_when_enabled(self):
+        driver = _GeminiDriver(spark_selected="0")
+        self.assertTrue(select_task_mode(driver, True))
+        self.assertEqual([driver.spark_task_button], driver.clicked)
+
+    def test_skips_clicking_task_mode_when_already_selected(self):
+        driver = _GeminiDriver(spark_selected="40")
+        self.assertTrue(select_task_mode(driver, True))
+        self.assertEqual([], driver.clicked)
+
+    def test_switches_back_to_chat_mode_when_disabled(self):
+        driver = _GeminiDriver(spark_selected="40")
+        self.assertTrue(select_task_mode(driver, False))
+        self.assertEqual([driver.spark_chat_button], driver.clicked)
+
+    def test_returns_false_when_spark_toggle_is_absent(self):
+        driver = _GeminiDriver()
+        driver.has_spark_toggle = False
+        self.assertFalse(select_task_mode(driver, True))
+        self.assertEqual([], driver.clicked)
 
 
 if __name__ == "__main__":

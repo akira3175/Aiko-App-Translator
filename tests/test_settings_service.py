@@ -35,12 +35,14 @@ class SettingsServiceTests(unittest.TestCase):
                 "retry": 3,
                 "lan_enabled": "off",
                 "lan_pin": "",
+                "gemini_web_task_mode": "off",
             },
             setting_labels={
                 "translate_model": "Model",
                 "retry": "Số lần thử",
                 "lan_enabled": "LAN",
                 "lan_pin": "PIN",
+                "gemini_web_task_mode": "Chọn nhiệm vụ",
             },
             setting_ranges={"retry": (1, 5)},
             setting_meta={},
@@ -79,6 +81,18 @@ class SettingsServiceTests(unittest.TestCase):
             )
             service.write_settings({"reset": True})
             self.assertFalse((root / "settings.json").exists())
+
+    def test_gemini_web_task_mode_accepts_on_off_and_rejects_invalid(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service, _api_keys = self._service(root)
+            service.write_settings({"values": {"gemini_web_task_mode": "on"}})
+            self.assertEqual(
+                {"gemini_web_task_mode": "on"},
+                json.loads((root / "settings.json").read_text(encoding="utf-8")),
+            )
+            with self.assertRaises(ValueError):
+                service.write_settings({"values": {"gemini_web_task_mode": "invalid"}})
 
     def test_ui_preferences_are_normalized(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -205,6 +205,10 @@ class UiPreferencesTests(unittest.TestCase):
         self.assertIn("novel-brush-cursor", script)
         self.assertIn('data-brush-cursor="on"', themes)
         self.assertIn("--anime-nav-icon", themes)
+        self.assertIn("novel-anime-ui", script)
+        self.assertIn("localStorage.getItem('novel-anime-ui')==='on'", script)
+        self.assertIn("localStorage.getItem('novel-anime-ui')==='on'?'on':'off'", (web / "index.html").read_text(encoding="utf-8"))
+        self.assertIn('data-anime-ui="on"', themes)
 
 
 if __name__ == "__main__":

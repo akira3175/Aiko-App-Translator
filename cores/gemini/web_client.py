@@ -16,6 +16,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from cores.gemini.web_controls import (
     select_flash_model,
     select_pro_model,
+    select_task_mode,
     select_thinking_level,
     select_thinking_model,
 )
@@ -69,6 +70,15 @@ def _upload_threshold():
         return int(option("gemini_web_upload_threshold", DEFAULT_UPLOAD_THRESHOLD) or 0)
     except (TypeError, ValueError):
         return DEFAULT_UPLOAD_THRESHOLD
+
+
+def _task_mode_enabled(task_mode=None):
+    if task_mode is not None:
+        if isinstance(task_mode, bool):
+            return task_mode
+        return str(task_mode).strip().lower() in {"on", "true", "1", "task", "spark"}
+    value = str(option("gemini_web_task_mode", "off") or "off").strip().lower()
+    return value in {"on", "true", "1", "task", "spark"}
 
 
 def _attachment_count(driver):
@@ -155,6 +165,7 @@ def generate_content(
     max_retries=3,
     web_model="pro",
     thinking_level=None,
+    task_mode=None,
 ):
     """
     Gửi prompt đến Gemini web và lấy response.
@@ -175,6 +186,38 @@ def generate_content(
             driver.get(link)
             time.sleep(3)
 
+            # Selectors theo cấu trúc HTML mới (test.html):
+            # <rich-textarea> → <div class="ql-editor ... new-input-ui" contenteditable="true"
+            #   aria-label="Nhập câu lệnh cho Gemini" data-placeholder="Hỏi Gemini" | "Mô tả tác vụ">
+            input_selectors = [
+                '.ql-editor.new-input-ui[contenteditable="true"]',  # Giao diện mới
+                'rich-textarea div.ql-editor[contenteditable="true"]',
+                'div.ql-editor[contenteditable="true"]',
+                'div[contenteditable="true"][aria-label*="Gemini"]',
+                'div[role="textbox"][contenteditable="true"]',
+                'div[contenteditable="true"]',  # Fallback rộng nhất
+            ]
+
+            def _locate_input_area(timeout_sec=60):
+                local_wait = WebDriverWait(driver, timeout_sec)
+                for selector in input_selectors:
+                    try:
+                        found = local_wait.until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                        )
+                        if found:
+                            return found
+                    except Exception:
+                        continue
+                return None
+
+            # Đợi giao diện Gemini Web tải xong trước khi thao tác chọn chế độ/model
+            if not _locate_input_area(timeout_sec=60):
+                raise NoSuchElementException("Không tìm thấy ô nhập liệu!")
+
+            # Bước 0: Chọn chế độ Nhiệm vụ / Cuộc trò chuyện (nếu có trên giao diện)
+            select_task_mode(driver, _task_mode_enabled(task_mode))
+
             # Bước 1: Chọn model
             selected_model = normalize_web_model(web_model)
             if selected_model == "thinking":
@@ -194,28 +237,8 @@ def generate_content(
             if effective_thinking and effective_thinking != "off":
                 select_thinking_level(driver, effective_thinking)
 
-            # Selectors theo cấu trúc HTML mới (test.html):
-            # <rich-textarea> → <div class="ql-editor ... new-input-ui" contenteditable="true"
-            #   aria-label="Nhập câu lệnh cho Gemini" data-placeholder="Hỏi Gemini">
-            input_selectors = [
-                '.ql-editor.new-input-ui[contenteditable="true"]',  # Giao diện mới
-                'rich-textarea div.ql-editor[contenteditable="true"]',
-                'div.ql-editor[contenteditable="true"]',
-                'div[contenteditable="true"][aria-label*="Gemini"]',
-                'div[role="textbox"][contenteditable="true"]',
-                'div[contenteditable="true"]',  # Fallback rộng nhất
-            ]
-            input_area = None
-            for selector in input_selectors:
-                try:
-                    input_area = wait.until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-                    )
-                    if input_area:
-                        break
-                except:
-                    continue
-
+            # Lấy lại ô nhập liệu sau khi đổi chế độ/model để tránh StaleElementReferenceException
+            input_area = _locate_input_area(timeout_sec=15)
             if not input_area:
                 raise NoSuchElementException("Không tìm thấy ô nhập liệu!")
 
@@ -304,10 +327,11 @@ def generate_content(
             while time.time() - start_time < max_wait:
                 current_text = ""
                 try:
-                    if response_root is None:
-                        response_root = _find_new_gemini_response(
-                            driver, response_token, old_response_count
-                        )
+                    latest_root = _find_new_gemini_response(
+                        driver, response_token, old_response_count
+                    )
+                    if latest_root is not None:
+                        response_root = latest_root
                     if response_root is not None:
                         current_text = _gemini_response_text(response_root)
                 except StaleElementReferenceException:
@@ -336,8 +360,14 @@ def generate_content(
                         )
                         if response_root is not None:
                             current_text = _gemini_response_text(response_root)
-                    final_text = copy_response_text(driver)
-                    result = final_text if final_text else current_text
+                    final_text = copy_response_text(
+                        driver, response_root, token=response_token
+                    )
+                    result = (
+                        final_text
+                        if final_text and _has_end_marker(final_text)
+                        else current_text
+                    )
                     print("✅ Streaming hoàn tất.")
                     return result
 
@@ -357,8 +387,14 @@ def generate_content(
                         if response_root is not None:
                             current_text = _gemini_response_text(response_root)
                     if _is_known_structured_response(current_text):
-                        final_text = copy_response_text(driver)
-                        result = final_text if final_text else current_text
+                        final_text = copy_response_text(
+                            driver, response_root, token=response_token
+                        )
+                        result = (
+                            final_text
+                            if final_text and _is_known_structured_response(final_text)
+                            else current_text
+                        )
                         print("✅ Streaming hoàn tất, JSON hợp lệ.")
                         return result
 
@@ -375,12 +411,16 @@ def generate_content(
                             print(
                                 "\n⚠️ Đã đợi 30 phút nhưng không thấy ###END###, kết thúc streaming."
                             )
-                            final_text = copy_response_text(driver)
+                            final_text = copy_response_text(
+                                driver, response_root, token=response_token
+                            )
                             return final_text if final_text else current_text
                     else:
                         if stable_count >= 20 and current_len >= min_response_length:
                             print("\n✅ Streaming hoàn tất.")
-                            final_text = copy_response_text(driver)
+                            final_text = copy_response_text(
+                                driver, response_root, token=response_token
+                            )
                             return final_text if final_text else current_text
                 else:
                     stable_count = 0

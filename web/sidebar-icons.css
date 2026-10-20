@@ -34,11 +34,11 @@ html:not([data-anime-illustrations="on"]) #sidebar .nav-item.active > .nav-icon,
 html:not([data-anime-illustrations="on"]) #sidebar .nav-item:hover > .nav-icon {
   color: var(--accent);
 }
-html[data-theme="quiet-light"]:not([data-anime-illustrations="on"]) #sidebar .nav-item > .nav-icon {
+html:is([data-theme="quiet-light"], [data-theme="mikan-breeze"], [data-theme="sfacg-boluobao"], [data-theme="cinnamoroll-sky"], [data-theme="sakura-latte"], [data-theme="schale-daylight"]):not([data-anime-illustrations="on"]) #sidebar .nav-item > .nav-icon {
   color: var(--sidebar-ink);
 }
-html[data-theme="quiet-light"]:not([data-anime-illustrations="on"]) #sidebar .nav-item.active > .nav-icon,
-html[data-theme="quiet-light"]:not([data-anime-illustrations="on"]) #sidebar .nav-item:hover > .nav-icon {
+html:is([data-theme="quiet-light"], [data-theme="mikan-breeze"], [data-theme="sfacg-boluobao"], [data-theme="cinnamoroll-sky"], [data-theme="sakura-latte"], [data-theme="schale-daylight"]):not([data-anime-illustrations="on"]) #sidebar .nav-item.active > .nav-icon,
+html:is([data-theme="quiet-light"], [data-theme="mikan-breeze"], [data-theme="sfacg-boluobao"], [data-theme="cinnamoroll-sky"], [data-theme="sakura-latte"], [data-theme="schale-daylight"]):not([data-anime-illustrations="on"]) #sidebar .nav-item:hover > .nav-icon {
   color: var(--accent);
 }
 
