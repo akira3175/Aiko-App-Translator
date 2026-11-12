@@ -1,11 +1,40 @@
 """Read and safely edit project pronoun history."""
 
-from cores.storage.project import load_json, save_json
+import hashlib
+import json
+
+from cores.pronouns.normalize import group_directions, resolve_direction
+from cores.pronouns.storage import edit_pronouns
+from cores.storage.project import load_json
 
 
 class PronounService:
     def __init__(self, safe_project):
         self._safe_project = safe_project
+
+    @staticmethod
+    def _revision(pair):
+        """Bind an editor's indexes to the exact history and lock it displayed."""
+        serialized = json.dumps(pair, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _direction_payload(state):
+        record = state.get("record") or {}
+        return {
+            "speaker": state.get("speaker", ""),
+            "listener": state.get("listener", ""),
+            "speaker_self": state.get("speaker_self", ""),
+            "speaker_to_listener": state.get("speaker_to_listener", ""),
+            "temporary_address": state.get("temporary_address", ""),
+            "relationship_status": state.get("relationship_status", ""),
+            "emotional_tone": state.get("emotional_tone", ""),
+            "chapter_number": state.get("chapter_number", 0),
+            "since_chapter": state.get("since_chapter"),
+            "previous": state.get("previous"),
+            "changed": bool(state.get("changed")),
+            "record_index": record.get("record_index"),
+        }
 
     def data(self, project_name):
         path = self._safe_project(project_name) / "pronouns.json"
@@ -23,24 +52,41 @@ class PronounService:
                 if isinstance(item, dict)
             ]
             timeline.sort(key=lambda item: item.get("chapter_number", 0))
-            latest = timeline[-1] if timeline else {}
-            previous = timeline[-2] if len(timeline) > 1 else {}
-            changed = bool(
-                previous
-                and (
-                    previous.get("speaker_self") != latest.get("speaker_self")
-                    or previous.get("speaker_to_listener")
-                    != latest.get("speaker_to_listener")
-                )
+            directions = [
+                self._direction_payload(resolve_direction(records))
+                for records in group_directions(timeline).values()
+            ]
+            directions.sort(
+                key=lambda item: item.get("chapter_number", 0) or 0, reverse=True
             )
+            latest = dict(timeline[-1]) if timeline else {}
+            if latest:
+                # Fill blank/placeholder values with the stable value of the
+                # same direction so the UI never shows "không rõ" as current.
+                same_direction = next(
+                    (
+                        item
+                        for item in directions
+                        if item["speaker"] == latest.get("speaker", "")
+                        and item["listener"] == latest.get("listener", "")
+                    ),
+                    None,
+                )
+                if same_direction:
+                    for field in ("speaker_self", "speaker_to_listener"):
+                        if same_direction[field]:
+                            latest[field] = same_direction[field]
+            changed = any(item["changed"] for item in directions)
             pairs.append(
                 {
                     "key": str(key),
+                    "revision": self._revision(value),
                     "characters": [
                         str(item) for item in value.get("characters", [])[:2]
                     ],
                     "timeline": timeline,
                     "latest": latest,
+                    "directions": directions,
                     "locked": bool(value.get("locked", False)),
                     "changed": changed,
                 }
@@ -59,12 +105,20 @@ class PronounService:
 
     def save(self, project_name, payload):
         path = self._safe_project(project_name) / "pronouns.json"
-        data = load_json(path, {})
-        if not isinstance(data, dict):
-            raise ValueError("pronouns.json không hợp lệ")
+        with edit_pronouns(path, backup=True) as data:
+            self._apply_edit(data, payload)
+        return self.data(project_name)
+
+    def _apply_edit(self, data, payload):
         key = str(payload.get("key", "")).strip()
         if not key or key not in data or not isinstance(data[key], dict):
             raise ValueError("Không tìm thấy cặp xưng hô")
+        expected_revision = payload.get("expected_revision")
+        # Indexed edits from older clients must reload instead of guessing
+        # which record now occupies that index. Latest-entry callers may omit it.
+        if expected_revision is not None or payload.get("timeline_index") is not None:
+            if expected_revision != self._revision(data[key]):
+                raise ValueError("Lịch sử xưng hô đã thay đổi; hãy tải lại dữ liệu rồi thử lại")
         if payload.get("action") == "delete":
             del data[key]
         else:
@@ -107,8 +161,6 @@ class PronounService:
             latest.update(fields)
             latest["source"] = "manual"
             pair["locked"] = bool(payload.get("locked", False))
-        save_json(path, data, backup=True)
-        return self.data(project_name)
 
     @staticmethod
     def _requested_entry(timeline, payload):

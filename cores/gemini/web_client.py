@@ -14,6 +14,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from cores.gemini.web_controls import (
+    select_custom_model,
+    select_flash_lite_model,
     select_flash_model,
     select_pro_model,
     select_task_mode,
@@ -148,10 +150,17 @@ def normalize_web_model(value):
         "gemini 3 flash": "flash",
         "3 flash": "flash",
         "3.8 flash": "flash",
+        "trợ giúp toàn diện": "flash",
+        "flash-lite": "flash-lite",
+        "3.5 flash-lite": "flash-lite",
+        "lite": "flash-lite",
+        "quick answers": "flash-lite",
         "3.1 pro": "pro",
+        "detailed research": "pro",
         "argon": "thinking",
         "4 argon": "thinking",
         "gemini argon": "thinking",
+        "code & analysis": "thinking",
     }
     return aliases.get(model, model)
 
@@ -226,9 +235,13 @@ def generate_content(
                 select_pro_model(driver)
             elif selected_model == "flash":
                 select_flash_model(driver)
-            else:
+            elif selected_model == "flash-lite":
+                select_flash_lite_model(driver)
+            elif selected_model in {"", "free", "default", "auto"}:
+                pass
+            elif not select_custom_model(driver, web_model):
                 print(
-                    f"⚠️ Model Gemini Web không hỗ trợ: {web_model!r}; "
+                    f"⚠️ Model Gemini Web không tìm thấy: {web_model!r}; "
                     "giữ nguyên model hiện tại"
                 )
 
@@ -318,13 +331,13 @@ def generate_content(
 
             max_wait = 1800
             min_response_length = 100
-            start_time = time.time()
+            start_time = time.monotonic()
             last_text = ""
             stable_count = 0
             response_root = None
             require_end = "###END###" in prompt or "###CHAR_END###" in prompt
 
-            while time.time() - start_time < max_wait:
+            while time.monotonic() - start_time < max_wait:
                 current_text = ""
                 try:
                     latest_root = _find_new_gemini_response(
@@ -368,6 +381,8 @@ def generate_content(
                         if final_text and _has_end_marker(final_text)
                         else current_text
                     )
+                    if not _has_end_marker(result):
+                        raise TimeoutException("Gemini mất dấu kết thúc sau khi đọc lại phản hồi.")
                     print("✅ Streaming hoàn tất.")
                     return result
 
@@ -407,14 +422,6 @@ def generate_content(
                                 f"\n⏳ Đang đợi ###END### (đã nhận {current_len} ký tự, tạm dừng {stable_count}s)...",
                                 flush=True,
                             )
-                        if stable_count >= 1800 and current_len >= min_response_length:
-                            print(
-                                "\n⚠️ Đã đợi 30 phút nhưng không thấy ###END###, kết thúc streaming."
-                            )
-                            final_text = copy_response_text(
-                                driver, response_root, token=response_token
-                            )
-                            return final_text if final_text else current_text
                     else:
                         if stable_count >= 20 and current_len >= min_response_length:
                             print("\n✅ Streaming hoàn tất.")
@@ -428,6 +435,8 @@ def generate_content(
 
                 time.sleep(1)
 
+            if require_end:
+                raise TimeoutException("Gemini chưa hoàn tất sau 30 phút: thiếu ###END### hoặc ###CHAR_END###.")
             if last_text:
                 return last_text
             raise TimeoutException("Timeout chờ response")

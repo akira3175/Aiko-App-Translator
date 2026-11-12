@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from cores.pronouns import load_pronouns, save_pronouns, update_pronoun_memory
 from services.pronouns import PronounService
 
 
@@ -90,6 +91,95 @@ class PronounServiceTests(unittest.TestCase):
 
             self.assertEqual(0, result["count"])
             self.assertTrue(path.with_name("pronouns.json.bak").exists())
+
+
+class PronounEditorRevisionTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.project = Path(directory.name)
+        self.path = self.project / "pronouns.json"
+        self.service = PronounService(lambda _: self.project)
+        save_pronouns({"Alice---Bob": {
+            "characters": ["Alice", "Bob"],
+            "timeline": [
+                {"chapter_id": f"c{n}", "chapter_number": n,
+                 "speaker": "Alice", "listener": "Bob",
+                 "speaker_self": "I", "speaker_to_listener": "you"}
+                for n in (1, 2, 3)
+            ],
+        }}, self.path)
+
+    def payload(self):
+        pair = self.service.data("p")["pairs"][0]
+        return {
+            "key": pair["key"], "timeline_index": 1,
+            "expected_revision": pair["revision"],
+            "expected_speaker": "Alice", "expected_listener": "Bob",
+            "speaker_self": "MANUAL", "speaker_to_listener": "SIR",
+        }
+
+    def assert_stale(self, payload):
+        before = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, "đã thay đổi"):
+            self.service.save("p", payload)
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_removed_chapter_cannot_shift_editor_to_another_chapter(self):
+        payload = self.payload()
+        update_pronoun_memory(
+            "c1", 1, "text", self.path, "test",
+            lambda _: '{"character_pairs":[]}', sleep=lambda _: None,
+        )
+        self.assert_stale(payload)
+
+    def test_same_position_with_changed_record_is_rejected(self):
+        payload = self.payload()
+        memory = load_pronouns(self.path)
+        memory["Alice---Bob"]["timeline"][1]["speaker_self"] = "CHANGED"
+        save_pronouns(memory, self.path)
+        self.assert_stale(payload)
+
+    def test_changed_pair_lock_is_rejected(self):
+        payload = self.payload()
+        memory = load_pronouns(self.path)
+        memory["Alice---Bob"]["locked"] = True
+        save_pronouns(memory, self.path)
+        self.assert_stale(payload)
+
+    def test_indexed_edit_requires_revision(self):
+        payload = self.payload()
+        del payload["expected_revision"]
+        self.assert_stale(payload)
+
+    def test_valid_revision_edits_only_selected_chapter(self):
+        payload = self.payload()
+        before = load_pronouns(self.path)["Alice---Bob"]["timeline"]
+        result = self.service.save("p", payload)
+        timeline = load_pronouns(self.path)["Alice---Bob"]["timeline"]
+        self.assertEqual(timeline[0], before[0])
+        self.assertEqual(timeline[2], before[2])
+        self.assertEqual(timeline[1]["chapter_id"], "c2")
+        self.assertEqual(timeline[1]["speaker_self"], "MANUAL")
+        self.assertNotEqual(result["pairs"][0]["revision"], payload["expected_revision"])
+
+    def test_unrelated_pair_change_does_not_invalidate_editor(self):
+        payload = self.payload()
+        memory = load_pronouns(self.path)
+        memory["Other---Pair"] = {"characters": ["Other", "Pair"], "timeline": []}
+        save_pronouns(memory, self.path)
+        self.service.save("p", payload)
+        self.assertIn("Other---Pair", load_pronouns(self.path))
+
+    def test_delete_checks_revision_too(self):
+        payload = self.payload()
+        memory = load_pronouns(self.path)
+        memory["Alice---Bob"]["locked"] = True
+        save_pronouns(memory, self.path)
+        self.assert_stale({
+            "key": payload["key"], "action": "delete",
+            "expected_revision": payload["expected_revision"],
+        })
 
 
 if __name__ == "__main__":

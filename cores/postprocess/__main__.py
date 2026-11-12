@@ -1,4 +1,4 @@
-"""Polish one existing translated chapter without running other stages."""
+"""Polish one existing chapter and update its enabled pronoun memory."""
 
 import json
 import os
@@ -14,6 +14,7 @@ from cores.chapters.images import uses_image_markers
 from cores.config import CONTEXT_JSON, RAW_DIR, TRANSLATED_DIR
 from cores.config.runtime import option, task_config
 from cores.postprocess import runtime
+from cores.postprocess.pipeline import update_final_pronouns
 from cores.pronouns import format_pronoun_context
 from cores.translation.context import filtered_context_and_names
 from providers.registry import pipeline_config
@@ -52,21 +53,30 @@ def main():
     runtime.setup_browser(provider)
     try:
         print(f"Đang hiệu đính {target} bằng {provider}...")
+        pronoun_output = {}
         title, content = runtime.polish_translation(
             chapter,
             chapter_index + 1,
             context_text,
             pronoun_context,
             pronouns_file=pronouns_path,
+            pronoun_output=pronoun_output,
         )
+        polished_content = content
         chapter["title_translation"] = title
         chapter["translation"] = content
         title, content = runtime.fix_translation(
             chapter, chapter_index + 1, context_text, pronoun_context
         )
+        chapter["title_translation"] = title
+        chapter["translation"] = content
         output = save_translated_md(
             raw_path, TRANSLATED_DIR, title, content,
             image_markers=chapter.get("_image_markers"),
+        )
+        update_final_pronouns(
+            runtime, chapter, chapter_index + 1, pronouns_path,
+            polished_content=polished_content, pronoun_output=pronoun_output,
         )
         print(f"Đã lưu bản hiệu đính: {output}")
     finally:

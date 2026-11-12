@@ -35,11 +35,14 @@ class PronounHistoryTests(unittest.TestCase):
                 json.dumps(original, ensure_ascii=False), encoding="utf-8"
             )
 
-            result = PronounService(lambda _name: project).save(
+            service = PronounService(lambda _name: project)
+            revision = service.data("project")["pairs"][0]["revision"]
+            result = service.save(
                 "project",
                 {
                         "key": "Alice|Bob",
                         "timeline_index": 0,
+                        "expected_revision": revision,
                         "expected_speaker": "Alice",
                         "expected_listener": "Bob",
                         "speaker_self": "mình",

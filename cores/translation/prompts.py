@@ -33,12 +33,12 @@ Không tự thêm định dạng Markdown. Phải giữ nguyên Markdown ảnh h
 
 **QUAN TRỌNG về xưng hô – linh hồn của bản dịch:**
 - PHÂN BIỆT RÕ DẪN TRUYỆN VÀ HỘI THOẠI:
-  + Trong phần DẪN TRUYỆN, TUÂN THỦ TUYỆT ĐỐI quy tắc dẫn truyện được giao.
-  + Trong phần HỘI THOẠI, nhân vật linh hoạt xưng hô theo cảm xúc và đối tượng giao tiếp.
-- Tham khảo bộ nhớ xưng hô bên dưới để giữ nhất quán, nhưng KHÔNG CỨNG NHẮC trong hội thoại.
-- Xưng hô phải phản ánh đúng CẢM XÚC & TRẠNG THÁI QUAN HỆ tại thời điểm đó.
-- Cảm xúc biến chuyển trong cùng cuộc hội thoại thì xưng hô cũng có thể biến chuyển theo.
-- Nếu có xung đột giữa bộ nhớ và ngữ cảnh hiện tại thì tin vào ngữ cảnh hiện tại.
+  + Trong phần DẪN TRUYỆN, TUÂN THỦ TUYỆT ĐỐI ngôi kể và đại từ ngôi thứ ba ghi trong hồ sơ nhân vật/quy tắc dịch.
+  + Trong phần HỘI THOẠI, dùng đúng xưng hô nền của từng cặp người nói → người nghe.
+- Thứ tự ưu tiên: quy tắc 🔒 ĐÃ KHÓA > xưng hô nền trong bộ nhớ xưng hô > suy luận từ ngữ cảnh.
+- Chỉ đổi xưng hô nền khi nguyên tác có biến cố quan hệ rõ ràng (lộ thân phận, thổ lộ, trở mặt, kết nghĩa, giả trang trước người khác...).
+- Cảm xúc nhất thời thể hiện bằng giọng điệu, từ ngữ và tiểu từ cuối câu, KHÔNG tự ý đổi hệ đại từ giữa chừng.
+- Cặp nhân vật chưa có trong bộ nhớ thì suy luận từ tuổi tác, vai vế, giới tính trong hồ sơ và kính ngữ của nguyên tác.
 
 **QUY TẮC TÊN TIÊU ĐỀ: Title Case** viết hoa ký tự đầu mỗi từ. Nếu tên chương đánh số thì đánh số Ả Rập."""
 
@@ -81,12 +81,12 @@ DEFAULT_POLISH_TASK = """Nhiệm vụ là BIÊN TẬP LẠI bản dịch hiện 
    - Giữ toàn bộ nội dung, KHÔNG cắt bớt hay thêm ý mới.
 
 2. CHỈNH XƯNG HÔ:
-   - Tra characters.md để biết giới tính, tuổi tác và vai trò của từng nhân vật.
+   - Tra characters.md để biết giới tính, tuổi tác, vai trò và đại từ dẫn truyện của từng nhân vật.
    - Tra bộ nhớ xưng hô liên quan để giữ cách xưng hô nhất quán với các chương trước.
-   - Trong HỘI THOẠI: xưng hô linh hoạt theo cảm xúc, không cứng nhắc.
-   - Trong DẪN TRUYỆN: nhất quán theo bộ nhớ xưng hô.
-   - Ưu tiên ngữ cảnh hiện tại nếu xung đột với bộ nhớ.
-   - Mục có locked: true là quy tắc do người dùng xác nhận, PHẢI ưu tiên và không tự ý thay đổi.
+   - Mục có locked: true / 🔒 là quy tắc do người dùng xác nhận, PHẢI ưu tiên và không tự ý thay đổi.
+   - Trong HỘI THOẠI: giữ xưng hô nền của từng cặp người nói → người nghe; cảm xúc nhất thời thể hiện qua giọng điệu, không đổi hệ đại từ.
+   - Trong DẪN TRUYỆN: nhất quán ngôi kể và đại từ ngôi thứ ba theo hồ sơ nhân vật.
+   - Chỉ đổi xưng hô nền khi nguyên tác có biến cố quan hệ rõ ràng; sửa các chỗ bản dịch tự ý đổi mà nguyên tác không có lý do.
 
 3. BIÊN TẬP TIÊU ĐỀ:
    - Chỉ sửa xưng hô hoặc văn phong nếu cần, KHÔNG đổi nghĩa.

@@ -105,10 +105,13 @@ def generate_content_with_chatgpt(
     )
 
 
+def _ai_studio_link():
+    link = str(option("link_ai_studio", "")).strip()
+    return link if link else "https://aistudio.google.com/prompts/new_chat"
+
+
 def setup_ai_studio_browser():
-    browser_runtime.get_chatgpt_driver().get(
-        "https://aistudio.google.com/prompts/new_chat"
-    )
+    browser_runtime.get_chatgpt_driver().get(_ai_studio_link())
 
 
 def close_ai_studio_driver():
@@ -118,6 +121,7 @@ def close_ai_studio_driver():
 def generate_content_with_ai_studio(
     prompt, max_retries=3, ai_studio_model="gemini-flash-latest",
     ai_studio_thinking="high", ai_studio_references=(), ai_studio_stage="",
+    ai_studio_link=None,
 ):
     return generate_ai_studio_content(
         prompt,
@@ -127,4 +131,5 @@ def generate_content_with_ai_studio(
         ai_studio_thinking=ai_studio_thinking,
         reference_documents=ai_studio_references,
         stage=ai_studio_stage,
+        ai_studio_link=ai_studio_link,
     )

@@ -122,11 +122,16 @@ def build_pronouns_snapshot(pronouns_file, n_chapters=50):
 
     filtered = {}
     for key_str, data in memory.items():
+        if not isinstance(data, dict):
+            continue
+        timeline = data.get("timeline", [])
         tl = [
             e
-            for e in data.get("timeline", [])
-            if e.get("chapter_number", 0) in recent_chapters
+            for e in timeline
+            if isinstance(e, dict) and e.get("chapter_number", 0) in recent_chapters
         ]
+        if not tl and data.get("locked") and timeline:
+            tl = [e for e in timeline if isinstance(e, dict)][-2:]
         if tl:
             filtered[key_str] = {
                 "characters": data.get("characters", []),

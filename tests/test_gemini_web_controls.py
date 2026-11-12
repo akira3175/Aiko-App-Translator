@@ -4,6 +4,8 @@ from unittest.mock import patch
 from cores.gemini.web_controls import (
     click_menu_item,
     open_model_dropdown,
+    select_custom_model,
+    select_flash_lite_model,
     select_flash_model,
     select_pro_model,
     select_task_mode,
@@ -226,6 +228,88 @@ class GeminiWebControlsTests(unittest.TestCase):
         driver.has_spark_toggle = False
         self.assertFalse(select_task_mode(driver, True))
         self.assertEqual([], driver.clicked)
+
+    def test_selects_models_when_name_is_in_sublabel_and_role_is_menuitemradio(self):
+        """Giao diện mới (2026-11): span.label là mô tả, div.sublabel là tên model."""
+        driver = _GeminiDriver(primary="Argon", secondary="Cao")
+        driver.models = [
+            _Element(
+                "Quick answers",
+                {"data-mode-id": "8c46e95b1a07cecc", "role": "menuitemradio", "aria-checked": "false"},
+                children={".sublabel": "3.5 Flash-Lite"},
+            ),
+            _Element(
+                "Trợ giúp toàn diện",
+                {"data-mode-id": "56fdd199312815e2", "role": "menuitemradio", "aria-checked": "false"},
+                children={".sublabel": "3.8 Flash"},
+            ),
+            _Element(
+                "Detailed research",
+                {"data-mode-id": "e6fa609c3fa255c0", "role": "menuitemradio", "aria-checked": "false"},
+                children={".sublabel": "3.1 Pro"},
+            ),
+            _Element(
+                "Code & analysis",
+                {"data-mode-id": "argon", "role": "menuitemradio", "aria-checked": "true"},
+                children={".sublabel": "4 Argon"},
+            ),
+        ]
+
+        self.assertTrue(select_pro_model(driver))
+        self.assertIs(driver.models[2], driver.clicked[-1])
+
+        driver.clicked.clear()
+        self.assertTrue(select_flash_model(driver))
+        self.assertIs(driver.models[1], driver.clicked[-1])
+
+        driver.clicked.clear()
+        self.assertTrue(select_flash_lite_model(driver))
+        self.assertIs(driver.models[0], driver.clicked[-1])
+
+    def test_selects_thinking_level_via_sublabel_jslog_and_position_fallbacks(self):
+        driver = _GeminiDriver(secondary="")
+        # Tầng 3: khớp qua jslog BardVeMetadataKey ngay cả khi nhãn đổi hoàn toàn
+        driver.levels = [
+            _Element(
+                "Tier A",
+                {
+                    "role": "menuitemradio",
+                    "aria-checked": "false",
+                    "jslog": "323336;track:generic_click;BardVeMetadataKey:W251bGwsWyJhcmdvbiIsMSw4XV0=;mutable:true",
+                },
+            ),
+            _Element(
+                "Tier B",
+                {
+                    "role": "menuitemradio",
+                    "aria-checked": "false",
+                    "jslog": "323336;track:generic_click;BardVeMetadataKey:W251bGwsWyJhcmdvbiIsNCw4XV0=;mutable:true",
+                },
+            ),
+            _Element(
+                "Tier C",
+                {
+                    "role": "menuitemradio",
+                    "aria-checked": "true",
+                    "jslog": "323336;track:generic_click;BardVeMetadataKey:W251bGwsWyJhcmdvbiIsMiw4XV0=;mutable:true",
+                },
+            ),
+        ]
+        # Đang ở mức Cao (aria-checked="true") -> không click lại khi yêu cầu high
+        self.assertTrue(select_thinking_level(driver, "high"))
+        self.assertNotIn(driver.levels[2], driver.clicked)
+
+        # Chuyển sang mức Trung bình (code=4 -> levels[1])
+        driver.clicked.clear()
+        self.assertTrue(select_thinking_level(driver, "medium"))
+        self.assertIs(driver.levels[1], driver.clicked[-1])
+
+    def test_selects_custom_future_model_name(self):
+        driver = _GeminiDriver(primary="3.1 Pro", secondary="")
+        future = _Element("Next-gen reasoning", children={".sublabel": "5.0 Ultra"})
+        driver.models.append(future)
+        self.assertTrue(select_custom_model(driver, "5.0 Ultra"))
+        self.assertIs(future, driver.clicked[-1])
 
 
 if __name__ == "__main__":

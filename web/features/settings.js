@@ -7,7 +7,7 @@ const settingsGroups={
   pipeline:['Quy trình dịch','Chọn engine, model và mức suy nghĩ cho từng công đoạn.'],
   'gemini-api':['Gemini API','Model và thông số sinh nội dung khi dịch, hậu dịch và review qua API.'],
   'gemini-web':['Gemini Web','Gem, model và mức suy nghĩ khi tự động hóa trình duyệt Gemini.'],
-  'google-ai-studio-web':['Google AI Studio Web','Chọn model qua URL và Thinking level trong Run settings của AI Studio.'],
+  'google-ai-studio-web':['Google AI Studio Web','Gắn link prompt AI Studio, chọn model và mức suy nghĩ trong Run settings.'],
   'chatgpt-web':['ChatGPT Web','Model và mức suy nghĩ khi tự động hóa trình duyệt ChatGPT.'],
   'chatgpt-plan':['ChatGPT Plan','Đăng nhập ChatGPT để thử dùng gói của tài khoản qua OpenAI Responses API.'],
   'gpt-api':['OpenAI API','Khóa, model và thông số cho các công đoạn dùng OpenAI API.'],

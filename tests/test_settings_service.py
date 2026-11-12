@@ -2,8 +2,12 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from services.settings import ConfigurationService
+from services.settings_schema import SETTING_DEFAULTS, SETTING_LABELS, SETTING_META, SETTING_RANGES
+from cores.config import runtime as runtime_config
+from cores.pronouns import format_pronoun_context, save_pronouns
 
 
 class _ApiKeys:
@@ -36,6 +40,7 @@ class SettingsServiceTests(unittest.TestCase):
                 "lan_enabled": "off",
                 "lan_pin": "",
                 "gemini_web_task_mode": "off",
+                "chatgpt_mode": "chat",
             },
             setting_labels={
                 "translate_model": "Model",
@@ -43,6 +48,7 @@ class SettingsServiceTests(unittest.TestCase):
                 "lan_enabled": "LAN",
                 "lan_pin": "PIN",
                 "gemini_web_task_mode": "Chọn nhiệm vụ",
+                "chatgpt_mode": "Chế độ ChatGPT Web",
             },
             setting_ranges={"retry": (1, 5)},
             setting_meta={},
@@ -82,6 +88,42 @@ class SettingsServiceTests(unittest.TestCase):
             service.write_settings({"reset": True})
             self.assertFalse((root / "settings.json").exists())
 
+    def test_pronoun_limit_is_saved_and_applied_to_prompt_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service, _ = self._service(root)
+            key = "pronoun_context_pairs"
+            service.setting_defaults = {key: SETTING_DEFAULTS[key]}
+            service.setting_labels = {key: SETTING_LABELS[key]}
+            service.setting_ranges = {key: SETTING_RANGES[key]}
+            service.setting_meta = {key: SETTING_META[key]}
+            item = service.settings_payload()["items"][0]
+            self.assertEqual((item["value"], item["type"], item["min"], item["max"], item["group"]), (10, "number", 1, 50, "general"))
+            pronouns = root / "pronouns.json"
+            save_pronouns({
+                f"A{n}---B{n}": {
+                    "characters": [f"A{n}", f"B{n}"],
+                    "timeline": [{"chapter_number": n, "speaker": f"A{n}", "listener": f"B{n}", "speaker_self": "I", "speaker_to_listener": "you"}],
+                } for n in range(1, 13)
+            }, pronouns)
+            before = pronouns.read_bytes()
+            with patch.object(runtime_config, "SETTINGS_FILE", root / "settings.json"), patch.dict("os.environ", {"NOVEL_WEB_CONFIG": "{}"}):
+                try:
+                    for value in (1, 3, 50):
+                        service.write_settings({"values": {key: value}})
+                        runtime_config.task_config.cache_clear()
+                        self.assertEqual(format_pronoun_context(20, pronouns).count("▸"), min(value, 12))
+                    self.assertEqual(format_pronoun_context(20, pronouns, max_pairs=2).count("▸"), 2)
+                    service.write_settings({"reset": True})
+                    runtime_config.task_config.cache_clear()
+                    self.assertEqual(format_pronoun_context(20, pronouns).count("▸"), 10)
+                finally:
+                    runtime_config.task_config.cache_clear()
+            self.assertEqual(pronouns.read_bytes(), before)
+            for invalid in (0, 51, "invalid"):
+                with self.subTest(value=invalid), self.assertRaises(ValueError):
+                    service.write_settings({"values": {key: invalid}})
+
     def test_gemini_web_task_mode_accepts_on_off_and_rejects_invalid(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -93,6 +135,18 @@ class SettingsServiceTests(unittest.TestCase):
             )
             with self.assertRaises(ValueError):
                 service.write_settings({"values": {"gemini_web_task_mode": "invalid"}})
+
+    def test_chatgpt_mode_accepts_chat_work_and_rejects_invalid(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service, _api_keys = self._service(root)
+            service.write_settings({"values": {"chatgpt_mode": "work"}})
+            self.assertEqual(
+                {"chatgpt_mode": "work"},
+                json.loads((root / "settings.json").read_text(encoding="utf-8")),
+            )
+            with self.assertRaises(ValueError):
+                service.write_settings({"values": {"chatgpt_mode": "invalid"}})
 
     def test_ui_preferences_are_normalized(self):
         with tempfile.TemporaryDirectory() as directory:

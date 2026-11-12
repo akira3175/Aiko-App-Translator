@@ -187,6 +187,26 @@ class StagePipelineTests(unittest.TestCase):
         self.assertEqual(generate.call_args.kwargs["chatgpt_model"], "gpt-pronouns")
         self.assertEqual(generate.call_args.kwargs["chatgpt_thinking"], "vừa")
 
+    def test_configured_polish_exposes_pronoun_payload(self):
+        response = '###TITLE###\nTitle\n###CONTENT###\nContent\n###PRONOUNS###\n{"character_pairs":[]}\n###END###'
+        values = {
+            "polish_provider": "openai-api", "polish_stage_model": "polish-model",
+            "pronouns_provider": "gemini-api", "pronouns_stage_model": "fallback-model",
+        }
+        collector = {}
+        with patch.object(
+            runtime_module, "option", side_effect=lambda key, default=None: values.get(key, default)
+        ), patch.dict(
+            translation_stage.TRANSPORT_OVERRIDES, {"openai-api": lambda *_args, **_kwargs: response}, clear=True
+        ), patch.object(configured_runtime, "log_api_call"), patch.object(
+            polish_module, "build_characters_snapshot", return_value=None
+        ):
+            result = configured_runtime.polish_translation(
+                dict(CHAPTER), 1, "context", "pronouns", pronoun_output=collector,
+            )
+        self.assertEqual(result, ("Title", "Content"))
+        self.assertEqual(collector, {"character_pairs": []})
+
 
 if __name__ == "__main__":
     unittest.main()

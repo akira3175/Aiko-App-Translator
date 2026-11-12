@@ -4,7 +4,13 @@ import os
 
 from cores.context.glossary import filter_glossary
 from cores.storage.project import load_context
-from cores.pronouns import _name_matches_glossary, load_pronouns
+from cores.pronouns import (
+    NameResolver,
+    _name_matches_glossary,
+    load_character_roster,
+    load_pronouns,
+)
+from cores.pronouns.normalize import default_characters_file
 
 
 def find_glossary_targets(file_path, raw_text="", pronouns_file=None):
@@ -21,12 +27,20 @@ def find_glossary_targets(file_path, raw_text="", pronouns_file=None):
     if not pronouns_file:
         return targets
     memory = load_pronouns(pronouns_file)
-    character_names = [
-        str(character)
-        for data in memory.values()
-        for character in data.get("characters", [])
-        if character
-    ]
+    resolver = NameResolver(
+        load_character_roster(default_characters_file(pronouns_file))
+    )
+    character_names = []
+    # A known character may not have pronoun history yet. Keep its glossary
+    # name so context selection can distinguish that from unknown characters.
+    for character in resolver.names():
+        character_names.extend(resolver.aliases(character))
+    for data in memory.values():
+        if not isinstance(data, dict):
+            continue
+        for character in data.get("characters", []):
+            if character:
+                character_names.extend(resolver.aliases(str(character)))
     return [
         target
         for target in targets

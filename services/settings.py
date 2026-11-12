@@ -128,10 +128,18 @@ class ConfigurationService:
                     raise ValueError("Chế độ streaming Gemini API không hợp lệ")
                 if key == "gemini_web_task_mode" and value not in {"off", "on"}:
                     raise ValueError("Chế độ Chọn nhiệm vụ Gemini Web không hợp lệ")
+                if key == "chatgpt_mode" and value not in {"chat", "work"}:
+                    raise ValueError("Chế độ ChatGPT Web không hợp lệ")
                 if key == "lan_pin" and value and not re.fullmatch(
                     r"\d{6,12}", value
                 ):
                     raise ValueError("Mã PIN LAN phải gồm 6–12 chữ số")
+                if key == "link_ai_studio" and value and not re.match(
+                    r"^https://aistudio\.google\.com/", value
+                ):
+                    raise ValueError(
+                        "Đường dẫn Google AI Studio phải bắt đầu bằng https://aistudio.google.com/"
+                    )
                 if value and key == "gemini_api_max_output_tokens":
                     try:
                         number = float(value)

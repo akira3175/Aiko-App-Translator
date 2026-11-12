@@ -2,10 +2,11 @@
 
 import re
 import time
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from uuid import uuid4
 
 import pyperclip
+from cores.config.runtime import option
 from cores.json_output import parse_complete_json_object
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
@@ -15,7 +16,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 
-AI_STUDIO_URL = "https://aistudio.google.com/prompts/new_chat"
+AI_STUDIO_HOST = "aistudio.google.com"
+AI_STUDIO_URL = f"https://{AI_STUDIO_HOST}/prompts/new_chat"
 DEFAULT_MODEL = "gemini-flash-latest"
 DEFAULT_THINKING = "high"
 THINKING_LEVELS = {"low", "medium", "high"}
@@ -39,11 +41,29 @@ _MODEL_TIME_RE = re.compile(
 )
 
 
-def _prompt_url(model):
+def _custom_link(link):
+    """Return a safe AI Studio link supplied by the user, or an empty string."""
+    value = str(link or "").strip()
+    if not value:
+        return ""
+    parsed = urlsplit(value)
+    if parsed.scheme != "https" or parsed.hostname != AI_STUDIO_HOST:
+        return ""
+    return value
+
+
+def _prompt_url(model, link=""):
     selected_model = str(model or DEFAULT_MODEL).strip() or DEFAULT_MODEL
     if selected_model.lower() == "current":
         selected_model = DEFAULT_MODEL
-    return f"{AI_STUDIO_URL}?{urlencode({'model': selected_model})}"
+    custom = _custom_link(link)
+    if not custom:
+        return f"{AI_STUDIO_URL}?{urlencode({'model': selected_model})}"
+    parsed = urlsplit(custom)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    # A model pinned inside the user's link wins over the stage model.
+    query.setdefault("model", selected_model)
+    return urlunsplit(parsed._replace(query=urlencode(query)))
 
 
 def _visible(elements):
@@ -298,12 +318,15 @@ def generate_content(
     ai_studio_thinking=DEFAULT_THINKING,
     reference_documents=(),
     stage="",
+    ai_studio_link=None,
 ):
+    if ai_studio_link is None:
+        ai_studio_link = option("link_ai_studio", "")
     last_error = None
     for attempt in range(max_retries):
         try:
             driver = get_driver()
-            driver.get(_prompt_url(ai_studio_model))
+            driver.get(_prompt_url(ai_studio_model, ai_studio_link))
             wait = WebDriverWait(driver, 60)
             input_area = wait.until(
                 EC.visibility_of_element_located(

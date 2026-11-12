@@ -5,7 +5,10 @@ import time
 from pathlib import Path
 
 from cores.postprocess.snapshots import build_characters_snapshot
+from cores.postprocess.outputs import parse_polish_output
 from cores.chapters.images import IMAGE_INSTRUCTION, validate_image_markers
+from cores.pronouns.extraction import build_pronoun_instructions
+from cores.pronouns.normalize import NameResolver, default_characters_file, load_character_roster
 
 
 def polish_translation(
@@ -18,8 +21,12 @@ def polish_translation(
     pronouns_file,
     model=None,
     thinking_level=None,
+    *,
+    pronoun_output=None,
 ):
     """Polish one translated chapter through the configured polish provider."""
+    if pronoun_output is not None:
+        pronoun_output.clear()
     chapter_id = chapter.get("id", f"chapter_{chapter_number}")
     raw_title = chapter.get("title", "")
     raw_content = chapter.get("content", "")
@@ -57,6 +64,19 @@ def polish_translation(
                 }
             )
         role, task = runtime.project_polish_prompt()
+        pronoun_instructions = ""
+        pronoun_format = ""
+        if pronoun_output is not None and runtime.enabled("pronouns"):
+            roster_path = default_characters_file(pronouns_file) if pronouns_file else characters_md_path
+            resolver = NameResolver(load_character_roster(roster_path))
+            pronoun_instructions = f"""
+## Xuất xưng hô sau hiệu đính
+Sau khi hiệu đính, trích xuất xưng hô thực tế trong bản hoàn chỉnh ở ###CONTENT###.
+Không sao chép các cặp chỉ có trong bộ nhớ nhưng không xuất hiện trong hội thoại chương này.
+Đặt toàn bộ JSON vào mục ###PRONOUNS### riêng, không đưa vào nội dung truyện.
+{build_pronoun_instructions(resolver)}
+"""
+            pronoun_format = '\n###PRONOUNS###\n<JSON object có "character_pairs" theo cấu trúc trên>'
         prompt = runtime.wrap_r19_prompt(f"""# Vai trò hiệu đính
 {role}
 
@@ -79,12 +99,13 @@ Tiêu đề: {raw_title}
 ## Bản dịch cần hiệu đính
 Tiêu đề: {title_cur}
 {content_cur}
+{pronoun_instructions}
 
 Chỉ trả về:
 ###TITLE###
 <tiêu đề hoàn chỉnh>
 ###CONTENT###
-<nội dung hoàn chỉnh>
+<nội dung hoàn chỉnh>{pronoun_format}
 ###END###""")
         if tmp_characters:
             prompt = runtime.with_character_document_instruction(prompt)
@@ -96,7 +117,9 @@ Chỉ trả về:
                 text, provider, effective_model = runtime.generate(
                     "polish", prompt, attachments
                 )
-                if "###TITLE###" not in text or "###CONTENT###" not in text:
+                try:
+                    title_out, content_out, payload = parse_polish_output(text)
+                except ValueError:
                     print("[POLISH] Output sai format -- giữ nguyên bản dịch cũ.")
                     runtime.log_api_call(
                         chapter_id,
@@ -108,12 +131,6 @@ Chỉ trả về:
                         attachments=attachments,
                     )
                     return title_cur, content_cur
-                title_marker = text.find("###TITLE###") + len("###TITLE###")
-                content_marker = text.find("###CONTENT###")
-                title_out = text[title_marker:content_marker].strip()
-                content_out = text[content_marker + len("###CONTENT###") :].strip()
-                if content_out.endswith("###END###"):
-                    content_out = content_out[: -len("###END###")].rstrip()
                 if "_image_markers" in chapter:
                     validate_image_markers(content_out, chapter["_image_markers"], title_out)
                 runtime.log_api_call(
@@ -129,6 +146,8 @@ Chỉ trả về:
                     f"[POLISH] Đã biên tập chương {chapter_number} "
                     f"({len(content_out)} ký tự)"
                 )
+                if pronoun_output is not None and payload is not None:
+                    pronoun_output.update(payload)
                 return title_out, content_out
             except Exception as error:
                 message = str(error)

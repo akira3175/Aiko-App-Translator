@@ -34,3 +34,46 @@ class SliderTests(unittest.TestCase):
         picker = Mock()
         picker.find_element.return_value.find_element.return_value.get_attribute.return_value = '4'
         self.assertFalse(c._select_chatgpt_slider_option(Mock(), picker, 'Mức suy luận', ['cao']))
+
+    def test_five_step_slider_supports_low_medium_high_xhigh_and_max(self):
+        expectations = [
+            (["nhẹ nhàng"], "0"),
+            (["vừa"], "1"),
+            (["cao"], "2"),
+            (["chuyên sâu"], "3"),
+            (["max"], "4"),
+        ]
+        for keywords, expected_val in expectations:
+            with self.subTest(keywords=keywords):
+                picker, control, slider = Mock(), Mock(), Mock()
+                picker.find_element.return_value = control
+                control.find_element.return_value = slider
+                state = {"aria-valuemin": "0", "aria-valuemax": "4", "aria-valuenow": "1"}
+                slider.get_attribute.side_effect = state.get
+
+                def press(key):
+                    delta = 1 if key == Keys.ARROW_RIGHT else -1
+                    state["aria-valuenow"] = str(int(round(float(state["aria-valuenow"]))) + delta)
+
+                control.send_keys.side_effect = press
+                with patch.object(c, "ActionChains"):
+                    self.assertTrue(
+                        c._select_chatgpt_slider_option(Mock(), picker, "Mức suy luận", keywords)
+                    )
+                self.assertEqual(state["aria-valuenow"], expected_val)
+
+    def test_fractional_slider_valuenow_is_rounded_cleanly(self):
+        picker, control, slider = Mock(), Mock(), Mock()
+        picker.find_element.return_value = control
+        control.find_element.return_value = slider
+        state = {"aria-valuemin": "0", "aria-valuemax": "4", "aria-valuenow": "0.850242"}
+        slider.get_attribute.side_effect = state.get
+        control.send_keys.side_effect = lambda _key: state.update({"aria-valuenow": "2"})
+        with patch.object(c, "ActionChains"):
+            self.assertTrue(c._select_chatgpt_slider_option(Mock(), picker, "Mức suy luận", ["cao"]))
+        self.assertEqual(state["aria-valuenow"], "2")
+        self.assertEqual(control.send_keys.call_count, 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

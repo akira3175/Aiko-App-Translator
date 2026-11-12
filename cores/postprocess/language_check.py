@@ -4,7 +4,7 @@ import os
 import time
 
 from cores.storage.project import load_json, save_json
-from cores.stages.outputs import parse_title_content
+from cores.postprocess.outputs import parse_polish_output
 from cores.chapters.images import IMAGE_INSTRUCTION, validate_image_markers
 
 
@@ -64,7 +64,7 @@ Nội dung dịch hiện tại:
             chapter_id_fix = chapter.get("id", f"chapter_{chapter_number}")
             text, provider, effective_model = runtime.generate("polish", prompt)
             if "###END###" in text:
-                title_out, content_out = parse_title_content(text, "Dịch lại")
+                title_out, content_out, _pronouns = parse_polish_output(text)
                 if "_image_markers" in chapter:
                     validate_image_markers(content_out, chapter["_image_markers"], title_out)
                 chapter["title_translation"] = title_out

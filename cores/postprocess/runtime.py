@@ -21,6 +21,7 @@ from cores.postprocess.review import (
     run_background_review as _run_review,
 )
 from cores.pronouns import update_pronoun_memory as _update_pronoun_memory
+from cores.pronouns.extraction import apply_pronoun_payload
 from cores.config.runtime import int_option, option
 from cores.stages.runtime import (
     TRANSPORT_OVERRIDES,
@@ -57,6 +58,7 @@ class PostprocessRuntime:
     _r19_placeholder_instruction = staticmethod(_r19_placeholder_instruction)
     project_polish_prompt = staticmethod(project_polish_prompt)
     with_character_document_instruction = staticmethod(with_character_document_instruction)
+    apply_pronoun_payload = staticmethod(apply_pronoun_payload)
 
     def provider(self, stage):
         return stage_provider(stage, get_option=option)
@@ -110,10 +112,12 @@ class PostprocessRuntime:
         self, chapter, chapter_number, context_text="", pronoun_context="",
         characters_md_path=CHARACTERS_MD, pronouns_file=None, model=None,
         thinking_level=None,
+        *, pronoun_output=None,
     ):
         return _polish_translation(
             self, chapter, chapter_number, context_text, pronoun_context,
             characters_md_path, pronouns_file, model, thinking_level,
+            pronoun_output=pronoun_output,
         )
 
     def fix_translation(
@@ -126,7 +130,8 @@ class PostprocessRuntime:
         )
 
     def update_pronoun_memory(
-        self, chapter_id, chapter_number, translation_text, pronouns_file
+        self, chapter_id, chapter_number, translation_text, pronouns_file,
+        source_text="",
     ):
         model, _thinking = self.model_and_thinking("pronouns")
         return _update_pronoun_memory(
@@ -137,6 +142,7 @@ class PostprocessRuntime:
             model=model,
             generate=lambda prompt: self.generate("pronouns", prompt)[0],
             switch_key=lambda: self.switch_key_for("pronouns"),
+            source_text=source_text,
         )
 
 

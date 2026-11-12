@@ -50,9 +50,16 @@ Bạn là trợ lý biên tập chuyên phân tích nhân vật trong tiểu thu
 - **Địa vị / Chức vụ**:
 - **Phe / Tổ chức**:
 
+### Xưng hô
+- **Đại từ dẫn truyện (ngôi thứ ba)**: (anh / cậu / hắn / gã / cô / nàng / con bé...)
+- **Tự xưng thường dùng**:
+- **Xưng hô với nhân vật quan trọng**: (Tên → tự xưng / gọi đối phương; ghi lý do nếu đặc biệt)
+
 ### Ghi chú dịch thuật
 - (Tên gốc, cách dịch đặc biệt, lưu ý khi dịch thoại...)
 ```
+
+Mục Xưng hô chỉ điền khi văn bản có căn cứ; chưa rõ thì để trống, không phỏng đoán.
 
 Bọc toàn bộ kết quả trong duy nhất một code block `markdown` để giữ nguyên các dấu `##`.
 Bên trong code block, bắt đầu bằng `###START###` và kết thúc bằng `###END###`.

@@ -1,8 +1,10 @@
 """Canonical application paths and runtime defaults."""
 
 from cores.config.browser import (
+    CHATGPT_SELECT_MODE,
     CHATGPT_SELECT_MODEL,
     CHATGPT_SELECT_THINKING,
+    LINK_AI_STUDIO,
     LINK_CHATGPT,
     LINK_GEMINI,
     SELECT_MODEL,

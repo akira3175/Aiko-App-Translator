@@ -1,6 +1,7 @@
 """Send prompts through ChatGPT Web and wait for the matching response."""
 
 import time
+from pathlib import Path
 
 from selenium.common.exceptions import (
     StaleElementReferenceException,
@@ -9,7 +10,12 @@ from selenium.common.exceptions import (
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 
-from cores.chatgpt.web_controls import select_chatgpt_model, select_chatgpt_thinking
+from cores.chatgpt.web_controls import (
+    select_chatgpt_mode,
+    select_chatgpt_model,
+    select_chatgpt_thinking,
+)
+from cores.config.runtime import option
 from cores.chatgpt.web_response import (
     copy_response_markdown,
     find_new_response as _find_new_chatgpt_response,
@@ -21,9 +27,25 @@ from cores.json_output import parse_complete_json_object
 
 
 END_MARKER_SETTLE_SECONDS = 3
+RESPONSE_TIMEOUT_SECONDS = 1800
+INCOMPLETE_RESPONSE_DIR = Path(__file__).resolve().parents[2] / ".runtime" / "chatgpt-incomplete"
+
+
+def _save_incomplete_response(text, attempt):
+    """Keep diagnostic text separate from accepted translation output."""
+    if not text:
+        return
+    try:
+        INCOMPLETE_RESPONSE_DIR.mkdir(parents=True, exist_ok=True)
+        path = INCOMPLETE_RESPONSE_DIR / f"{time.time_ns()}-attempt-{attempt}.txt"
+        path.write_text(text, encoding="utf-8")
+        print(f"[ChatGPT] Phản hồi chưa hoàn tất đã lưu tại: {path}")
+    except OSError as error:
+        print(f"[ChatGPT] Không lưu được phản hồi dang dở: {error}")
 
 INPUT_SELECTORS = (
     '#pending-home-input', '#prompt-textarea',
+    'div.ProseMirror[contenteditable="true"][data-composer-markdown]',
     'div[contenteditable="true"][data-placeholder]',
     'div[role="textbox"][contenteditable="true"]',
 )
@@ -89,6 +111,18 @@ def _settle_end_marker_response(
     )
 
 
+def _resolve_chatgpt_mode(chatgpt_mode=None):
+    if chatgpt_mode is not None:
+        if isinstance(chatgpt_mode, bool):
+            return "work" if chatgpt_mode else "chat"
+        value = str(chatgpt_mode).strip().lower()
+    else:
+        value = str(option("chatgpt_mode", "chat") or "chat").strip().lower()
+    if value in {"work", "cong viec", "công việc", "on", "true", "1", "task", "nhiem vu", "nhiệm vụ"}:
+        return "work"
+    return "chat"
+
+
 def generate_content(
     prompt,
     *,
@@ -100,6 +134,7 @@ def generate_content(
     max_retries=3,
     chatgpt_model=None,
     chatgpt_thinking=None,
+    chatgpt_mode=None,
     chat_url=None,
 ):
     """
@@ -111,8 +146,10 @@ def generate_content(
         chatgpt_model = default_model
     if chatgpt_thinking is None:
         chatgpt_thinking = default_thinking
+    effective_mode = _resolve_chatgpt_mode(chatgpt_mode)
 
     for attempt in range(max_retries):
+        partial_text = ""
         try:
             driver = get_driver()
             wait = WebDriverWait(driver, 60)
@@ -121,6 +158,11 @@ def generate_content(
             time.sleep(3)
 
             input_area = wait.until(_ready_input)
+            if not select_chatgpt_mode(driver, effective_mode):
+                print(
+                    f"⚠️ Không chuyển được chế độ ChatGPT '{effective_mode}'. "
+                    "Tiếp tục với chế độ hiện tại trên ChatGPT."
+                )
             if chatgpt_model and not select_chatgpt_model(driver, chatgpt_model):
                 print(
                     f"⚠️ Không chọn được model ChatGPT '{chatgpt_model}'. "
@@ -157,14 +199,12 @@ def generate_content(
             time.sleep(5)
 
             # ── Bước 4: Chờ response streaming hoàn tất ──
-            max_wait = 1600
-            min_response_length = 100
-            start_time = time.time()
+            start_time = time.monotonic()
             last_text = ""
             stable_count = 0
             response_turn = None
 
-            while time.time() - start_time < max_wait:
+            while time.monotonic() - start_time < RESPONSE_TIMEOUT_SECONDS:
                 current_text = ""
                 try:
                     if response_turn is None:
@@ -179,6 +219,8 @@ def generate_content(
                     continue
 
                 current_len = len(current_text) if current_text else 0
+                if current_text:
+                    partial_text = current_text
                 last_len = len(last_text) if last_text else 0
 
                 if current_len > last_len:
@@ -222,12 +264,6 @@ def generate_content(
                             "\n⚠️ AI đã dừng stream 30s nhưng chưa thấy ###END###. Bạn có thể bấm 'Continue generating' nếu cần. Script sẽ đợi tối đa 30 phút..."
                         )
 
-                    # Nếu chưa thấy ###END###, đợi tối đa 30 phút (1800s)
-                    elif stable_count >= 1800 and current_len >= min_response_length:
-                        print(
-                            "\n✅ Streaming hoàn tất (không thấy END, ngừng do đợi quá 30 phút)."
-                        )
-                        return copy_response_markdown(driver, response_token, old_assistant_count)
                 else:
                     stable_count = 0
                     last_text = current_text
@@ -235,13 +271,14 @@ def generate_content(
                 time.sleep(1)
 
             if last_text:
-                return copy_response_markdown(driver, response_token, old_assistant_count)
-            raise TimeoutException("Timeout chờ ChatGPT response")
+                raise TimeoutException("ChatGPT chưa hoàn tất sau 30 phút: thiếu ###END### hoặc JSON hợp lệ.")
+            raise TimeoutException("Timeout chờ ChatGPT response hoàn tất sau 30 phút")
 
         except ChatGPTComposerError:
             # Keep the browser open for inspection; do not retry a UI mismatch.
             raise
         except Exception as e:
+            _save_incomplete_response(partial_text, attempt + 1)
             print(f"⚠️ Lỗi Selenium lần {attempt + 1}/{max_retries}: {e}")
             close_driver(close_orphans=True)
             if attempt < max_retries - 1:

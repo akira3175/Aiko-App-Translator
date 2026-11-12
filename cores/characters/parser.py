@@ -19,7 +19,7 @@ def _restore_rendered_character_headings(text: str) -> str:
             lines[index] = f"## {line.strip()}"
     for index, line in enumerate(lines):
         section = line.strip().lstrip("#").strip().casefold()
-        if section in {"thông tin cơ bản", "ghi chú dịch thuật"}:
+        if section in {"thông tin cơ bản", "xưng hô", "ghi chú dịch thuật"}:
             lines[index] = f"### {line.strip().lstrip('#').strip()}"
     return "\n".join(lines)
 

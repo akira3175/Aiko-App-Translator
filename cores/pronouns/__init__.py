@@ -14,13 +14,25 @@ from cores.pronouns.extraction import (
     update_pronoun_memory,
 )
 from cores.pronouns.matching import _name_matches_glossary
+from cores.pronouns.normalize import (
+    NameResolver,
+    clean_pronoun,
+    group_directions,
+    load_character_roster,
+    resolve_direction,
+)
 from cores.pronouns.storage import load_pronouns, save_pronouns
 
 
 __all__ = [
+    "NameResolver",
+    "clean_pronoun",
     "extract_pronouns_from_translation",
     "format_pronoun_context",
+    "group_directions",
+    "load_character_roster",
     "load_pronouns",
+    "resolve_direction",
     "save_pronouns",
     "update_pronoun_memory",
 ]

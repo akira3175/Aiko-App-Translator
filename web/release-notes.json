@@ -1,6 +1,19 @@
 {
   "versions": [
     {
+        "version":  "1.4.11",
+        "date":  "2026-11-12",
+        "title":  "Xưng hô nhất quán \u0026 cải thiện điều khiển AI",
+        "summary":  "Cải thiện bộ nhớ xưng hô, kết hợp hiệu đính với cập nhật xưng hô và bổ sung tùy chọn cho các dịch vụ AI.",
+        "highlights":  [
+                           "Xưng hô nhất quán hơn: nhận diện tên và biệt danh tốt hơn, theo dõi cách xưng hô của từng nhân vật với nhau và giữ nguyên các cặp đã khóa.",
+                           "Sửa lịch sử xưng hô an toàn hơn: cảnh báo khi dữ liệu đã thay đổi, tránh ghi đè nhầm trong lúc ứng dụng đang dịch.",
+                           "Hiệu đính kết hợp cập nhật xưng hô: giảm lượt gọi AI bằng cách lấy thông tin xưng hô ngay từ kết quả hiệu đính; tự trích xuất lại nếu nội dung bản dịch thay đổi sau đó.",
+                           "Cải thiện điều khiển ChatGPT và Gemini: hỗ trợ thêm lựa chọn model, chế độ hoạt động và mức suy luận.",
+                           "Google AI Studio: hỗ trợ sử dụng đường dẫn cuộc trò chuyện đã lưu."
+                       ]
+    },
+    {
       "version": "1.4.10",
       "date": "2026-10-20",
       "title": "Chủ đề Anime Pastel & Nâng cấp Gemini Web",

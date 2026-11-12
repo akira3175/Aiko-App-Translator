@@ -2,7 +2,7 @@ const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
 
 export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSetting,markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast,onReviewsChanged=()=>{}}) {
-  let pronounEditIndex=null;
+  let pronounEdit=null;
   let reviewLoadingChapter=null;
   let contextPreviewRevision=0;
 
@@ -118,7 +118,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     if(!pair)return;
     const latest=recordIndex===null?(pair.latest||{}):(pair.timeline||[]).find(item=>item.record_index===Number(recordIndex));
     if(!latest)return toast('Không tìm thấy mốc lịch sử xưng hô');
-    pronounEditIndex=latest.record_index;
+    pronounEdit={project:state.project,projectRevision:state.projectRevision,key:pair.key,revision:pair.revision,timelineIndex:latest.record_index,speaker:latest.speaker||'',listener:latest.listener||''};
     $('#pronounModalTitle').textContent=`${pronounPairLabel(pair)} · Chương ${latest.chapter_number??'—'}`;
     $('#pronounSpeaker').value=latest.speaker||'';
     $('#pronounListener').value=latest.listener||'';
@@ -131,10 +131,14 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
   }
 
   async function savePronounEdit() {
-    if(!state.pronounCurrent)return;
+    const edit=pronounEdit;
+    if(!edit)return;
+    if(state.project!==edit.project||state.projectRevision!==edit.projectRevision)return toast('Truyện đang mở đã thay đổi. Hãy mở lại mốc xưng hô cần sửa.');
     const button=$('#savePronounEdit');button.disabled=true;button.textContent='Đang lưu…';
     try {
-      state.pronouns=await api('/api/pronouns?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({key:state.pronounCurrent,timeline_index:pronounEditIndex,expected_speaker:$('#pronounSpeaker').value,expected_listener:$('#pronounListener').value,speaker_self:$('#pronounSelf').value,speaker_to_listener:$('#pronounToListener').value,relationship_status:$('#pronounRelationship').value,emotional_tone:$('#pronounTone').value,locked:$('#pronounLocked').checked})});
+      const data=await api('/api/pronouns?project='+encodeURIComponent(edit.project),{method:'POST',body:JSON.stringify({key:edit.key,expected_revision:edit.revision,timeline_index:edit.timelineIndex,expected_speaker:edit.speaker,expected_listener:edit.listener,speaker_self:$('#pronounSelf').value,speaker_to_listener:$('#pronounToListener').value,relationship_status:$('#pronounRelationship').value,emotional_tone:$('#pronounTone').value,locked:$('#pronounLocked').checked})});
+      if(state.project!==edit.project||state.projectRevision!==edit.projectRevision||pronounEdit!==edit)return;
+      state.pronouns=data;state.pronounCurrent=edit.key;pronounEdit=null;
       $('#pronounModal').classList.remove('open');renderPronouns();toast('Đã lưu quy tắc xưng hô · Có bản sao .bak');
     } catch(error){toast(error.message);}
     finally{button.disabled=false;button.textContent='Lưu quy tắc';}
@@ -144,7 +148,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     const pair=(state.pronouns.pairs||[]).find(item=>item.key===state.pronounCurrent);
     if(!pair||!confirm(`Xóa toàn bộ lịch sử “${pronounPairLabel(pair)}”?`))return;
     try {
-      state.pronouns=await api('/api/pronouns?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({action:'delete',key:pair.key})});
+      state.pronouns=await api('/api/pronouns?project='+encodeURIComponent(state.project),{method:'POST',body:JSON.stringify({action:'delete',key:pair.key,expected_revision:pair.revision})});
       state.pronounCurrent=state.pronouns.pairs[0]?.key||null;renderPronouns();toast('Đã xóa cặp xưng hô · Có thể khôi phục từ .bak');
     } catch(error){toast(error.message);}
   }
@@ -448,7 +452,7 @@ export function createProjectMemoryFeature({api,escapeHtml,executePipeline,getSe
     };
     $('#pronounSearch').oninput=renderPronouns;
     $('#pronounFilter').onchange=renderPronouns;
-    $('#cancelPronounEdit').onclick=()=>$('#pronounModal').classList.remove('open');
+    $('#cancelPronounEdit').onclick=()=>{pronounEdit=null;$('#pronounModal').classList.remove('open');};
     $('#savePronounEdit').onclick=savePronounEdit;
     $('#contextModal .context-tabs').insertAdjacentHTML('beforeend','<button type="button" role="tab" data-context-tab="context-prompt">Tạo Context</button>');
     $('#contextModal .context-modal-actions').insertAdjacentHTML('beforebegin',`<div class="context-tab-pane" data-context-pane="context-prompt"><label class="context-field"><span>Hướng dẫn cho AI</span><textarea id="contextGenerationInstructions" maxlength="20000" rows="12" spellcheck="false"></textarea><small>Lưu riêng theo truyện. App tự thêm nguyên tác, glossary và định dạng đầu ra. Tác vụ này chỉ tạo glossary; ghi chú phong cách được chỉnh ở tab Văn phong.</small></label><div class="context-generation-actions"><button class="secondary" type="button" id="resetContextGeneration">Khôi phục mặc định</button><label class="context-field"><span>Số chương xem trước</span><input type="number" id="contextGenerationBatch" min="1" max="100" value="30"></label><button class="secondary" type="button" id="previewContextGeneration">Xem prompt đầy đủ</button></div><p id="contextGenerationPreviewStatus" role="status"></p><label class="context-field"><span>Prompt đầy đủ</span><textarea id="contextGenerationPreview" rows="12" readonly spellcheck="false"></textarea></label></div>`);
