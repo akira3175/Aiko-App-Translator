@@ -175,6 +175,7 @@ def generate_content(
     web_model="pro",
     thinking_level=None,
     task_mode=None,
+    force_upload=False,
 ):
     """
     Gửi prompt đến Gemini web và lấy response.
@@ -268,13 +269,15 @@ def generate_content(
             time.sleep(0.5)
             threshold = _upload_threshold()
             uploaded = False
-            if threshold and len(prompt) > threshold:
+            if force_upload or (threshold and len(prompt) > threshold):
                 print(f"📎 Prompt dài {len(prompt)} ký tự → gửi dưới dạng {UPLOAD_FILE_NAME}...")
                 try:
                     uploaded = _upload_prompt_file(driver, input_area, prompt)
                 except Exception as e:
                     print(f"⚠️ Upload file lỗi: {e}")
                 if not uploaded:
+                    if force_upload:
+                        raise ValueError('Không đính kèm được toàn bộ TXT. Hãy thử lại hoặc dùng cách tách thường.')
                     print("⚠️ Không xác nhận được file đã gắn, quay về dán text.")
             # Thay vì dùng pyperclip và phím tắt dán (chiếm OS clipboard), ta dùng js execCommand
             _insert_text(driver, input_area, _upload_instruction() if uploaded else prompt)

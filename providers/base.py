@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 
-STAGES = ("translate", "polish", "pronouns", "review", "glossary", "characters")
+STAGES = ("translate", "polish", "pronouns", "review", "glossary", "characters", "import")
 
 
 @dataclass(frozen=True)

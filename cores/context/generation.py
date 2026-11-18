@@ -4,6 +4,7 @@ import time
 
 from cores.gemini import switch_api_key
 from cores.context.prompts import build_glossary_prompt
+from cores.context.merge import parse_glossary
 from cores.config.runtime import int_option, option
 from cores.stages import (
     browser_lifecycle as stage_browser_lifecycle,
@@ -51,9 +52,8 @@ def generate_glossary(chapters, old_glossary, instructions=None):
                 get_option=option,
                 overrides=TRANSPORT_OVERRIDES,
             )[0].text.strip()
-            if "###START###" in response and "###END###" in response:
-                return response
-            print("⚠️ Kết quả thiếu marker START/END.")
+            parse_glossary(response)
+            return response
         except Exception as error:
             print(f"⚠️ Lỗi tạo Context qua {provider}: {error}")
             if provider == "gemini-api" and (

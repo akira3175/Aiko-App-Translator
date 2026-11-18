@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "1.4.13",
+      "date": "2026-11-19",
+      "title": "Tách chương TXT bằng AI và chọn vị trí dịch",
+      "summary": "Thêm tách chương TXT bằng AI (Beta), chọn chương bắt đầu dịch và cải thiện cập nhật glossary.",
+      "highlights": [
+        "Thêm Tách chương TXT bằng AI (Beta), hỗ trợ nhiều kiểu tiêu đề chương. Chọn engine và model tại Cài đặt → Nhập truyện.",
+        "Cho phép chọn chương bắt đầu dịch. App tự bỏ qua các chương đã dịch và tiếp tục cho đủ số chương đã chọn.",
+        "Khi tạo Context, AI có thể bổ sung thuật ngữ mới và sửa các mục có sẵn trong glossary."
+      ]
+    },
+    {
       "version": "1.4.12",
       "date": "2026-11-18",
       "title": "Duyệt hiệu đính trực tiếp & log gọn hơn",

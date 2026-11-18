@@ -11,10 +11,13 @@ class GeminiWebProvider(ProviderAdapter):
         prompt = request.prompt
         if request.stage != "translate":
             prompt = prompt_with_attachments(prompt, request.attachments)
+        options = dict(request.options)
+        if request.stage == 'import':
+            options.update(force_upload=True, max_retries=1)
         text = self._generate(
             prompt,
             web_model=request.model,
             thinking_level=request.thinking,
-            **request.options,
+            **options,
         )
         return ProviderResponse(str(text or ""), self.id, request.model)

@@ -214,14 +214,15 @@ async function createProject() {
   const format=file.name.toLowerCase().endsWith('.epub')?'epub':file.name.toLowerCase().endsWith('.txt')?'txt':'';
   if(!format)return toast('File phải có định dạng EPUB hoặc TXT');
   if(!Number.isInteger(segmentLimit)||segmentLimit<500||segmentLimit>50000)return toast('Giới hạn segment phải từ 500 đến 50.000');
-  button.disabled=true; button.textContent=`Đang tách ${format.toUpperCase()}…`;
+  const splitMethod=format==='txt'?$('#newProjectSplitMethod').value:'auto';
+  button.disabled=true; $('#cancelNewProject').disabled=true; button.textContent=splitMethod==='ai'?'AI đang đọc và tách TXT…':`Đang tách ${format.toUpperCase()}…`;
   try {
-    const query=new URLSearchParams({name,volume,format,segment_limit:String(segmentLimit)});
+    const query=new URLSearchParams({name,volume,format,segment_limit:String(segmentLimit),split_method:splitMethod});
     const result=await api('/api/projects?'+query,{method:'POST',headers:{'Content-Type':format==='epub'?'application/epub+zip':'text/plain;charset=utf-8'},body:file});
     $('#newProjectModal').classList.remove('open');
     await loadProjects(); await selectProject(result.project);
     toast(`Đã tạo ${result.chapters} chương · ${result.segments} segment`);
-  } catch(error){toast(error.message);} finally {button.disabled=false;button.textContent='Tạo và tách truyện';}
+  } catch(error){toast(error.message);} finally {button.disabled=false;$('#cancelNewProject').disabled=false;button.textContent='Tạo và tách truyện';}
 }
 
 async function saveChapter() {

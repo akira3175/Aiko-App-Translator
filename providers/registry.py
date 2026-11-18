@@ -13,41 +13,41 @@ PROVIDERS = {
     "gemini-api": {
         "label": "Gemini API",
         "capabilities": ProviderCapabilities(
-            ("translate", "polish", "pronouns", "review", "glossary", "characters"),
+            ("translate", "polish", "pronouns", "review", "glossary", "characters", "import"),
             batch=True, attachments=True, thinking=True, streaming=True,
         ),
     },
     "gemini-web": {
         "label": "Gemini Web",
         "capabilities": ProviderCapabilities(
-            ("translate", "polish", "pronouns", "review", "glossary", "characters"), browser=True, batch=True, thinking=True,
+            ("translate", "polish", "pronouns", "review", "glossary", "characters", "import"), browser=True, batch=True, thinking=True,
         ),
     },
     "google-ai-studio-web": {
         "label": "Google AI Studio Web",
         "capabilities": ProviderCapabilities(
-            ("translate", "polish", "pronouns", "review", "glossary", "characters"),
+            ("translate", "polish", "pronouns", "review", "glossary", "characters", "import"),
             browser=True, batch=True, attachments=True, thinking=True,
         ),
     },
     "openai-api": {
         "label": "OpenAI API",
         "capabilities": ProviderCapabilities(
-            ("translate", "polish", "pronouns", "review", "glossary", "characters"),
+            ("translate", "polish", "pronouns", "review", "glossary", "characters", "import"),
             attachments=True, thinking=True,
         ),
     },
     "chatgpt-web": {
         "label": "ChatGPT Web",
         "capabilities": ProviderCapabilities(
-            ("translate", "polish", "pronouns", "review", "glossary", "characters"),
+            ("translate", "polish", "pronouns", "review", "glossary", "characters", "import"),
             browser=True, batch=True, attachments=True, thinking=True,
         ),
     },
     "chatgpt-plan": {
         "label": "ChatGPT Plan",
         "capabilities": ProviderCapabilities(
-            ("translate", "polish", "pronouns", "review", "glossary", "characters"),
+            ("translate", "polish", "pronouns", "review", "glossary", "characters", "import"),
             attachments=True, thinking=True, streaming=True,
         ),
     },

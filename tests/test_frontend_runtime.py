@@ -1,9 +1,24 @@
+import json
 import subprocess
 import unittest
 from pathlib import Path
 
 
 class FrontendRuntimeTests(unittest.TestCase):
+    def test_ai_import_controls_settings_and_error_recovery(self):
+        from services.settings_schema import SETTING_DEFAULTS, SETTING_LABELS, SETTING_META
+        items = [{'key': key, 'value': value, 'default': value,
+                  'label': SETTING_LABELS[key], 'type': 'text',
+                  **SETTING_META.get(key, {'group': 'general'})}
+                 for key, value in SETTING_DEFAULTS.items()]
+        result = subprocess.run(
+            ['node', 'tests/ai_import_ui_check.mjs'],
+            cwd=Path(__file__).resolve().parents[1], input=json.dumps(items),
+            capture_output=True, text=True, encoding='utf-8', timeout=15,
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn('ai-import-ui-ok', result.stdout)
+
     def test_app_modules_initialize_without_runtime_error(self):
         root = Path(__file__).resolve().parents[1]
         result = subprocess.run(

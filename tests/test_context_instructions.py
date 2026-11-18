@@ -55,3 +55,42 @@ class ContextInstructionsTests(unittest.TestCase):
             run_context_generation(engine_name='test',setup_browser=None,close_browser=None,generate_glossary=generate,raw_dir=project/'raw',context_file=project/'context.json',batch_size=1)
         self.assertEqual(['First rule','Next rule'],seen)
         self.assertEqual('Next rule',load_context(project)['context_instructions'])
+
+    def test_workflow_replaces_glossary_and_feeds_next_batch(self):
+        project = self.root / 'A'
+        save_context(project, {'index': 0, 'glossary': 'Name = Sai\nKeep = Giữ'})
+        seen = []
+        corrected = 'Name = Đúng\nKeep = Giữ'
+
+        def generate(batch, old, instructions=None):
+            seen.append(old)
+            return f'###START###\n{corrected}\n###END###'
+
+        with patch('cores.context.workflow.time.sleep'):
+            run_context_generation(
+                engine_name='test', setup_browser=None, close_browser=None,
+                generate_glossary=generate, raw_dir=project/'raw',
+                context_file=project/'context.json', batch_size=1,
+            )
+        self.assertEqual(['Name = Sai\nKeep = Giữ', corrected], seen)
+        self.assertEqual(corrected, load_context(project)['glossary'])
+        self.assertEqual(2, load_context(project)['index'])
+
+    def test_invalid_output_preserves_glossary_and_progress(self):
+        project = self.root / 'A'
+        original = {'index': 0, 'glossary': 'Name = Ten'}
+        for response in ('', '###START###\n###END###',
+                         '###START###\nName = New',
+                         '###START###\nName = New\nGiải thích\n###END###',
+                         '###END###\nName = New\n###START###',
+                         '###START###\nName = \n###END###'):
+            with self.subTest(response=response):
+                save_context(project, original)
+                with self.assertRaises(ValueError):
+                    run_context_generation(
+                        engine_name='test', setup_browser=None, close_browser=None,
+                        generate_glossary=lambda *args, **kwargs: response,
+                        raw_dir=project/'raw', context_file=project/'context.json',
+                        batch_size=1,
+                    )
+                self.assertEqual(original, load_context(project))

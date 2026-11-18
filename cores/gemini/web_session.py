@@ -91,7 +91,7 @@ class GeminiWebSession:
                 pass
         self.driver = None
 
-    def setup(self, skip_login_prompt=False, input_func=input):
+    def setup(self, skip_login_prompt=False, input_func=input, link="https://gemini.google.com/app"):
         print("\n" + "=" * 60)
         print("🔧 CHẾ ĐỘ CÀI ĐẶT GEMINI")
         print("=" * 60)
@@ -100,8 +100,8 @@ class GeminiWebSession:
         print("  2. Truy cập gemini.google.com và cấu hình (nếu cần)")
         print("  3. Chọn model, cài đặt ngôn ngữ, v.v...")
         print("=" * 60 + "\n")
-        self.get_driver().get("https://gemini.google.com/app")
-        print("🌐 Trình duyệt đã mở tại: https://gemini.google.com/app")
+        self.get_driver().get(link)
+        print(f"🌐 Trình duyệt đã mở tại: {link}")
         print("\n🔔 Sau khi đăng nhập và cài đặt xong, nhấn ENTER để bắt đầu dịch...")
         if not skip_login_prompt:
             input_func()

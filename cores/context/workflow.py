@@ -65,8 +65,7 @@ def run_context_generation(
                 batch, prompt_context.get("glossary", ""),
                 instructions=prompt_context.get('context_instructions'),
             )
-            # AI có thể chạy lâu; đọc lại sau khi nhận kết quả để giữ các chỉnh sửa
-            # người dùng vừa lưu trong lúc batch đang xử lý.
+            # Đọc lại để giữ metadata mới nhất; glossary được thay bằng bản AI trả về.
             latest_context = load_context(project_dir)
             old_context = merge_context(latest_context, new_glossary)
             old_context["index"] = start_chapter + offset + len(batch)

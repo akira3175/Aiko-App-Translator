@@ -27,6 +27,41 @@ class _Handler:
 
 
 class ProjectRouteTests(unittest.TestCase):
+    def test_ai_import_preview_passes_method_to_service(self):
+        with tempfile.TemporaryDirectory() as directory:
+            calls = []
+            def preview(project, fmt, limit, content, **kwargs):
+                calls.append((project, fmt, limit, b''.join(content), kwargs))
+                return {'token': 'ai-preview'}
+            routes = self._routes(Path(directory), import_preview=preview)
+            handler = _Handler()
+            handler.headers = {'Content-Length': '4'}
+            handler.rfile = io.BytesIO(b'text')
+            routes.handle_post(handler, '/api/chapters/import-preview', {
+                'project': ['Demo'], 'format': ['txt'], 'split_method': ['ai']})
+            self.assertEqual(200, handler.responses[-1][0])
+            self.assertEqual([('Demo', 'txt', 5000, b'text', {'split_method': 'ai'})], calls)
+
+    def test_new_project_uses_ai_splitter_when_requested(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            routes = self._routes(root)
+            handler = _Handler()
+            handler.headers = {'Content-Length': '4'}
+            handler.rfile = io.BytesIO(b'text')
+            def split(source, volume, base, **kwargs):
+                self.assertEqual('text', Path(source).read_text())
+                raw = Path(kwargs['project_dir']) / 'raw'
+                raw.mkdir()
+                (raw / 'v1_c0_s1.md').write_text('# Heading\n\nBody')
+                return {'chapters': 1, 'segments': 1, 'split_method': 'ai'}
+            with patch('split.ai_txt.split_txt_with_ai', side_effect=split) as mocked:
+                routes.handle_post(handler, '/api/projects', {
+                    'name': ['Demo'], 'format': ['txt'], 'split_method': ['ai']})
+            self.assertEqual(201, handler.responses[-1][0], handler.responses)
+            self.assertEqual(1, mocked.call_count)
+            self.assertFalse((root / 'Demo' / '.import.txt').exists())
+
     def test_large_upload_streams_through_create_and_preview(self):
         size = 301 * 1024 * 1024 + 7
 

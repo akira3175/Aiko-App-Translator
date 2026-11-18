@@ -48,7 +48,16 @@ def run_single_translation(
         return
 
     target_chapter = str(option("target_chapter", "") or "").strip()
+    start_chapter = str(option("start_chapter", "") or "").strip()
+    start_index = 0
+    if start_chapter:
+        names = [os.path.basename(path) for path in raw_files]
+        if start_chapter not in names:
+            raise ValueError('Chương bắt đầu không còn tồn tại; hãy chọn lại vị trí dịch.')
+        start_index = names.index(start_chapter)
     for index, raw_path in enumerate(raw_files):
+        if index < start_index:
+            continue
         if target_chapter and os.path.basename(raw_path) != target_chapter:
             continue
         current_chapter_id = chapter_id(raw_path)

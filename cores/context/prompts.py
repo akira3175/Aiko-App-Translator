@@ -10,7 +10,7 @@ Trích xuất thuật ngữ, danh hiệu, xưng hô, tên riêng và địa danh
 - Bỏ qua từ phổ thông và vật dụng đời thường.
 - Giữ nguyên chính xác từ/cụm từ nguồn ở vế trái.
 - Chỉ khôi phục tên La-tinh gốc khi có căn cứ chắc chắn.
-- Dịch thuật ngữ và danh hiệu sang tiếng Việt tự nhiên, thống nhất với glossary cũ.
+- Dịch thuật ngữ và danh hiệu sang tiếng Việt tự nhiên; sửa cách dịch cũ nếu nội dung cho thấy sai.
 - Tên riêng viết hoa từng âm tiết; danh từ và chức vị thông thường viết thường."""
 
 
@@ -37,6 +37,11 @@ Glossary hiện có:
 Nội dung raw:
 {content}
 
+Trả về TOÀN BỘ glossary sau cập nhật để ghi đè bản hiện có, không chỉ các mục mới.
+Giữ lại các mục cũ vẫn đúng, kể cả khi không xuất hiện trong batch này.
+Được sửa hoặc thay thế mục cũ sai dựa trên nội dung raw, thêm mục mới và bỏ mục trùng.
+Mỗi nguyên văn chỉ có một cách dịch cuối cùng; không giữ đồng thời bản sai và bản đã sửa.
+Nếu không cần thay đổi, trả lại toàn bộ glossary hiện có.
 Chỉ xuất mỗi dòng theo dạng:
 Nguyên văn = Bản dịch
 

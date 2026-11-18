@@ -4,6 +4,7 @@ const $=selector=>document.querySelector(selector);
 const $$=selector=>[...document.querySelectorAll(selector)];
 const settingValue=input=>input.type==='checkbox'?(input.checked?'on':'off'):input.value;
 const settingsGroups={
+  import:['Nhập truyện','Chọn engine và model dùng khi tách TXT bằng AI. AI chỉ xác định vị trí chương; nội dung được lấy từ file gốc.'],
   pipeline:['Quy trình dịch','Chọn engine, model và mức suy nghĩ cho từng công đoạn.'],
   'gemini-api':['Gemini API','Model và thông số sinh nội dung khi dịch, hậu dịch và review qua API.'],
   'gemini-web':['Gemini Web','Gem, model và mức suy nghĩ khi tự động hóa trình duyệt Gemini.'],
@@ -102,27 +103,27 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
     const providerDefaults={
       'gemini-api':{
         translate:['translate_model','gemini_api_thinking'],polish:['polish_model','gemini_api_thinking'],
-        pronouns:['pronoun_model','gemini_api_thinking'],review:['review_bg_model','gemini_api_thinking'],context:['context_model','gemini_api_thinking'],characters:['translate_model','gemini_api_thinking'],
+        pronouns:['pronoun_model','gemini_api_thinking'],review:['review_bg_model','gemini_api_thinking'],context:['context_model','gemini_api_thinking'],characters:['translate_model','gemini_api_thinking'],import:['translate_model','gemini_api_thinking'],
       },
       'gemini-web':{
         translate:['gemini_web_model','gemini_thinking'],polish:['gemini_web_model','gemini_thinking'],
-        pronouns:['gemini_web_model','gemini_thinking'],review:['gemini_web_model','gemini_thinking'],context:['gemini_web_model','gemini_thinking'],characters:['gemini_web_model','gemini_thinking'],
+        pronouns:['gemini_web_model','gemini_thinking'],review:['gemini_web_model','gemini_thinking'],context:['gemini_web_model','gemini_thinking'],characters:['gemini_web_model','gemini_thinking'],import:['gemini_web_model','gemini_thinking'],
       },
       'google-ai-studio-web':{
         translate:['ai_studio_model','ai_studio_thinking'],polish:['ai_studio_model','ai_studio_thinking'],
-        pronouns:['ai_studio_pronoun_model','ai_studio_thinking'],review:['ai_studio_review_model','ai_studio_thinking'],context:['ai_studio_model','ai_studio_thinking'],characters:['ai_studio_model','ai_studio_thinking'],
+        pronouns:['ai_studio_pronoun_model','ai_studio_thinking'],review:['ai_studio_review_model','ai_studio_thinking'],context:['ai_studio_model','ai_studio_thinking'],characters:['ai_studio_model','ai_studio_thinking'],import:['ai_studio_model','ai_studio_thinking'],
       },
       'openai-api':{
         translate:['gpt_api_translate_model','gpt_api_translate_effort'],polish:['gpt_api_polish_model','gpt_api_polish_effort'],
-        pronouns:['gpt_api_pronoun_model','gpt_api_polish_effort'],review:['gpt_api_review_model','gpt_api_review_effort'],context:['gpt_api_translate_model','gpt_api_translate_effort'],characters:['gpt_api_translate_model','gpt_api_translate_effort'],
+        pronouns:['gpt_api_pronoun_model','gpt_api_polish_effort'],review:['gpt_api_review_model','gpt_api_review_effort'],context:['gpt_api_translate_model','gpt_api_translate_effort'],characters:['gpt_api_translate_model','gpt_api_translate_effort'],import:['gpt_api_translate_model','gpt_api_translate_effort'],
       },
       'chatgpt-web':{
         translate:['chatgpt_model','chatgpt_thinking'],polish:['chatgpt_model','chatgpt_thinking'],
-        pronouns:['chatgpt_model','chatgpt_thinking'],review:['chatgpt_model','chatgpt_thinking'],context:['chatgpt_model','chatgpt_thinking'],characters:['chatgpt_model','chatgpt_thinking'],
+        pronouns:['chatgpt_model','chatgpt_thinking'],review:['chatgpt_model','chatgpt_thinking'],context:['chatgpt_model','chatgpt_thinking'],characters:['chatgpt_model','chatgpt_thinking'],import:['chatgpt_model','chatgpt_thinking'],
       },
       'chatgpt-plan':{
         translate:['chatgpt_plan_model','chatgpt_plan_effort'],polish:['chatgpt_plan_model','chatgpt_plan_effort'],
-        pronouns:['chatgpt_plan_model','chatgpt_plan_effort'],review:['chatgpt_plan_model','chatgpt_plan_effort'],context:['chatgpt_plan_model','chatgpt_plan_effort'],characters:['chatgpt_plan_model','chatgpt_plan_effort'],
+        pronouns:['chatgpt_plan_model','chatgpt_plan_effort'],review:['chatgpt_plan_model','chatgpt_plan_effort'],context:['chatgpt_plan_model','chatgpt_plan_effort'],characters:['chatgpt_plan_model','chatgpt_plan_effort'],import:['chatgpt_plan_model','chatgpt_plan_effort'],
       },
     };
     const engineOptions=(stage,value)=>[['gemini-api','Gemini API'],['gemini-web','Gemini Web'],['google-ai-studio-web','Google AI Studio Web'],['openai-api','OpenAI API'],['chatgpt-web','ChatGPT Web'],['chatgpt-plan','ChatGPT Plan']].map(([key,label])=>{
@@ -141,10 +142,12 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       const modelField=provider.value==='chatgpt-plan'
         ? `<label class="python-setting"><span>Model</span><select data-python-setting="${model.key}" data-plan-stage-model="${stage}">${planModelOptions(model.value)}</select><small>Model của tài khoản ChatGPT dùng riêng cho ${label.toLowerCase()}.</small></label>`
         : renderSetting(model);
-      return `<details class="pipeline-stage-setting" data-pipeline-stage="${stage}" ${stage==='translate'?'open':''}><summary><strong>${label}</strong><span>${PROVIDER_LABELS[provider.value]||provider.value}</span></summary><div class="pipeline-stage-body"><label class="python-setting"><span>Engine</span><select data-python-setting="${provider.key}" data-stage-engine="${stage}">${engineOptions(stage,provider.value)}</select><small>Engine dùng riêng cho công đoạn này.</small></label>${modelField}${renderSetting(thinking)}</div></details>`;
+      return `<details class="pipeline-stage-setting" data-pipeline-stage="${stage}" ${stage==='translate'||stage==='import'?'open':''}><summary><strong>${label}</strong><span>${PROVIDER_LABELS[provider.value]||provider.value}</span></summary><div class="pipeline-stage-body"><label class="python-setting"><span>Engine</span><select data-python-setting="${provider.key}" data-stage-engine="${stage}">${engineOptions(stage,provider.value)}</select><small>Engine dùng riêng cho công đoạn này.</small></label>${modelField}${renderSetting(thinking)}</div></details>`;
     };
     $('#pythonSettingsFields').innerHTML=activeGroup==='pipeline'
       ? `<div class="pipeline-stage-list">${pipelineStage('Dịch','translate')}${pipelineStage('Hiệu đính','polish')}${pipelineStage('Xuất xưng hô','pronouns')}${pipelineStage('Review','review')}${pipelineStage('Tạo Context','context')}${pipelineStage('Hồ sơ nhân vật','characters')}</div>`
+      : activeGroup==='import'
+      ? `<div class="pipeline-stage-list">${pipelineStage('Tách TXT bằng AI','import')}</div>`
       : activeGroup==='publishing'&&settingFields
       ? `<details class="publishing-advanced"><summary>Cài đặt nâng cao: tài khoản Hako và kho ảnh</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
       : activeGroup==='sharing'&&settingFields
@@ -157,7 +160,7 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       $('#chatgptPlanDisconnect').onclick=disconnectChatgptPlan;
       loadChatgptPlanStatus();
     }
-    if(activeGroup==='pipeline'&&$$('[data-plan-stage-model]').length)ensurePlanModels();
+    if(['pipeline','import'].includes(activeGroup)&&$$('[data-plan-stage-model]').length)ensurePlanModels();
     $$('[data-settings-tab]').forEach(button=>button.onclick=()=>{
       $$('[data-python-setting]').forEach(input=>{ const item=items.find(entry=>entry.key===input.dataset.pythonSetting); if(item)item.value=settingValue(input); });
       activeGroup=button.dataset.settingsTab;

@@ -74,7 +74,14 @@ def _anchor_score(source_features, existing_features):
     return score if valid else 0
 
 
-def _splitter(source_format):
+def _splitter(source_format, split_method='auto'):
+    if split_method not in {'auto', 'ai'}:
+        raise ValueError('Cách tách chương không hợp lệ')
+    if split_method == 'ai':
+        if source_format != 'txt':
+            raise ValueError('Tách bằng AI chỉ hỗ trợ TXT')
+        from split.ai_txt import split_txt_with_ai
+        return split_txt_with_ai
     from split.chapter_splitter_novelpia_md import split_epub_to_md, split_txt_to_md
 
     return split_epub_to_md if source_format == "epub" else split_txt_to_md
@@ -89,6 +96,7 @@ def create_preview(
     segment_limit,
     content,
     splitter=None,
+    split_method='auto',
 ):
     if source_format not in {"epub", "txt"}:
         raise ValueError("Chỉ hỗ trợ file EPUB hoặc TXT")
@@ -100,7 +108,7 @@ def create_preview(
     upload = staging / f"source.{source_format}"
     try:
         write_upload(upload, content)
-        split = splitter or _splitter(source_format)
+        split = splitter or _splitter(source_format, split_method)
         result = split(
             str(upload),
             0,
@@ -170,6 +178,8 @@ def create_preview(
                     "segments": len(paths),
                     "match": f"v{matched[0]}_c{matched[1]}" if matched else "",
                     "match_score": round(best_score, 2) if matched else 0,
+                    **(result.get('chapter_details', [])[source_index]
+                       if source_index < len(result.get('chapter_details', [])) else {}),
                 }
             )
         mappings = {}

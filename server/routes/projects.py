@@ -152,7 +152,8 @@ class ProjectRoutes:
                 content = self._upload_body(handler)
                 handler.json_response(
                     self.import_preview(
-                        project, source_format, segment_limit, content
+                        project, source_format, segment_limit, content,
+                        **({'split_method': query['split_method'][0]} if 'split_method' in query else {}),
                     )
                 )
             except Exception as exc:
@@ -224,12 +225,8 @@ class ProjectRoutes:
             (project_path / "translated").mkdir()
             upload = project_path / f".import.{source_format}"
             write_upload(upload, content)
-            from split.chapter_splitter_novelpia_md import (
-                split_epub_to_md,
-                split_txt_to_md,
-            )
-
-            splitter = split_epub_to_md if source_format == "epub" else split_txt_to_md
+            from services.importing.chapters import _splitter
+            splitter = _splitter(source_format, query.get('split_method', ['auto'])[0])
             result = splitter(
                 str(upload),
                 volume,

@@ -35,12 +35,12 @@ class BrowserRuntime:
     def close_gemini(self):
         self.gemini.close()
 
-    def setup_gemini(self, skip_login_prompt=False):
-        self.gemini.setup(skip_login_prompt=skip_login_prompt)
+    def setup_gemini(self, skip_login_prompt=False, link="https://gemini.google.com/app"):
+        self.gemini.setup(skip_login_prompt=skip_login_prompt, link=link)
 
     def generate_gemini(
         self, prompt, link, default_thinking, max_retries=3,
-        web_model=None, thinking_level=None,
+        web_model=None, thinking_level=None, force_upload=False,
     ):
         return self._gemini_generate(
             prompt,
@@ -50,6 +50,7 @@ class BrowserRuntime:
             max_retries=max_retries,
             web_model=web_model,
             thinking_level=thinking_level,
+            **({'force_upload': True} if force_upload else {}),
         )
 
     def close_chatgpt_orphans(self):

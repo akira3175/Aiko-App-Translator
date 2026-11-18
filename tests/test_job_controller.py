@@ -93,6 +93,15 @@ class JobControllerTests(unittest.TestCase):
         self.assertEqual(3, config["max_chapters"])
         self.assertEqual(0, config["batch_runs"])
 
+    def test_start_chapter_is_checked_before_launch(self):
+        with self.assertRaisesRegex(JobRequestError, 'không còn tồn tại'):
+            self.controller().start('pipeline','Demo',{'config':{'start_chapter':'v1_c10_s1.md'}})
+        raw=self.project/'raw'
+        raw.mkdir(exist_ok=True)
+        (raw/'v1_c10_s1.md').write_text('# Test')
+        self.controller().start('pipeline','Demo',{'config':{'start_chapter':'v1_c10_s1.md','max_chapters':5}})
+        self.assertEqual('v1_c10_s1.md',_Thread.created[-1].kwargs['args'][2]['start_chapter'])
+
     def test_start_reports_conflict_when_pipeline_is_running(self):
         self.jobs["pipeline"] = {"status": "running"}
 

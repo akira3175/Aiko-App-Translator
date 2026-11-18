@@ -21,6 +21,9 @@ DEFAULT_GEMINI_WEB_UPLOAD_INSTRUCTION = (
     "trong đó. Chỉ xuất kết quả đúng định dạng file yêu cầu, không giải thích thêm."
 )
 SETTING_DEFAULTS = {
+    "pipeline_import_provider": "gemini-api",
+    "pipeline_import_model": "gemini-flash-latest",
+    "pipeline_import_thinking": "high",
     "image_markers": "off",
     "pipeline_translate_provider": "gemini-api",
     "pipeline_translate_model": "gemini-flash-latest",
@@ -101,6 +104,9 @@ SETTING_DEFAULTS = {
     "lan_pin": "",
 }
 SETTING_LABELS = {
+    "pipeline_import_provider": "Engine tách TXT",
+    "pipeline_import_model": "Model",
+    "pipeline_import_thinking": "Cấp độ suy nghĩ",
     "image_markers": "Giữ vị trí ảnh bằng mã trong bản dịch",
     "pipeline_translate_provider": "Provider dịch",
     "pipeline_translate_model": "Model",
@@ -191,6 +197,9 @@ SETTING_RANGES = {
     "gpt_api_retries": (1, 10),
 }
 SETTING_META = {
+    "pipeline_import_provider": {"group": "import", "type": "select", "options": [["gemini-api", "Gemini API"], ["gemini-web", "Gemini Web"], ["google-ai-studio-web", "Google AI Studio Web"], ["openai-api", "OpenAI API"], ["chatgpt-web", "ChatGPT Web"], ["chatgpt-plan", "ChatGPT Plan"]]},
+    "pipeline_import_model": {"group": "import"},
+    "pipeline_import_thinking": {"group": "import"},
     "image_markers": {
         "group": "general", "type": "select",
         "options": [["off", "Tắt"], ["on", "Bật"]],

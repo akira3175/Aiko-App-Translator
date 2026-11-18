@@ -40,6 +40,20 @@ class ContextGenerationTests(unittest.TestCase):
         self.assertIn("###START###", prompt)
         self.assertIn("###END###", prompt)
 
+    def test_invalid_glossary_retries_before_returning_complete_result(self):
+        valid = "###START###\nName = Đúng\n###END###"
+        with (
+            patch.object(generation, "context_provider", return_value="openai-api"),
+            patch.object(generation, "context_model_and_thinking", return_value=("test", "high")),
+            patch.object(generation, "int_option", return_value=2),
+            patch.object(generation.time, "sleep"),
+            patch.dict(generation.TRANSPORT_OVERRIDES, {
+                "openai-api": unittest.mock.Mock(side_effect=["###START###\n###END###", valid])
+            }, clear=True),
+        ):
+            result = generation.generate_glossary([{"content": "Name"}], "Name = Sai")
+        self.assertEqual(valid, result)
+
 
 if __name__ == "__main__":
     unittest.main()

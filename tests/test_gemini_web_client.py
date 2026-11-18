@@ -31,11 +31,30 @@ class GeminiWebClientTests(unittest.TestCase):
         copy = stack.enter_context(patch.object(client, 'copy_response_text', return_value=copied))
         return driver, copy
 
-    def generate(self, driver, prompt='translate ###END###', retries=2):
+    def generate(self, driver, prompt='translate ###END###', retries=2, **kwargs):
         return client.generate_content(
             prompt, get_driver=lambda: driver, link='https://gemini.google.com/',
             default_thinking='off', web_model='auto', task_mode=False, max_retries=retries,
+            **kwargs,
         )
+
+    def test_forced_upload_works_even_when_threshold_disabled(self):
+        complete = 'complete ###END###'
+        driver, _copy = self.response_fixture([complete, complete], [0, 1], complete)
+        with patch.object(client, '_upload_prompt_file', return_value=True) as upload:
+            self.assertEqual(complete, self.generate(driver, retries=1, force_upload=True))
+        upload.assert_called_once()
+        self.assertEqual('translate ###END###', upload.call_args.args[2])
+        client._insert_text.assert_called_once_with(driver, unittest.mock.ANY, client._upload_instruction())
+
+    def test_forced_upload_failure_never_pastes_source_or_retries(self):
+        driver, _copy = self.response_fixture([], [])
+        with patch.object(client, '_upload_prompt_file', return_value=False) as upload:
+            with self.assertRaisesRegex(ValueError, 'Không đính kèm'):
+                self.generate(driver, retries=1, force_upload=True)
+        upload.assert_called_once()
+        client._insert_text.assert_not_called()
+        driver.refresh.assert_not_called()
 
     def test_missing_end_retries_and_never_returns_partial_text(self):
         driver, copy = self.response_fixture(['partial', 'partial'], [0, 1, 1801] * 2)

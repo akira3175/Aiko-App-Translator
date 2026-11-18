@@ -282,6 +282,16 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
     if(webReview)fields+=`<small class="pipeline-settings-hint">${reviewProvider==='gemini-web'?'Gemini Web':reviewProvider==='chatgpt-web'?'ChatGPT Web':'Google AI Studio Web'} xử lý tuần tự từng chương nên không dùng số luồng song song.</small>`;
     if(kind==='pipeline'){
       fields=`<label class="task-field"><span>Số chương muốn chạy</span><input data-task-field="max_chapters" type="number" min="1" step="1" value="1" placeholder="Tất cả"><small>Để trống để chạy đến hết.</small></label><div class="pipeline-options"><label class="task-check"><input data-task-field="enable_polish" type="checkbox" checked><span>Hiệu đính bản dịch</span></label><label class="task-check"><input data-task-field="enable_pronouns" type="checkbox" checked><span>Xuất xưng hô</span></label><label class="task-check"><input data-task-field="enable_review" type="checkbox" checked><span>Review sau khi dịch</span></label></div><small class="pipeline-settings-hint">Engine và model được quản lý trong Cài đặt > Quy trình dịch.</small>`;
+      const groups=new Map();
+      for(const chapter of state.chapters){
+        if(!chapter.raw)continue;
+        const match=/^v(\d+)_c(\d+)_s(\d+)\.md$/.exec(chapter.name);
+        if(!match)continue;
+        const key=`${match[1]}:${match[2]}`,segment=Number(match[3]);
+        if(!groups.has(key)||segment<groups.get(key).segment)groups.set(key,{...chapter,segment,volume:Number(match[1]),chapter:Number(match[2])});
+      }
+      const starts=[...groups.values()].sort((a,b)=>a.volume-b.volume||a.chapter-b.chapter);
+      fields+=`<label class="task-check"><input id="chooseTranslationStart" type="checkbox" ${starts.length?'':'disabled'}><span>Chọn vị trí bắt đầu</span></label><label class="task-field" id="translationStartField" hidden><span>Bắt đầu từ chương</span><select data-task-field="start_chapter" id="translationStartChapter" disabled>${starts.map(item=>`<option value="${escapeHtml(item.name)}">${escapeHtml(`Tập ${item.volume} · Chương ${item.chapter} · ${item.title||''}`)}</option>`).join('')}</select><small>Bắt đầu từ segment đầu. Bỏ qua phần đã dịch và tìm tiếp cho đủ số lượng đã chọn.</small></label>`;
     } else if(multiChapterTasks.has(kind))fields=`<label class="task-field"><span>Số chương muốn chạy</span><input data-task-field="max_chapters" type="number" min="1" step="1" value="1" placeholder="Tất cả"><small>Để trống để chạy đến hết.</small></label>${fields}`;
     if(kind==='hako'){
       const publishingBooks=publishingBooksFeature.getBooks();
@@ -296,12 +306,20 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
       fields=`<div class="task-field-row publishing-range"><label class="task-field"><span>Chương bắt đầu</span><select data-task-field="start_target">${options}</select></label><label class="task-field"><span>Chương kết thúc</span><select data-task-field="end_target">${options}</select></label></div><div class="publishing-task-note ${missing.length?'warning':''}">${missing.length?`Chưa có Book ID cho volume ${missing.join(', ')}. Hãy thiết lập trong Cài đặt > Xuất bản.`:`Đã sẵn sàng cho ${publishingBooks.length} volume. Book ID sẽ được chọn tự động.`}</div>${fields}`;
     }
     $('#taskFields').innerHTML=fields;
+    if(kind==='pipeline')$('#chooseTranslationStart').onchange=event=>{
+      $('#translationStartField').hidden=!event.target.checked;
+      $('#translationStartField').style.display=event.target.checked?'':'none';
+      $('#translationStartChapter').disabled=!event.target.checked;
+    };
+    if(kind==='pipeline')$('#translationStartField').style.display='none';
     $('#taskModal').classList.add('open');
   }
 
   function confirmTask() {
     const config=Object.fromEntries($$('[data-task-field]').map(field=>[field.dataset.taskField,field.type==='checkbox'?field.checked:field.value]));
     if(pendingTask==='pipeline'){
+      if(!$('#chooseTranslationStart').checked)delete config.start_chapter;
+      else if(!config.start_chapter)return toast('Hãy chọn vị trí bắt đầu dịch');
       const saved=settingsFeature.getValue;
       config.translate_provider=saved('pipeline_translate_provider')||'gemini-api';
       config.gemini_api_streaming=saved('gemini_api_streaming')||'off';
@@ -360,13 +378,16 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
   function confirmGlossaryCoverage(kind,config={}) {
     if(!['pipeline','interactions','manual','retranslate'].includes(kind))return true;
     const glossaryIndex=Number(state.context?.index)||0;
+    const lowerBound=config.start_chapter?state.chapters.findIndex(item=>item.name===config.start_chapter):0;
+    const pending=state.chapters.map((item,index)=>({item,index})).filter(({item,index})=>index>=lowerBound&&!item.translated);
     let startIndex=kind==='retranslate'
       ? state.chapters.findIndex(item=>item.name===state.current)
-      : state.chapters.findIndex(item=>!item.translated);
+      : (pending[0]?.index??-1);
     if(startIndex<0)return true;
     let endChapter=startIndex+1;
     if(kind!=='retranslate'){
-      endChapter=config.max_chapters===''?state.chapters.length:Math.min(state.chapters.length,startIndex+Math.max(1,Number(config.max_chapters)||1));
+      const selected=config.max_chapters===''?pending:pending.slice(0,Math.max(1,Number(config.max_chapters)||1));
+      endChapter=(selected.at(-1)?.index??startIndex)+1;
     }
     if(endChapter<=glossaryIndex)return true;
     const range=endChapter===startIndex+1?`chương ${endChapter}`:`chương ${startIndex+1}–${endChapter}`;

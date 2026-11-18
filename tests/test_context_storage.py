@@ -8,7 +8,7 @@ from cores.storage.project import load_context, save_context
 
 
 class ContextStorageTests(unittest.TestCase):
-    def test_batch_merge_preserves_edit_saved_while_ai_is_running(self):
+    def test_batch_overwrites_glossary_but_preserves_latest_metadata(self):
         with tempfile.TemporaryDirectory() as folder:
             project = Path(folder)
             raw = project / "raw"
@@ -17,7 +17,7 @@ class ContextStorageTests(unittest.TestCase):
             save_context(project, {"index": 0, "glossary": "旧 = Cũ"})
 
             def generate(_batch, _old_glossary, instructions=None):
-                save_context(project, {"index": 0, "glossary": "旧 = Đã sửa tay"})
+                save_context(project, {"index": 0, "glossary": "旧 = Đã sửa tay", "style_notes": "Ghi chú mới"})
                 return "###START###\n新 = Mới\n###END###"
 
             with patch("cores.context.workflow.time.sleep"):
@@ -32,8 +32,8 @@ class ContextStorageTests(unittest.TestCase):
                 )
 
             saved = load_context(project)
-            self.assertIn("旧 = Đã sửa tay", saved["glossary"])
-            self.assertIn("新 = Mới", saved["glossary"])
+            self.assertEqual("新 = Mới", saved["glossary"])
+            self.assertEqual("Ghi chú mới", saved["style_notes"])
             self.assertEqual(saved["index"], 1)
 
 

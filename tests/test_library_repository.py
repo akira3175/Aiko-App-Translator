@@ -17,6 +17,18 @@ from services.library import LibraryService
 
 
 class LibraryRepositoryTests(unittest.TestCase):
+    def test_comma_in_project_name(self):
+        with tempfile.TemporaryDirectory() as directory:
+            library = Path(directory)
+            name = "Sư Tôn Phản Diện, Thiên Hạ Vô Địch"
+            self.assertEqual(name, validate_new_project_name(library, name))
+            (library / name / "raw").mkdir(parents=True)
+            self.assertEqual((library / name).resolve(), safe_project(library, name))
+            self.assertEqual([], chapters(library, name))
+            for invalid in ("../Story,", "Story,/outside", "Story,\\outside"):
+                with self.subTest(name=invalid), self.assertRaises(ValueError):
+                    safe_project(library, invalid)
+
     def test_service_binds_library_root(self):
         with tempfile.TemporaryDirectory() as directory:
             library = Path(directory)

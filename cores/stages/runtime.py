@@ -26,6 +26,7 @@ MODEL_DEFAULTS = {
         "pronouns": ("pronoun_model", "gemini-flash-lite-latest"),
         "review": ("review_bg_model", "gemini-flash-lite-latest"),
         "context": ("context_model", "gemini-flash-latest"),
+        "import": ("context_model", "gemini-flash-latest"),
         "characters": ("character_model", "gemini-flash-latest"),
     },
     "gemini-web": {},
@@ -36,6 +37,7 @@ MODEL_DEFAULTS = {
         "pronouns": ("gpt_api_pronoun_model", "gpt-5.6-terra"),
         "review": ("gpt_api_review_model", "gpt-5.6-terra"),
         "context": ("gpt_api_translate_model", "gpt-5.6-luna"),
+        "import": ("gpt_api_translate_model", "gpt-5.6-luna"),
         "characters": ("gpt_api_translate_model", "gpt-5.6-luna"),
     },
     "chatgpt-web": {},
@@ -51,6 +53,7 @@ STAGE_LABELS = {
     "pronouns": "Xưng hô",
     "review": "Review",
     "context": "Context",
+    "import": "Nhập truyện",
     "characters": "Hồ sơ nhân vật",
 }
 PROVIDER_LABELS = {
@@ -96,6 +99,7 @@ def stage_model_and_thinking(stage, provider, *, get_option=option):
             "translate": "gpt_api_translate_effort",
             "review": "gpt_api_review_effort",
             "context": "gpt_api_translate_effort",
+            "import": "gpt_api_translate_effort",
             "characters": "gpt_api_translate_effort",
         }.get(stage, "gpt_api_polish_effort")
         return (

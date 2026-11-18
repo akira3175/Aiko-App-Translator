@@ -48,22 +48,29 @@ def close_gemini_driver():
     browser_runtime.close_gemini()
 
 
-def setup_gemini_browser():
+def _gemini_link():
+    return str(option("link_gemini", LINK_GEMINI) or LINK_GEMINI).strip()
+
+
+def setup_gemini_browser(*, skip_login_prompt=None):
     browser_runtime.setup_gemini(
-        skip_login_prompt=web_mode() and bool_option("skip_login_prompt", True)
+        skip_login_prompt=(web_mode() and bool_option("skip_login_prompt", True)
+                           if skip_login_prompt is None else skip_login_prompt),
+        link=_gemini_link(),
     )
 
 
 def generate_content_with_selenium(
-    prompt, max_retries=3, web_model=SELECT_MODEL, thinking_level=None
+    prompt, max_retries=3, web_model=SELECT_MODEL, thinking_level=None, force_upload=False
 ):
     return browser_runtime.generate_gemini(
         prompt,
-        link=LINK_GEMINI,
+        link=_gemini_link(),
         default_thinking=WEB_THINKING_LEVEL,
         max_retries=max_retries,
         web_model=web_model,
         thinking_level=thinking_level,
+        **({'force_upload': True} if force_upload else {}),
     )
 
 
@@ -79,9 +86,10 @@ def close_orphaned_chatgpt_chrome():
     browser_runtime.close_chatgpt_orphans()
 
 
-def setup_chatgpt_browser():
+def setup_chatgpt_browser(*, skip_login_prompt=None):
     browser_runtime.setup_chatgpt(
-        skip_login_prompt=web_mode() and bool_option("skip_login_prompt", True),
+        skip_login_prompt=(web_mode() and bool_option("skip_login_prompt", True)
+                           if skip_login_prompt is None else skip_login_prompt),
         link=_chatgpt_link(),
     )
 

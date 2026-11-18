@@ -13,7 +13,7 @@ class ChapterImportService:
     runtime_root: Path
     library: object
 
-    def preview(self, project_name, source_format, segment_limit, content):
+    def preview(self, project_name, source_format, segment_limit, content, split_method='auto'):
         project = self.library.safe_project(project_name)
         raw_dir, _translated = self.library.project_folders(project_name)
         return create_preview(
@@ -24,6 +24,7 @@ class ChapterImportService:
             source_format,
             segment_limit,
             content,
+            **({'split_method': split_method} if split_method != 'auto' else {}),
         )
 
     def confirm(self, project_name, payload):

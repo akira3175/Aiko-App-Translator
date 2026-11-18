@@ -91,6 +91,14 @@ class JobController:
             )
         if kind == "pipeline":
             config = self.pipeline_config(config)
+            start_chapter = config.get('start_chapter', '')
+            if start_chapter:
+                if not isinstance(start_chapter, str):
+                    raise JobRequestError('Chương bắt đầu không hợp lệ')
+                raw, _translated = self.project_folders(project)
+                target = self.safe_file(raw, start_chapter)
+                if not target.is_file():
+                    raise JobRequestError('Chương bắt đầu không còn tồn tại; hãy chọn lại vị trí dịch.')
         if kind == "polish":
             target = str(config.get("target_chapter", ""))
             raw, translated = self.project_folders(project)

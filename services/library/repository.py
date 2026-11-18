@@ -19,11 +19,11 @@ def safe_project(library: Path, name: str) -> Path:
     if (
         not name
         or name in {"raw", "translated"}
-        or not re.fullmatch(r"[\w .-]+", name, re.UNICODE)
+        or not re.fullmatch(r"[\w .,\-]+", name, re.UNICODE)
     ):
         raise ValueError(
             "Tên truyện không hợp lệ; chỉ dùng chữ, số, khoảng trắng, "
-            "dấu chấm, gạch ngang hoặc gạch dưới"
+            "dấu chấm, dấu phẩy, gạch ngang hoặc gạch dưới"
         )
     path = (library / name).resolve()
     if library.resolve() not in path.parents:
