@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from server.routes.projects import ProjectRoutes
 from services.importing.chapters import create_preview, cancel
+from services.polish_review import create_review, load_review
 
 
 class _Handler:
@@ -157,6 +158,36 @@ class ProjectRouteTests(unittest.TestCase):
             routes = self._routes(Path(directory))
             self.assertFalse(routes.handle_get(_Handler(), "/api/settings", {}))
             self.assertFalse(routes.handle_post(_Handler(), "/api/jobs", {}))
+
+    def test_chapter_exposes_review_and_accept_endpoint_saves_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            routes = self._routes(root)
+            name = "v1_c1_s1.md"
+            target = root / "translated" / name
+            target.write_text("# Cũ\n", encoding="utf-8")
+            review = create_review(target, "# Cũ\n", "# Mới\n")
+            handler = _Handler()
+            routes.handle_get(handler, "/api/chapter/" + name, {"project": ["Demo"]})
+            self.assertEqual(review, handler.responses[-1][1]["polish_review"])
+            self.assertEqual("# Cũ\n", handler.responses[-1][1]["translated"])
+            handler = _Handler({"id": review["id"], "revision": 0, "action": "accept", "values": review["values"]})
+            self.assertTrue(routes.handle_post(handler, "/api/polish-review/" + name, {"project": ["Demo"]}))
+            self.assertEqual(200, handler.responses[-1][0])
+            self.assertEqual("# Mới\n", target.read_text(encoding="utf-8"))
+            self.assertIsNone(load_review(target))
+
+    def test_review_endpoint_returns_conflict_for_stale_session(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            routes = self._routes(root)
+            target = root / "translated" / "v1_c1_s1.md"
+            target.write_text("Cũ", encoding="utf-8")
+            create_review(target, "Cũ", "Mới")
+            handler = _Handler({"id": "stale", "revision": 0, "action": "discard"})
+            routes.handle_post(handler, "/api/polish-review/v1_c1_s1.md", {"project": ["Demo"]})
+            self.assertEqual(409, handler.responses[-1][0])
+            self.assertIsNotNone(load_review(target))
 
 
 if __name__ == "__main__":

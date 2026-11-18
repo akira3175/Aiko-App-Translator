@@ -119,6 +119,12 @@ class JobControllerTests(unittest.TestCase):
         self.assertEqual({"ok": True}, result)
         self.assertEqual("polish", _Thread.created[0].kwargs["args"][0])
         self.assertEqual(chapter, _Thread.created[0].kwargs["args"][2]["target_chapter"])
+        self.assertIs(True, _Thread.created[0].kwargs["args"][2]["polish_review"])
+        from services.polish_review import create_review
+        create_review(self.project / "translated" / chapter, "# Dịch\n\nNội dung", "# Đề xuất")
+        with self.assertRaises(JobRequestError) as raised:
+            controller.start("polish", "Demo", {"config": {"target_chapter": chapter}})
+        self.assertEqual(409, raised.exception.status)
 
     def test_immediate_cancel_terminates_only_matching_pid(self):
         self.jobs["pipeline"] = {

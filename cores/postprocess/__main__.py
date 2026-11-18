@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,6 +31,12 @@ def main():
     translated_path = Path(TRANSLATED_DIR) / target
     if not raw_path or not translated_path.is_file():
         raise RuntimeError("Không tìm thấy chương đã dịch cần hiệu đính")
+    review_mode = option("polish_review", False) is True
+    original = translated_path.read_text(encoding="utf-8")
+    if review_mode:
+        from services.polish_review import create_review, load_review
+        if load_review(translated_path):
+            raise RuntimeError("Chương này còn bản hiệu đính chờ duyệt")
 
     chapter_index = raw_files.index(raw_path)
     marker_mode = uses_image_markers(translated_path)
@@ -70,6 +77,17 @@ def main():
         )
         chapter["title_translation"] = title
         chapter["translation"] = content
+        if review_mode:
+            # Render through the existing image-preserving serializer, in isolation.
+            with tempfile.TemporaryDirectory() as folder:
+                proposal = save_translated_md(
+                    raw_path, folder, title, content,
+                    image_markers=chapter.get("_image_markers"),
+                )
+                create_review(translated_path, original, Path(proposal).read_text(encoding="utf-8"))
+            # Unaccepted text must never feed the shared pronoun memory.
+            print("Đã tạo bản hiệu đính chờ duyệt; bản dịch và bộ nhớ xưng hô được giữ nguyên.")
+            return
         output = save_translated_md(
             raw_path, TRANSLATED_DIR, title, content,
             image_markers=chapter.get("_image_markers"),

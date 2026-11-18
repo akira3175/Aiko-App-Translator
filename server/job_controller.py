@@ -98,6 +98,10 @@ class JobController:
             translated_target = self.safe_file(translated, target)
             if not translated_target.is_file():
                 raise JobRequestError("Chương này chưa có bản dịch để hiệu đính")
+            from services.polish_review import load_review
+            if load_review(translated_target):
+                raise JobRequestError("Hãy lưu hoặc bỏ bản hiệu đính đang chờ duyệt trước khi chạy lại", HTTPStatus.CONFLICT)
+            config["polish_review"] = True
         self._validate_counts(config)
         if kind == "manual":
             self._validate_manual(project, config)

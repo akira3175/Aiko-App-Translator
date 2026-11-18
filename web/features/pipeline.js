@@ -406,7 +406,7 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
       activeJobKind='polish';
       const button=$('#polishButton');
       button.disabled=true;button.textContent='Đang hiệu đính…';
-      pollPolish(job.chapter||state.current);
+      pollPolish(job.chapter||state.current,job.project||state.project);
       return;
     }
     if(job.kind==='review'&&job.workspace_review){
@@ -508,7 +508,10 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
 
   async function startPolish() {
     if(!state.current)return toast('Hãy chọn một chương trước');
+    if(state.polishReview)return toast('Hãy lưu hoặc bỏ bản hiệu đính đang chờ duyệt trước khi chạy lại');
     if(state.dirty)await saveChapter();
+    if(state.dirty)return;
+    const project=state.project;
     const chapter=state.current, button=$('#polishButton');
     button.disabled=true;button.textContent='Đang hiệu đính…';
     try {
@@ -517,20 +520,21 @@ export function createPipelineFeature({aiLogFeature,api,editorRuntime,editorView
       });
       activeJobKind='polish';
       toast('Đã bắt đầu hiệu đính chương');
-      pollPolish(chapter);
+      pollPolish(chapter,project);
     } catch(error) {
       button.disabled=false;button.textContent='Hiệu đính';toast(error.message);
     }
   }
 
-  async function pollPolish(chapter) {
+  async function pollPolish(chapter,project=state.project) {
     const button=$('#polishButton');
     try {
       const job=await api('/api/job/polish');
-      if(job.status==='running')return setTimeout(()=>pollPolish(chapter),500);
+      if(job.status==='running')return setTimeout(()=>pollPolish(chapter,project),500);
       activeJobKind=null;button.disabled=false;button.textContent='Hiệu đính';
       if(job.status==='done'){
-        toast('Đã hiệu đính chương');
+        toast('Bản hiệu đính đã sẵn sàng để duyệt');
+        if(state.project!==project)return;
         await loadChapters();
         if(state.current===chapter)await openChapter(chapter);
       }else{

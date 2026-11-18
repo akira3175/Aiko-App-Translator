@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TRANSLATION_KINDS = {"pipeline", "interactions", "manual", "polish"}
 TRANSLATION_LOCK = ROOT / ".runtime" / "translation.lock"
-STREAM_PROGRESS_PREFIXES = ("✍️ Đang nhận:", "📥 Đang nhận:")
+STREAM_PROGRESS_PREFIXES = ("✍️ Đang nhận:", "📥 Đang nhận:", "Đang nhận:")
 
 jobs: dict[str, dict] = {}
 job_processes: dict[str, subprocess.Popen] = {}
@@ -124,7 +124,22 @@ def isolated_process_kwargs():
     return {"start_new_session": True}
 
 
+def format_process_line(line: str) -> str:
+    """Keep the plain terminal, with quiet text and explicit warning labels."""
+    if re.fullmatch(r"[\s─━═_=-]{5,}", line):
+        return ""
+    level = "LỖI" if re.search("[❌⛔]", line) else "CHÚ Ý" if "⚠" in line else ""
+    # Restrict removal to pictographs, preserving CJK names, arrows and prose.
+    clean = re.sub(r"[\U0001f300-\U0001faff\u2600-\u27bf\u2139\u23f3\u23f0\ufe0f\ufe0e\u200d]", "", line)
+    if clean != line:
+        clean = re.sub(r"^(\[[^\]]+\])? +", lambda match: (match[1] + " ") if match[1] else "", clean)
+    if level:
+        clean = f"[{level}] {clean}"
+    return clean
+
+
 def timestamp_process_line(line: str, *, now=None) -> str:
+    line = format_process_line(line)
     if not line.strip():
         return line
     stamp = (now or datetime.now()).strftime("%H:%M:%S")
@@ -146,6 +161,8 @@ def _without_timestamp(line: str) -> str:
 def merge_process_output(output: str, line: str) -> str:
     """Replace the latest live counter instead of adding one console line per tick."""
     current = line.rstrip("\r\n")
+    if not current.strip():
+        return output if not line or output.endswith("\n\n") else (output + line)[-12000:]
     countdown = r"Chờ \d+ giây trước khi cập nhật chương tiếp theo…"
     if re.fullmatch(countdown, _without_timestamp(current)):
         lines = output.rstrip("\r\n").splitlines()
@@ -161,6 +178,8 @@ def merge_process_output(output: str, line: str) -> str:
         else:
             lines.append(current)
         return ("\n".join(lines) + "\n")[-12000:]
+    if re.match(r"(?:Dang dich Chuong|Đang dịch chương|\[PIPELINE\] (?:Bắt đầu hậu xử lý|Bước \d))", _without_timestamp(current), re.I):
+        output = output.rstrip("\r\n") + "\n\n" if output.strip() else ""
     return (output + line)[-12000:]
 
 

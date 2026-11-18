@@ -66,6 +66,8 @@ Copy-Item -LiteralPath (Join-Path $projectRoot "VERSION") -Destination $stageRoo
 foreach ($folder in @("cloudflare", "cores", "defaults", "providers", "server", "services", "split", "web", "up")) {
     Copy-Item -LiteralPath (Join-Path $projectRoot $folder) -Destination $stageRoot -Recurse
 }
+# Publishing settings belong to the user's machine, never to the portable app.
+Remove-Item -LiteralPath (Join-Path $stageRoot "up\config_md.json") -Force -ErrorAction SilentlyContinue
 "{}" | Set-Content -LiteralPath (Join-Path $stageRoot "up\image_cache.json") -Encoding UTF8
 New-Item -ItemType Directory -Force -Path (Join-Path $stageRoot "truyen"), (Join-Path $stageRoot ".runtime"), (Join-Path $stageRoot "data") | Out-Null
 New-Item -ItemType File -Force -Path (Join-Path $stageRoot "data\apikeys.txt") | Out-Null

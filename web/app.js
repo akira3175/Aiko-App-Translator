@@ -9,6 +9,7 @@ import { createAiLogFeature } from './features/ai-logs.js';
 import { createBookExportFeature } from './features/book-export.js';
 import { createChapterImportFeature } from './features/chapter-import.js';
 import { createEditorFeature } from './features/editor.js';
+import { createPolishReviewFeature } from './features/polish-review.js';
 import { createHakoEditFeature } from './features/hako-edit.js';
 import { createPipelineFeature } from './features/pipeline.js';
 import { createPublishingBooksFeature } from './features/publishing-books.js';
@@ -61,6 +62,9 @@ async function loadProjects(preferredProject='') {
 let projectSelection=0;
 const projectLoadingFeature=createProjectLoadingFeature({retry:()=>selectProject(state.project)});
 async function selectProject(name) {
+  const releaseReview=polishReviewFeature.freeze();
+  try {
+  if(polishReviewFeature.busy||!await polishReviewFeature.flush())return;
   const selection=++projectSelection;
   if (state.dirty) await saveChapter();
   if(selection!==projectSelection||state.dirty)return;
@@ -79,6 +83,7 @@ async function selectProject(name) {
   storySearchFeature.reset();
   state.projectRevision+=1;
   state.project = name; state.current = null; state.chapters = [];
+  polishReviewFeature.open(null);
   localStorage.setItem('novel-project', name);
   $('#currentProject').textContent = name; $('#activeProjectLabel').textContent = name;
   $('#currentChapter').textContent = 'Chọn một chương';
@@ -108,6 +113,7 @@ async function selectProject(name) {
     state.projectRevision+=1;
     projectLoadingFeature.fail(selection,name,error);
   } finally {clearTimeout(timeout);}
+  } finally {releaseReview();}
 }
 
 function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));}
@@ -120,6 +126,7 @@ async function copyPlainText(text){
 let pipelineFeature;
 const editorFeature=createEditorFeature({api,escapeHtml,positionPopover,saveChapter,state,toast});
 const {markdownToHtml,refreshFind,renderMarkdownEditors,runtime:editorRuntime,setEditorValue,updateCounts,updateLineNumbers,value:editorValue,views:editorViews}=editorFeature;
+const polishReviewFeature=createPolishReviewFeature({api,state,toast,escapeHtml,editorFeature,reload:async(name,project)=>{if(state.project!==project||state.current!==name)return;await openChapter(name);await loadChapters();}});
 const projectMemoryFeature=createProjectMemoryFeature({api,escapeHtml,executePipeline:(...args)=>pipelineFeature.execute(...args),getSetting:key=>settingsFeature.getValue(key),onReviewsChanged:()=>renderChapterList(),markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast});
 const {loadCharacters,loadContext,loadPronouns,loadReviews,renderContext,renderWorkspaceReview,requireProject,saveCharacters,saveGlossaryChanges}=projectMemoryFeature;
 const aiLogFeature=createAiLogFeature({api,copyPlainText,escapeHtml,getProject:()=>state.project,toast});
@@ -172,6 +179,9 @@ function openAdjacentChapter(offset) {
 }
 
 async function openChapter(name,project=state.project,revision=state.projectRevision,{strict=false}={}) {
+  const releaseReview=polishReviewFeature.freeze();
+  try {
+  if(polishReviewFeature.busy||!await polishReviewFeature.flush())return false;
   if (state.dirty) await saveChapter();
   if (state.dirty) return false;
   const request=state.chapterRequest=(state.chapterRequest||0)+1;
@@ -187,8 +197,10 @@ async function openChapter(name,project=state.project,revision=state.projectRevi
     state.currentImages=chapter.images||[]; renderMarkdownEditors();
     updateCounts(); updateLineNumbers('source'); updateLineNumbers('target'); refreshFind('source'); refreshFind('target'); setSaveState('Đã đồng bộ'); renderWorkspaceReview();
     $('#chapterPopover').classList.remove('open'); showView('workspace');
+    polishReviewFeature.open(chapter.polish_review||null);
     return true;
   } catch (error) { if(state.project!==project||state.projectRevision!==revision)return false;if(strict)throw error;toast(error.message); }
+  } finally {releaseReview();}
 }
 
 async function createProject() {
@@ -213,6 +225,7 @@ async function createProject() {
 }
 
 async function saveChapter() {
+  if(polishReviewFeature.active)return polishReviewFeature.flush();
   if (!state.current) return toast('Hãy chọn một chương trước');
   const project=state.project,name=state.current,content=editorValue('target');
   setSaveState('Đang lưu…');
@@ -354,7 +367,7 @@ document.addEventListener('keydown',event=>{
   if(r19Feature.handleShortcut(event))return;
   editorFeature.handleShortcut(event);
 });
-$('#saveButton').onclick=saveChapter;
+$('#saveButton').onclick=()=>polishReviewFeature.active?polishReviewFeature.accept():saveChapter();
 $('#polishButton').onclick=pipelineFeature.startPolish;
 $('#retranslateButton').onclick=()=>{if(!state.current)return toast('Hãy chọn một chương trước');$('#retranslateChapter').textContent=prettyName(state.current)+' · Bản cũ sẽ được giữ nếu dịch lỗi.';$('#retranslateModal').classList.add('open');};
 $('#cancelRetranslate').onclick=()=>$('#retranslateModal').classList.remove('open');

@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "1.4.12",
+      "date": "2026-11-18",
+      "title": "Duyệt hiệu đính trực tiếp & log gọn hơn",
+      "summary": "Duyệt thay đổi ngay trong trình soạn thảo và làm gọn log terminal.",
+      "highlights": [
+        "Thêm duyệt hiệu đính trực tiếp trong trình soạn thảo, tô màu nội dung thay đổi như VS Code.",
+        "Làm gọn log terminal, bỏ emoji và giảm các dòng lặp."
+      ]
+    },
+    {
         "version":  "1.4.11",
         "date":  "2026-11-12",
         "title":  "Xưng hô nhất quán \u0026 cải thiện điều khiển AI",

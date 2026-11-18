@@ -147,6 +147,7 @@ export function createEditorFeature({api,escapeHtml,positionPopover,saveChapter,
   }
   
   function setEditorMode(mode) {
+    if(state.polishReview&&mode==='target-preview')mode='target-text';
     const source=mode.startsWith('source'), preview=mode.endsWith('preview');
     const editor=$(source?'#sourceEditorShell':'#targetEditorShell'), output=$(source?'#sourcePreview':'#targetPreview');
     if(preview)renderMarkdownEditors();
@@ -223,6 +224,7 @@ export function createEditorFeature({api,escapeHtml,positionPopover,saveChapter,
   }
   
   function markTargetChanged() {
+    if(state.polishReview){updateCounts();refreshFind('target');return;}
     state.dirty=true; updateCounts(); updateLineNumbers('target'); renderMarkdownEditors(); refreshFind('target'); setSaveState('Chưa lưu');
     clearTimeout(state.timer); if($('#autosave').checked)state.timer=setTimeout(saveChapter,1200);
   }

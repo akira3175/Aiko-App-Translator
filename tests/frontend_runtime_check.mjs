@@ -22,6 +22,9 @@ class ElementStub {
   getBoundingClientRect() { return {left:0,right:10,top:0,bottom:10,width:10,height:10}; }
   cloneNode() { return new ElementStub(); }
   appendChild() {}
+  insertBefore(node) { this.children.push(node); }
+  append(...nodes) { this.children.push(...nodes); }
+  replaceChildren(...nodes) { this.children=nodes; }
   remove() {}
 }
 
@@ -36,6 +39,7 @@ globalThis.document={
   },
   querySelectorAll() { return []; },
   createElement() { return new ElementStub(); },
+  createDocumentFragment() { return new ElementStub(); },
   createRange() { return {selectNodeContents(){}}; },
   execCommand() { return true; },
   addEventListener() {},

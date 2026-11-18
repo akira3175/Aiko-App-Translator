@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from urllib.parse import unquote
 from services.library.search import search_chapters
+from services.polish_review import ReviewConflict, change_review, load_review, save_translation
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ class ProjectRoutes:
                         if translated_path.exists()
                         else "",
                         "images": self.chapter_images(project, raw_text),
+                        "polish_review": load_review(translated_path),
                     }
                 )
             except (ValueError, OSError) as exc:
@@ -105,6 +107,16 @@ class ProjectRoutes:
 
     def handle_post(self, handler, path, query):
         project = query.get("project", [""])[0]
+        if path.startswith("/api/polish-review/"):
+            try:
+                _, translated = self.project_folders(project)
+                target = self.safe_file(translated, unquote(path.rsplit("/", 1)[-1]))
+                handler.json_response(change_review(target, handler.body()))
+            except ReviewConflict as exc:
+                handler.json_response({"error": str(exc)}, HTTPStatus.CONFLICT)
+            except (ValueError, OSError) as exc:
+                handler.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
         if path == '/api/library/visibility':
             try:
                 handler.json_response(set_hidden(self.library, project, handler.body().get('hidden')))
@@ -165,9 +177,7 @@ class ProjectRoutes:
                 _, translated = self.project_folders(project)
                 target = self.safe_file(translated, name)
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(
-                    str(handler.body().get("translated", "")), encoding="utf-8"
-                )
+                save_translation(target, str(handler.body().get("translated", "")))
                 handler.json_response({"ok": True, "words": self.word_count(target)})
             except (ValueError, OSError, json.JSONDecodeError) as exc:
                 handler.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
