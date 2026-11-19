@@ -55,6 +55,9 @@ Trích xuất các cặp xưng hô TRONG HỘI THOẠI giữa các nhân vật, 
 
 Quy tắc bắt buộc:
 - speaker/listener PHẢI dùng đúng tên trong "Danh sách nhân vật chuẩn" nếu nhân vật có trong danh sách; quy đổi mọi biệt danh, danh hiệu, tên tắt về tên chuẩn.
+- Tên nhân vật chỉ dùng để định danh speaker/listener, KHÔNG phải cách xưng hô nền. Không ghi tên riêng, tên tắt hoặc tên riêng kèm danh xưng vào speaker_self/speaker_to_listener; không chuyển các giá trị bị loại này sang temporary_address.
+- Nếu có nguyên tác, đối chiếu đại từ trong nguyên tác với bản dịch: khi 我/你 (hoặc đại từ tương đương) bị dịch thành tên riêng/danh hiệu, bỏ qua giá trị xưng hô đó. Không học cách dịch này làm quy tắc và không tự đoán đại từ thay thế. Nếu không có bằng chứng xưng hô hợp lệ khác trong chương, để trường tương ứng là chuỗi rỗng "" để kế thừa quy tắc trước đây. Khi không có nguyên tác, vẫn loại tên riêng, không suy đoán danh xưng có phải do bản dịch tự thêm hay không.
+- Ví dụ: 我 → "Yến Yến", 你 → "Thẩm Thích chân nhân" thì speaker vẫn là "Ninh Yến Yến", listener vẫn là "Thẩm Thích", nhưng speaker_self và speaker_to_listener đều là "" nếu không có bằng chứng hợp lệ khác. Không rút "chân nhân" từ "Thẩm Thích chân nhân" để lưu thay thế. Danh xưng độc lập như "sư phụ", "chân nhân", "tiểu thư" vẫn được ghi khi thực sự là cách gọi ổn định và không trái nguyên tác được cung cấp.
 - Người kể chuyện ngôi thứ nhất ("tôi") dùng tên "{narrator}".
 - Cả speaker và listener phải là nhân vật cụ thể; không dùng quốc gia, tổ chức, đám đông, nhóm người.
 - speaker_self và speaker_to_listener chỉ ghi XƯNG HÔ NỀN (đại từ hoặc danh xưng ổn định). Nếu trong chương người nói không tự xưng hoặc không gọi trực tiếp thì để chuỗi rỗng "" — TUYỆT ĐỐI không ghi "không rõ", "không xác định", "?".

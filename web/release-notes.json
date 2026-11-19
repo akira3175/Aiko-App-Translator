@@ -1,455 +1,464 @@
 {
-  "versions": [
-    {
-      "version": "1.4.13",
-      "date": "2026-11-19",
-      "title": "Tách chương TXT bằng AI và chọn vị trí dịch",
-      "summary": "Thêm tách chương TXT bằng AI (Beta), chọn chương bắt đầu dịch và cải thiện cập nhật glossary.",
-      "highlights": [
-        "Thêm Tách chương TXT bằng AI (Beta), hỗ trợ nhiều kiểu tiêu đề chương. Chọn engine và model tại Cài đặt → Nhập truyện.",
-        "Cho phép chọn chương bắt đầu dịch. App tự bỏ qua các chương đã dịch và tiếp tục cho đủ số chương đã chọn.",
-        "Khi tạo Context, AI có thể bổ sung thuật ngữ mới và sửa các mục có sẵn trong glossary."
-      ]
-    },
-    {
-      "version": "1.4.12",
-      "date": "2026-11-18",
-      "title": "Duyệt hiệu đính trực tiếp & log gọn hơn",
-      "summary": "Duyệt thay đổi ngay trong trình soạn thảo và làm gọn log terminal.",
-      "highlights": [
-        "Thêm duyệt hiệu đính trực tiếp trong trình soạn thảo, tô màu nội dung thay đổi như VS Code.",
-        "Làm gọn log terminal, bỏ emoji và giảm các dòng lặp."
-      ]
-    },
-    {
-        "version":  "1.4.11",
-        "date":  "2026-11-12",
-        "title":  "Xưng hô nhất quán \u0026 cải thiện điều khiển AI",
-        "summary":  "Cải thiện bộ nhớ xưng hô, kết hợp hiệu đính với cập nhật xưng hô và bổ sung tùy chọn cho các dịch vụ AI.",
-        "highlights":  [
-                           "Xưng hô nhất quán hơn: nhận diện tên và biệt danh tốt hơn, theo dõi cách xưng hô của từng nhân vật với nhau và giữ nguyên các cặp đã khóa.",
-                           "Sửa lịch sử xưng hô an toàn hơn: cảnh báo khi dữ liệu đã thay đổi, tránh ghi đè nhầm trong lúc ứng dụng đang dịch.",
-                           "Hiệu đính kết hợp cập nhật xưng hô: giảm lượt gọi AI bằng cách lấy thông tin xưng hô ngay từ kết quả hiệu đính; tự trích xuất lại nếu nội dung bản dịch thay đổi sau đó.",
-                           "Cải thiện điều khiển ChatGPT và Gemini: hỗ trợ thêm lựa chọn model, chế độ hoạt động và mức suy luận.",
-                           "Google AI Studio: hỗ trợ sử dụng đường dẫn cuộc trò chuyện đã lưu."
-                       ]
-    },
-    {
-      "version": "1.4.10",
-      "date": "2026-10-20",
-      "title": "Chủ đề Anime Pastel & Nâng cấp Gemini Web",
-      "summary": "Thêm 7 theme phong cách Anime & Light Novel, tùy chọn giao diện Pastel dễ thương và nâng cấp chế độ Nhiệm vụ cùng sao chép Markdown trên Gemini Web.",
-      "highlights": [
-        "Thêm 7 theme mới phong cách Anime & Light Novel: Cinnamoroll Sky, Cinnamoroll Night, Schale Daylight, Sakura Latte, Astral Express, Elven Grimoire, Mikan Breeze.",
-        "Thêm tùy chọn 'Nút bấm & khung Pastel dễ thương': bo tròn mềm mại kiểu kẹo bông, hiệu ứng phân tầng dịu nhẹ và bóng đổ màu pastel.",
-        "Thêm tùy chọn cài đặt 'Chọn nhiệm vụ': tự động chuyển sang chế độ Nhiệm vụ trên Gemini Web trước khi gửi prompt.",
-        "Nâng cấp cơ chế sao chép kết quả trực tiếp từ nút Copy chính thức của Gemini Web, đảm bảo giữ chuẩn 100% cấu trúc Markdown và không sót chữ."
-      ]
-    },
-    {
-      "version": "1.4.9",
-      "date": "2026-10-15",
-      "title": "Tối ưu Gemini Web với file đính kèm",
-      "summary": "Tự động gửi prompt dài dưới dạng file .md đính kèm, khắc phục lỗi treo trình duyệt Chrome.",
-      "highlights": [
-        "Tự động chuyển prompt dài thành file prompt.md đính kèm trên Gemini Web, tránh đơ khung chat và lỗi kết nối timeout.",
-        "Thêm tùy chọn 'Số ký tự chuyển prompt thành file .md' (mặc định 15.000 ký tự, nhập 0 để tắt).",
-        "Thêm tùy chọn 'Câu lệnh gửi kèm file prompt.md' cho phép tùy chỉnh lời nhắc gửi cùng file theo ý muốn.",
-        "Cơ chế dự phòng tự động chuyển về dán text truyền thống nếu việc đính kèm file không thành công."
-      ]
-    },
-    {
-      "version": "1.4.8",
-      "date": "2026-10-14",
-      "title": "Cập nhật tương thích Gemini Web mới",
-      "summary": "Tương thích giao diện Gemini Web mới, hỗ trợ model Argon và cấp độ tư duy.",
-      "highlights": [
-        "Tương thích giao diện Gemini Web mới: sửa lỗi kẹt nút chọn model và menu.",
-        "Hỗ trợ model tư duy mới 4 Argon (Argon) cùng các model 3.1 Pro và 3.8 Flash.",
-        "Hỗ trợ submenu Cấp độ tư duy mới: Thấp, Trung bình, Cao.",
-        "Tự động ưu tiên bản 3.8 Flash đầy đủ, tránh chọn nhầm bản 3.5 Flash-Lite.",
-        "Sửa lỗi kết thúc streaming sớm khi Gemini Web tạm dừng sinh text: luôn đợi đầy đủ marker ###END### trước khi hoàn tất."
-      ]
-    },
-    {
-      "version": "1.4.6",
-      "date": "2026-09-25",
-      "title": "Cập nhật ChatGPT Web và sửa lỗi đăng Hako",
-      "summary": "Tương thích giao diện ChatGPT mới, cải thiện đăng chương Hako và trình biên tập.",
-      "highlights": [
-        "Cập nhật khả năng tương thích với giao diện ChatGPT mới: chọn model, mức suy luận và sao chép câu trả lời.",
-        "Sửa lỗi cập nhật chương Hako không nhận cấu hình R2 đã lưu, khiến ảnh không tải lên được.",
-        "Khi đăng hoặc cập nhật Hako, chương có nhiều section chỉ giữ tiêu đề của section đầu.",
-        "Bộ đếm chờ giữa các chương Hako cập nhật trên một dòng, giúp log gọn hơn.",
-        "Cải thiện bố cục thanh tìm kiếm và thay thế.",
-        "Sửa lỗi xem trước không hiển thị ảnh chỉ có trong bản dịch."
-      ]
-    },
-    {
-      "version": "1.4.5",
-      "date": "2026-09-16",
-      "title": "ChatGPT Work ổn định hơn và giao diện gọn hơn",
-      "summary": "Cải thiện sao chép Markdown trên ChatGPT Work và hoàn thiện giao diện Thư viện, Context.",
-      "highlights": [
-        "Cải thiện thao tác sao chép bản dịch trên ChatGPT Work, giữ nguyên định dạng Markdown.",
-        "Thêm icon thường và icon anime riêng cho Thư viện, dễ phân biệt với Kho chương.",
-        "Làm gọn hàng tab chỉnh Context: tên ngắn hơn, tab đang chọn rõ hơn và hỗ trợ cuộn ngang khi cửa sổ hẹp."
-      ]
-    },
-    {
-      "version": "1.4.4",
-      "date": "2026-09-15",
-      "title": "Thư viện truyện và tùy chỉnh Context",
-      "summary": "Quản lý nhiều truyện gọn hơn, tùy chỉnh cách tạo Context và giữ nguyên Markdown khi dùng ChatGPT Web.",
-      "highlights": [
-        "Thêm Thư viện truyện: tìm kiếm, lọc, ẩn/hiện truyện trong danh sách chọn và mở nhanh thư mục lưu truyện.",
-        "Thêm Prompt tạo Context riêng cho từng truyện, hỗ trợ khôi phục mặc định và xem prompt đầy đủ trước khi chạy.",
-        "Cải thiện ChatGPT Web: lấy câu trả lời dưới dạng Markdown, giữ nguyên dấu phân cách ---, chữ đậm, chữ nghiêng và mã ảnh."
-      ]
-    },
-    {
-      "version": "1.4.3",
-      "date": "2026-09-15",
-      "title": "Giữ vị trí ảnh và thêm chương thông minh hơn",
-      "summary": "Ảnh ổn định hơn trong bản dịch và việc nhập thêm chương thuận tiện hơn.",
-      "highlights": [
-        "Thêm tùy chọn Giữ vị trí ảnh bằng mã trong bản dịch, giúp ảnh không bị xê dịch khi AI gộp hoặc tách đoạn.",
-        "Khi không tìm thấy chương trùng làm điểm neo, Thêm chương tự đề xuất volume kế tiếp và bắt đầu từ chương đầu tiên.",
-        "Sửa lỗi tiêu đề chương bị lặp trong nội dung khi nhập truyện hoặc thêm chương từ EPUB.",
-        "Cải thiện kiểm tra vị trí ảnh khi dịch và hiệu đính; app sẽ báo lỗi nếu AI làm mất hoặc đảo thứ tự ảnh."
-      ]
-    },
-    {
-      "version": "1.4.2",
-      "date": "2026-09-11",
-      "title": "Nhập EPUB đầy đủ ảnh và hỗ trợ file lớn",
-      "summary": "Truyện đã nhập bị thiếu ảnh cần nhập lại EPUB để bổ sung.",
-      "highlights": [
-        "Khắc phục thiếu ảnh khi nhập EPUB: nhận diện thêm ảnh nhúng qua SVG, bao gồm ảnh WebP trong EPUB từ ESJ Zone.",
-        "Bỏ giới hạn nhập file 300 MB: áp dụng khi tạo truyện mới và thêm chương từ EPUB/TXT.",
-        "Giảm mức sử dụng RAM khi tải file lớn vào app."
-      ]
-    },
-    {
-      "version": "1.4.1",
-      "date": "2026-09-10",
-      "title": "Sao chép câu trả lời Google AI Studio ổn định hơn",
-      "summary": "Cải thiện thao tác tự động lấy nội dung từ Google AI Studio.",
-      "highlights": [
-        "Cải thiện độ ổn định khi tự động sao chép câu trả lời từ Google AI Studio.",
-        "Khắc phục trường hợp phải rê chuột vào câu trả lời thì ứng dụng mới sao chép được.",
-        "Giữ định dạng Markdown khi lấy nội dung qua “Copy as Markdown”."
-      ]
-    },
-    {
-      "version": "1.4.0",
-      "date": "2026-09-09",
-      "title": "Giao diện gọn hơn, hướng dẫn ngay trong từng trang",
-      "summary": "Tập trung hơn vào công việc chính, tìm chương cần sửa nhanh hơn và xem hướng dẫn mà không phải rời khỏi màn hình đang dùng.",
-      "highlights": [
-        "Tinh gọn tiêu đề, mô tả và khoảng trống thừa; sắp xếp lại các nút thao tác trên Kho chương, Thuật ngữ, Nhân vật, Edit Hako, Chia sẻ, R19 và Cài đặt.",
-        "Thêm nút hướng dẫn theo từng trang, giải thích chức năng, cách thao tác và các lưu ý quan trọng ngay trong ứng dụng.",
-        "Kho chương hiển thị điểm AI review, hỗ trợ sắp xếp điểm thấp trước và mở chi tiết review trực tiếp từ danh sách.",
-        "Tập trung lựa chọn model của từng công đoạn tại Quy trình dịch để việc cấu hình rõ ràng và nhất quán hơn.",
-        "Bổ sung hướng dẫn dùng cú pháp (note: ...) để tạo ghi chú đúng vị trí khi xuất bản hoặc cập nhật chương Hako bằng ứng dụng."
-      ]
-    },
-    {
-      "version": "1.3.0",
-      "date": "2026-09-08",
-      "title": "Tìm toàn truyện và trải nghiệm Aiko mới",
-      "summary": "Tìm nội dung nhanh hơn, mở truyện rõ ràng hơn và làm mới giao diện để sử dụng nhất quán trong những phiên biên tập dài.",
-      "highlights": [
-        "Thêm Tìm trong truyện, hỗ trợ tìm ở bản gốc, bản dịch hoặc cả hai; có thể phân biệt hoa thường, tìm nguyên từ và nhảy thẳng tới kết quả. Mở nhanh bằng Ctrl + Shift + F.",
-        "Hiển thị trạng thái rõ ràng khi mở hoặc chuyển truyện, đồng thời cho phép thử lại nếu tải dữ liệu thất bại.",
-        "Làm mới toàn bộ icon điều hướng và các nút chức năng để giao diện gọn, rõ và đồng bộ hơn.",
-        "Cập nhật bộ minh họa Aiko, gồm icon anime, nút chuyển chương và hình chờ khi mở truyện hoặc chạy review.",
-        "Aiko Midnight trở thành giao diện mặc định cho người dùng mới; lựa chọn theme đã lưu vẫn được giữ nguyên.",
-        "Cải thiện cập nhật nhiều chương lên Hako: tự chờ giữa các chương và có thể dừng an toàn trong thời gian chờ."
-      ]
-    },
-    {
-      "version": "1.2.2",
-      "date": "2026-08-29",
-      "title": "Hiệu đính đúng cấu hình đã chọn",
-      "summary": "Khắc phục cấu hình hiệu đính và tinh chỉnh trải nghiệm mặc định.",
-      "highlights": [
-        "Sửa lỗi Hiệu đính không sử dụng đúng nhà cung cấp và model đã chọn trong Cài đặt.",
-        "Minh họa Aiko giờ mặc định tắt trên lần sử dụng đầu tiên; người dùng vẫn có thể bật lại trong Cài đặt."
-      ]
-    },
-    {
-      "version": "1.2.1",
-      "date": "2026-08-28",
-      "title": "Dịch lại bản còn sót ngôn ngữ ổn định hơn",
-      "summary": "Cải thiện khả năng hoàn thiện bản dịch khi vẫn còn sót ngôn ngữ raw.",
-      "highlights": [
-        "Cải thiện bước tự động dịch lại khi bản dịch còn sót tiếng Trung, Hàn hoặc Thái.",
-        "Yêu cầu kết quả trả về đầy đủ để tránh lưu nội dung bị thiếu hoặc chưa hoàn tất."
-      ]
-    },
-    {
-      "version": "1.2.0",
-      "date": "2026-08-28",
-      "title": "Google AI Studio Web và model Gemini mới nhất",
-      "summary": "Bổ sung engine Google AI Studio Web, tùy chọn model và Thinking linh hoạt hơn.",
-      "highlights": [
-        "Thêm engine thứ 5: Google AI Studio Web.",
-        "Hỗ trợ chọn model AI Studio bằng tên model trên URL.",
-        "Hỗ trợ chọn mức Thinking: Low, Medium hoặc High.",
-        "Tự động sử dụng model Gemini mới nhất: gemini-flash-latest cho dịch và hiệu đính; gemini-flash-lite-latest cho review và xuất xưng hô.",
-        "Mỗi công đoạn hiển thị đúng model mặc định của engine đã chọn.",
-        "Sửa nút Review lại không hoạt động đúng theo engine đã chọn.",
-        "Tăng độ ổn định khi AI Studio xử lý nội dung dài."
-      ]
-    },
-    {
-      "version": "1.1.2",
-      "date": "2026-08-27",
-      "title": "Khắc phục lỗi khởi động Tạo Context",
-      "summary": "Bản vá khôi phục khả năng chạy tác vụ Tạo Context.",
-      "highlights": [
-        "Khắc phục lỗi khiến tác vụ Tạo Context không thể khởi động trên một số máy."
-      ]
-    },
-    {
-      "version": "1.1.1",
-      "date": "2026-08-27",
-      "title": "Khắc phục cấu hình model trong Quy trình dịch",
-      "summary": "Bản vá giúp việc thay đổi model hoạt động chính xác hơn và hiển thị rõ model thực tế đang được sử dụng.",
-      "highlights": [
-        "Khắc phục lỗi không thể thay đổi hoặc lưu model cho một số công đoạn trong Quy trình dịch.",
-        "Model Review và Tạo Context giờ được lưu chính xác, không còn bị đặt lại ngoài ý muốn.",
-        "Hồ sơ nhân vật giờ sử dụng đúng model Gemini API đã cấu hình.",
-        "Console hiển thị rõ công đoạn, provider và model thực tế đang được sử dụng."
-      ]
-    },
-    {
-      "version": "1.1.0",
-      "date": "2026-08-27",
-      "title": "Giao diện mới, dịch trực tiếp và trải nghiệm mượt mà hơn",
-      "summary": "Bản cập nhật mở rộng khả năng tùy biến giao diện, bổ sung streaming Gemini API và cải thiện độ ổn định trong suốt quá trình dịch.",
-      "highlights": [
-        "Thêm 5 giao diện mới: GitHub Theme, One Dark Pro, Everforest Dark Medium, Night Owl và Catppuccin Mocha.",
-        "Đổi tên Aiko Anime thành Aiko Midnight; có thể bật hoặc tắt minh họa Aiko độc lập trên mọi giao diện.",
-        "Làm mới bộ icon anime, cải thiện độ cân chỉnh và khả năng hiển thị trên nền tối.",
-        "Tối ưu Không gian dịch gọn gàng hơn, dành nhiều diện tích cho bản thảo và thích ứng tốt hơn với màn hình nhỏ.",
-        "Thêm tùy chọn Streaming thử nghiệm cho Gemini API, cho phép xem bản dịch xuất hiện trực tiếp trong editor.",
-        "Cải thiện trạng thái tiến trình AI: hiển thị thời điểm từng thông báo và cho biết khi prompt đã được gửi, đang chờ phản hồi.",
-        "Review và Nhật ký AI được cập nhật nhanh hơn trong lúc pipeline đang chạy.",
-        "Console không còn tự kéo xuống dưới khi người dùng đang đọc nội dung cũ.",
-        "Tăng độ ổn định khi Gemini quá tải hoặc gặp lỗi tạm thời; ứng dụng tự chờ và thử lại.",
-        "Giảm các lần gọi và làm mới không cần thiết để giao diện hoạt động nhẹ hơn."
-      ]
-    },
-    {
-      "version": "1.0.6",
-      "date": "2026-08-25",
-      "title": "Cải thiện độ chính xác khi dịch và kiểm tra bản dịch",
-      "summary": "ChatGPT Web giờ nhận đầy đủ tài liệu tham chiếu của chương trong quá trình dịch.",
-      "highlights": [
-        "Chức năng kiểm tra toàn bộ và kiểm tra nền giờ sử dụng hồ sơ nhân vật liên quan.",
-        "Cải thiện khả năng kiểm tra tên nhân vật, giới tính, cách xưng hô và tính nhất quán với bản dịch.",
-        "Ghi nhận tài liệu đã sử dụng trong nhật ký kiểm tra để hỗ trợ đối chiếu khi cần."
-      ]
-    },
-    {
-      "version": "1.0.5",
-      "date": "2026-08-24",
-      "title": "Cập nhật ứng dụng an toàn hơn",
-      "summary": "Bản vá khắc phục lỗi file của Launcher bị khóa trong lúc cài đặt phiên bản mới và cải thiện khả năng khôi phục khi cập nhật thất bại.",
-      "highlights": [
-        "Updater giờ tự đóng Aiko Launcher trước khi thay thế file ứng dụng.",
-        "Khắc phục lỗi aiko-blue-logo.png đang được tiến trình khác sử dụng khi cập nhật.",
-        "Cải thiện rollback để không xóa nhầm file cũ khi một bước thay thế chưa hoàn tất."
-      ]
-    },
-    {
-      "version": "1.0.4",
-      "date": "2026-08-24",
-      "title": "Áp dụng chính xác prompt tùy chỉnh",
-      "summary": "Bản vá bảo đảm prompt dịch và prompt hiệu đính tùy chỉnh theo từng truyện được sử dụng đúng trong quá trình xử lý.",
-      "highlights": [
-        "Sửa lỗi khiến prompt dịch và prompt hiệu đính tùy chỉnh theo từng truyện đôi khi không được áp dụng.",
-        "Prompt do bạn chọn hoặc tự viết trong phần Bộ nhớ truyện giờ sẽ được sử dụng chính xác khi dịch và hiệu đính."
-      ]
-    },
-    {
-      "version": "1.0.3",
-      "date": "2026-08-24",
-      "title": "Cập nhật rõ ràng, mở truyện nhanh hơn",
-      "summary": "Bản cập nhật cải thiện Launcher, quá trình cập nhật, tốc độ chuyển truyện và khả năng giữ định dạng khi xuất sách.",
-      "highlights": [
-        "Có thêm Aiko Launcher để mở ứng dụng, khởi động lại hoặc tắt server thuận tiện hơn.",
-        "Cải thiện cập nhật ứng dụng: hiển thị dung lượng đã tải, phần trăm, tốc độ và thời gian còn lại.",
-        "Có thể hủy tải bản cập nhật trước khi bắt đầu cài đặt.",
-        "Khắc phục lỗi font tiếng Việt trong cửa sổ cập nhật.",
-        "Mở và chuyển đổi giữa các truyện nhanh hơn, đặc biệt với dự án có hàng nghìn chương.",
-        "EPUB và DOCX giờ giữ nguyên chữ in đậm, in nghiêng và đậm-nghiêng."
-      ]
-    },
-    {
-      "version": "1.0.2",
-      "date": "2026-08-23",
-      "title": "Aiko ổn định và dễ sử dụng hơn",
-      "summary": "Bản cập nhật cải thiện Launcher, cấu hình quy trình dịch và độ ổn định khi sử dụng ChatGPT Web hoặc Gemini Web.",
-      "highlights": [
-        "Ra mắt Launcher mới với giao diện đẹp và dễ sử dụng hơn.",
-        "Chỉ cần tải một file EXE để cài đặt và cập nhật Aiko.",
-        "Sửa lỗi không lưu được cấu hình quy trình dịch.",
-        "ChatGPT giờ mở đúng cuộc trò chuyện đã thiết lập.",
-        "Khắc phục trình duyệt đóng mở liên tục khi dịch.",
-        "Cải thiện độ ổn định khi khởi động và chạy tác vụ."
-      ]
-    },
-    {
-      "version": "1.0.1",
-      "date": "2026-08-23",
-      "title": "Sửa lỗi mở ChatGPT Web và Gemini Web",
-      "summary": "Bản vá sửa lỗi trình duyệt của ứng dụng không thể khởi động trên một số bản portable.",
-      "highlights": [
-        "Sửa lỗi Binary Location Must be a String khi mở ChatGPT Web hoặc Gemini Web.",
-        "Chuẩn hóa đường dẫn Chrome và ChromeDriver portable để tương thích đúng với Selenium."
-      ]
-    },
-    {
-      "version": "1.0.0",
-      "date": "2026-08-23",
-      "title": "Aiko 1.0 — Quy trình dịch hợp nhất",
-      "summary": "Aiko 1.0 hợp nhất các engine cũ thành một quy trình dịch linh hoạt, cho phép chọn AI riêng cho từng công đoạn, đồng thời bổ sung launcher Windows và tự chuyển đổi project từ v0.13.",
-      "highlights": [
-        "Hợp nhất các chế độ V1, V2, V3 và GPT thành một quy trình dịch 1.0 dễ cấu hình hơn.",
-        "Cho phép chọn riêng Gemini API, Gemini Web, OpenAI API hoặc ChatGPT Web cho từng công đoạn: dịch, hiệu đính, xưng hô, review, tạo Context và hồ sơ nhân vật.",
-        "Mỗi công đoạn có thể chọn model và mức suy nghĩ riêng; các bước hiệu đính, xưng hô và review có thể tắt độc lập.",
-        "Thêm Aiko Launcher cho Windows với bảng điều khiển server, khởi động lại, tạo shortcut Desktop/Start Menu và tắt server.",
-        "Người dùng nâng cấp từ v0.13 được hướng dẫn mở launcher mới ngay trong ứng dụng và chỉ cần thiết lập một lần.",
-        "Project v0.13 được giữ nguyên và tự chuyển đổi an toàn khi mở lần đầu; dữ liệu YAML cũ được lưu lại dưới dạng .legacy.",
-        "Chuyển Context, glossary, xưng hô, review, publishing và trạng thái project sang định dạng JSON/TXT dễ kiểm tra và ổn định hơn.",
-        "Cải thiện độ ổn định của dịch, hiệu đính và review; giữ bản dịch cũ và dữ liệu project khi một công đoạn gặp lỗi.",
-        "Tổ chức lại giao diện cài đặt theo từng công đoạn, giúp nhìn rõ engine, model và mức suy nghĩ đang được sử dụng."
-      ]
-    },
-    {
-      "version": "0.13.0",
-      "date": "2026-08-17",
-      "title": "ChatGPT Web V2 và Chrome dùng chung",
-      "summary": "Thêm pipeline ChatGPT Web hoàn chỉnh, cho phép cấu hình riêng từng giai đoạn và cải thiện khả năng điều khiển trình duyệt tự động.",
-      "highlights": [
-        "Thêm ChatGPT Web V2, chạy toàn bộ quy trình dịch, hiệu đính, xuất xưng hô và review trực tiếp trên ChatGPT Web theo batch.",
-        "Cho phép bật/tắt từng bước hậu dịch và chọn model, mức suy luận riêng cho dịch, hiệu đính, xưng hô và review.",
-        "Mỗi giai đoạn sử dụng chat riêng, tự chọn model và mức suy luận qua menu ChatGPT; cải thiện việc chờ prompt, nhận response và kiểm tra kết quả hoàn tất.",
-        "Tự lưu bản dịch sau từng mốc quan trọng, giúp hạn chế mất kết quả khi một bước hậu dịch gặp lỗi.",
-        "Thêm Chrome của ứng dụng dùng chung cho ChatGPT, Gemini và duyệt web thông thường; người dùng có thể chủ động đăng nhập, đăng xuất hoặc đổi tài khoản.",
-        "Cải thiện nhật ký ChatGPT Web: tiến độ nhận response cập nhật trên một dòng và hỗ trợ tốt hơn terminal Windows dùng tiếng Việt."
-      ]
-    },
-    {
-      "version": "0.12.3",
-      "date": "2026-08-15",
-      "title": "Chỉnh lịch sử xưng hô, polish ổn định hơn",
-      "summary": "Bản cập nhật cho phép sửa chính xác từng mốc xưng hô và thống nhất cách gửi tài liệu tham chiếu trong bước polish.",
-      "highlights": [
-        "Cho phép chỉnh sửa trực tiếp từng mốc trong lịch sử xưng hô; app cập nhật đúng bản ghi được chọn, không ảnh hưởng các mốc còn lại và tự tạo pronouns.yaml.bak.",
-        "Chuyển tài liệu nhân vật và xưng hô của bước polish sang dạng văn bản tham chiếu, giống lượt dịch V1; áp dụng chung cho V1, V2 và V3, không còn phụ thuộc Gemini Files API."
-      ]
-    },
-    {
-      "version": "0.12.2",
-      "date": "2026-08-14",
-      "title": "V1 Interactions ổn định hơn, cấu hình Gemini gọn hơn",
-      "summary": "Bản cập nhật giúp V1 Interactions tự tiếp tục khi Gemini gặp lỗi tạm thời và đơn giản hóa cấu hình sinh nội dung.",
-      "highlights": [
-        "Giúp V1 Interactions tiếp tục chạy khi Gemini tạm thời quá tải hoặc gặp lỗi, thay vì dừng tác vụ và hiện traceback.",
-        "Loại bỏ Temperature, Top P và Top K khỏi toàn bộ lời gọi Gemini, để model tự sử dụng cấu hình mặc định."
-      ]
-    },
-    {
-      "version": "0.12.1",
-      "date": "2026-08-14",
-      "title": "Quản lý Gemini API key tốt hơn, ổn định dịch V1",
-      "summary": "Bản cập nhật cải thiện khả năng kiểm tra và lựa chọn Gemini API key, ghi nhớ key đang sử dụng, đồng thời sửa lỗi dừng tác vụ và tương thích tài liệu trong V1 Interactions.",
-      "highlights": [
-        "Thêm kiểm tra từng Gemini API key hoặc kiểm tra hàng loạt bằng yêu cầu sinh nội dung thật; hiển thị gọn mã lỗi, model và trạng thái của từng key.",
-        "Cho phép chọn API key bắt đầu; app ghi nhớ key hiện tại bằng fingerprint và tiếp tục từ đúng key khi chạy lại, thay vì luôn quay về key đầu tiên.",
-        "Hiển thị số thứ tự API key đang sử dụng trong phần cài đặt và nhật ký tác vụ.",
-        "Sửa lỗi nút Dừng ngay bị khóa ở lần chạy tiếp theo, khiến người dùng phải F5.",
-        "Sửa lỗi 400 unsupported mime_type của V1 Interactions bằng cách gửi hồ sơ nhân vật và xưng hô dưới dạng văn bản tham chiếu."
-      ]
-    },
-    {
-      "version": "0.12.0",
-      "date": "2026-08-13",
-      "title": "Sidebar tùy biến, nhật ký AI và xuất truyện hoàn chỉnh",
-      "summary": "Bản cập nhật bổ sung khả năng tùy biến giao diện, kiểm tra dữ liệu gửi AI, đối chiếu chương Hako và xuất truyện sang các định dạng phổ biến.",
-      "highlights": [
-        "Thêm menu quản lý sidebar: tìm kiếm, ghim, bỏ ghim và kéo thả sắp xếp.",
-        "Thêm Nhật ký AI để xem prompt, phản hồi, model và tệp đính kèm.",
-        "Gửi snapshot nhân vật và xưng hô vào Gemini/GPT khi dịch và hiệu đính.",
-        "Thêm công cụ đối chiếu, cập nhật chương Hako theo phạm vi.",
-        "Thêm xuất truyện EPUB, DOCX và Markdown từ Kho chương.",
-        "Chuyển API key, từ R19 và tùy chỉnh sidebar vào thư mục data."
-      ]
-    },
-    {
-      "version": "0.11.0",
-      "date": "2026-08-12",
-      "title": "Review chính xác hơn, chia sẻ và nhập truyện linh hoạt hơn",
-      "summary": "Bản cập nhật bổ sung trang quản lý Dịch R19, đồng bộ hệ thống review đa ngôn ngữ và cải thiện quy trình tạo glossary, chia sẻ chương cùng khả năng nhập EPUB.",
-      "highlights": [
-        "Thêm trang quản lý Dịch R19 với danh sách từ dùng chung và số chương ngữ cảnh riêng.",
-        "Review nền chạy bằng worker riêng song song với quá trình dịch, tự đổi API key khi gặp lỗi 4xx và thử lại cùng key khi gặp 408/5xx.",
-        "Đồng bộ Review nền và Review toàn bộ về cùng một prompt, cùng tiêu chí tùy chỉnh và hỗ trợ mọi ngôn ngữ nguồn sang tiếng Việt.",
-        "Review nhận đầy đủ raw và bản dịch cuối cùng sau hiệu đính; sửa lỗi cắt độc lập tự gây báo thiếu nội dung hoặc còn ngoại ngữ sai.",
-        "Cải thiện prompt tạo glossary cho tiếng Hàn, Trung, Nhật, Anh và các ngôn ngữ khác; nhận diện tên riêng và cách chuyển tự phù hợp với từng nguồn.",
-        "Tự gộp các segment s1, s2… thành một chương khi Share, giữ một tiêu đề và dọn dữ liệu segment cũ trên R2.",
-        "Cải thiện giao diện đọc Share với cột nội dung cân đối, điều hướng chương thuận tiện hơn trên desktop và thiết bị di động.",
-        "Hỗ trợ EPUB chứa nhiều chương dạng <section> trong cùng một file XHTML, kết hợp tiêu đề từ NCX mà vẫn giữ cơ chế nhập EPUB cũ làm dự phòng.",
-        "Sửa một số lỗi bố cục biểu mẫu và cải thiện hiển thị các thiết lập dài."
-      ]
-    },
-    {
-      "version": "0.10.0",
-      "date": "2026-08-06",
-      "title": "Chia sẻ truyện riêng tư qua R2, quản lý chương thuận tiện hơn",
-      "summary": "Bản cập nhật bổ sung hệ thống chia sẻ truyện trực tiếp trên Cloudflare R2, tự động thiết lập Cloudflare, cải thiện quản lý glossary và tinh chỉnh phạm vi chạy tác vụ dịch.",
-      "highlights": [
-        "Thêm hệ thống chia sẻ truyện private qua Cloudflare R2 và giao diện đọc truyện trực tuyến.",
-        "Chương được tải theo nhu cầu khi người đọc chuyển chương, không tải toàn bộ truyện ngay từ đầu.",
-        "Tự động tạo bucket, triển khai Share Worker và điền cấu hình R2 từ Cloudflare Account ID cùng API Token.",
-        "Thêm tự động thiết lập R2 Xuất bản, tạo bucket ảnh public và lấy đường dẫn r2.dev.",
-        "Cho phép tìm kiếm, thêm, chỉnh sửa và xóa glossary ngay tại giao diện chính.",
-        "Thêm số chương muốn chạy cho tác vụ dịch đơn; tác vụ batch dùng số lần chạy batch và nhập 0 để chạy đến hết."
-      ]
-    },
-    {
-      "version": "0.9.0",
-      "date": "2026-08-05",
-      "title": "Prompt theo phong cách riêng, dịch web chính xác hơn",
-      "summary": "Bản cập nhật mở rộng khả năng tùy chỉnh prompt theo từng truyện và ngăn Gemini, ChatGPT lấy nhầm bản dịch cũ trong cùng cuộc trò chuyện.",
-      "highlights": [
-        "Cho phép chọn prompt dịch mẫu hoặc tự chỉnh vai trò và nhiệm vụ theo từng truyện.",
-        "Thêm prompt hiệu đính tùy chỉnh với các mẫu cân bằng, sát nguyên tác, biên tập văn học và sửa lỗi tối thiểu.",
-        "Áp dụng prompt hiệu đính riêng cho cả Gemini API và GPT API.",
-        "Ngăn ChatGPT Web và Gemini Web lấy nhầm câu trả lời cũ khi tiếp tục dùng cùng cuộc trò chuyện.",
-        "Bổ sung đầy đủ dấu tiếng Việt cho prompt hiệu đính Gemini.",
-        "Thêm cửa sổ Có gì mới để giới thiệu nội dung sau khi cập nhật.",
-        "Tinh gọn danh sách tác vụ bằng cách ẩn Chèn thuật ngữ và Tách review khỏi giao diện chính."
-      ]
-    },
-    {
-      "version": "0.8.0",
-      "date": "2026-08-04",
-      "title": "Dịch linh hoạt hơn, xuất bản liền mạch hơn",
-      "summary": "Bản cập nhật tập trung vào khả năng tùy chỉnh engine dịch, độ an toàn của glossary và quy trình đăng chương lên Hako.",
-      "highlights": [
-        "Mở cuộc trò chuyện ChatGPT đã chuẩn bị sẵn prompt mớm trước khi gửi prompt dịch chính.",
-        "Cho phép bỏ qua các model phụ Gemini API và GPT API khi để trống hoặc nhập none.",
-        "Thêm model cập nhật xưng hô riêng cho Gemini API và GPT API.",
-        "Cảnh báo khi chương dịch vượt quá phạm vi glossary đã duyệt.",
-        "Tự tạo ghi chú Hako từ cú pháp (note: nội dung) và gắn note đúng vị trí.",
-        "Thay logo, brandmark và favicon mới; cải thiện hiển thị tên truyện dài.",
-        "Bản portable có thể tự chuẩn bị môi trường build khi máy không cài Python hệ thống."
-      ]
-    }
-  ]
+    "versions":  [
+                     {
+                         "version":  "1.4.14",
+                         "date":  "2026-11-19",
+                         "title":  "Cải thiện trích xuất xưng hô",
+                         "summary":  "Cải thiện trích xuất xưng hô, tránh ghi nhầm tên nhân vật thành cách tự xưng hoặc gọi đối phương.",
+                         "highlights":  [
+                                            "Cải thiện trích xuất xưng hô, tránh ghi nhầm tên nhân vật thành cách tự xưng hoặc gọi đối phương."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.13",
+                         "date":  "2026-11-19",
+                         "title":  "Tách chương TXT bằng AI và chọn vị trí dịch",
+                         "summary":  "Thêm tách chương TXT bằng AI (Beta), chọn chương bắt đầu dịch và cải thiện cập nhật glossary.",
+                         "highlights":  [
+                                            "Thêm Tách chương TXT bằng AI (Beta), hỗ trợ nhiều kiểu tiêu đề chương. Chọn engine và model tại Cài đặt → Nhập truyện.",
+                                            "Cho phép chọn chương bắt đầu dịch. App tự bỏ qua các chương đã dịch và tiếp tục cho đủ số chương đã chọn.",
+                                            "Khi tạo Context, AI có thể bổ sung thuật ngữ mới và sửa các mục có sẵn trong glossary."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.12",
+                         "date":  "2026-11-18",
+                         "title":  "Duyệt hiệu đính trực tiếp \u0026 log gọn hơn",
+                         "summary":  "Duyệt thay đổi ngay trong trình soạn thảo và làm gọn log terminal.",
+                         "highlights":  [
+                                            "Thêm duyệt hiệu đính trực tiếp trong trình soạn thảo, tô màu nội dung thay đổi như VS Code.",
+                                            "Làm gọn log terminal, bỏ emoji và giảm các dòng lặp."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.11",
+                         "date":  "2026-11-12",
+                         "title":  "Xưng hô nhất quán \u0026 cải thiện điều khiển AI",
+                         "summary":  "Cải thiện bộ nhớ xưng hô, kết hợp hiệu đính với cập nhật xưng hô và bổ sung tùy chọn cho các dịch vụ AI.",
+                         "highlights":  [
+                                            "Xưng hô nhất quán hơn: nhận diện tên và biệt danh tốt hơn, theo dõi cách xưng hô của từng nhân vật với nhau và giữ nguyên các cặp đã khóa.",
+                                            "Sửa lịch sử xưng hô an toàn hơn: cảnh báo khi dữ liệu đã thay đổi, tránh ghi đè nhầm trong lúc ứng dụng đang dịch.",
+                                            "Hiệu đính kết hợp cập nhật xưng hô: giảm lượt gọi AI bằng cách lấy thông tin xưng hô ngay từ kết quả hiệu đính; tự trích xuất lại nếu nội dung bản dịch thay đổi sau đó.",
+                                            "Cải thiện điều khiển ChatGPT và Gemini: hỗ trợ thêm lựa chọn model, chế độ hoạt động và mức suy luận.",
+                                            "Google AI Studio: hỗ trợ sử dụng đường dẫn cuộc trò chuyện đã lưu."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.10",
+                         "date":  "2026-10-20",
+                         "title":  "Chủ đề Anime Pastel \u0026 Nâng cấp Gemini Web",
+                         "summary":  "Thêm 7 theme phong cách Anime \u0026 Light Novel, tùy chọn giao diện Pastel dễ thương và nâng cấp chế độ Nhiệm vụ cùng sao chép Markdown trên Gemini Web.",
+                         "highlights":  [
+                                            "Thêm 7 theme mới phong cách Anime \u0026 Light Novel: Cinnamoroll Sky, Cinnamoroll Night, Schale Daylight, Sakura Latte, Astral Express, Elven Grimoire, Mikan Breeze.",
+                                            "Thêm tùy chọn \u0027Nút bấm \u0026 khung Pastel dễ thương\u0027: bo tròn mềm mại kiểu kẹo bông, hiệu ứng phân tầng dịu nhẹ và bóng đổ màu pastel.",
+                                            "Thêm tùy chọn cài đặt \u0027Chọn nhiệm vụ\u0027: tự động chuyển sang chế độ Nhiệm vụ trên Gemini Web trước khi gửi prompt.",
+                                            "Nâng cấp cơ chế sao chép kết quả trực tiếp từ nút Copy chính thức của Gemini Web, đảm bảo giữ chuẩn 100% cấu trúc Markdown và không sót chữ."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.9",
+                         "date":  "2026-10-15",
+                         "title":  "Tối ưu Gemini Web với file đính kèm",
+                         "summary":  "Tự động gửi prompt dài dưới dạng file .md đính kèm, khắc phục lỗi treo trình duyệt Chrome.",
+                         "highlights":  [
+                                            "Tự động chuyển prompt dài thành file prompt.md đính kèm trên Gemini Web, tránh đơ khung chat và lỗi kết nối timeout.",
+                                            "Thêm tùy chọn \u0027Số ký tự chuyển prompt thành file .md\u0027 (mặc định 15.000 ký tự, nhập 0 để tắt).",
+                                            "Thêm tùy chọn \u0027Câu lệnh gửi kèm file prompt.md\u0027 cho phép tùy chỉnh lời nhắc gửi cùng file theo ý muốn.",
+                                            "Cơ chế dự phòng tự động chuyển về dán text truyền thống nếu việc đính kèm file không thành công."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.8",
+                         "date":  "2026-10-14",
+                         "title":  "Cập nhật tương thích Gemini Web mới",
+                         "summary":  "Tương thích giao diện Gemini Web mới, hỗ trợ model Argon và cấp độ tư duy.",
+                         "highlights":  [
+                                            "Tương thích giao diện Gemini Web mới: sửa lỗi kẹt nút chọn model và menu.",
+                                            "Hỗ trợ model tư duy mới 4 Argon (Argon) cùng các model 3.1 Pro và 3.8 Flash.",
+                                            "Hỗ trợ submenu Cấp độ tư duy mới: Thấp, Trung bình, Cao.",
+                                            "Tự động ưu tiên bản 3.8 Flash đầy đủ, tránh chọn nhầm bản 3.5 Flash-Lite.",
+                                            "Sửa lỗi kết thúc streaming sớm khi Gemini Web tạm dừng sinh text: luôn đợi đầy đủ marker ###END### trước khi hoàn tất."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.6",
+                         "date":  "2026-09-25",
+                         "title":  "Cập nhật ChatGPT Web và sửa lỗi đăng Hako",
+                         "summary":  "Tương thích giao diện ChatGPT mới, cải thiện đăng chương Hako và trình biên tập.",
+                         "highlights":  [
+                                            "Cập nhật khả năng tương thích với giao diện ChatGPT mới: chọn model, mức suy luận và sao chép câu trả lời.",
+                                            "Sửa lỗi cập nhật chương Hako không nhận cấu hình R2 đã lưu, khiến ảnh không tải lên được.",
+                                            "Khi đăng hoặc cập nhật Hako, chương có nhiều section chỉ giữ tiêu đề của section đầu.",
+                                            "Bộ đếm chờ giữa các chương Hako cập nhật trên một dòng, giúp log gọn hơn.",
+                                            "Cải thiện bố cục thanh tìm kiếm và thay thế.",
+                                            "Sửa lỗi xem trước không hiển thị ảnh chỉ có trong bản dịch."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.5",
+                         "date":  "2026-09-16",
+                         "title":  "ChatGPT Work ổn định hơn và giao diện gọn hơn",
+                         "summary":  "Cải thiện sao chép Markdown trên ChatGPT Work và hoàn thiện giao diện Thư viện, Context.",
+                         "highlights":  [
+                                            "Cải thiện thao tác sao chép bản dịch trên ChatGPT Work, giữ nguyên định dạng Markdown.",
+                                            "Thêm icon thường và icon anime riêng cho Thư viện, dễ phân biệt với Kho chương.",
+                                            "Làm gọn hàng tab chỉnh Context: tên ngắn hơn, tab đang chọn rõ hơn và hỗ trợ cuộn ngang khi cửa sổ hẹp."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.4",
+                         "date":  "2026-09-15",
+                         "title":  "Thư viện truyện và tùy chỉnh Context",
+                         "summary":  "Quản lý nhiều truyện gọn hơn, tùy chỉnh cách tạo Context và giữ nguyên Markdown khi dùng ChatGPT Web.",
+                         "highlights":  [
+                                            "Thêm Thư viện truyện: tìm kiếm, lọc, ẩn/hiện truyện trong danh sách chọn và mở nhanh thư mục lưu truyện.",
+                                            "Thêm Prompt tạo Context riêng cho từng truyện, hỗ trợ khôi phục mặc định và xem prompt đầy đủ trước khi chạy.",
+                                            "Cải thiện ChatGPT Web: lấy câu trả lời dưới dạng Markdown, giữ nguyên dấu phân cách ---, chữ đậm, chữ nghiêng và mã ảnh."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.3",
+                         "date":  "2026-09-15",
+                         "title":  "Giữ vị trí ảnh và thêm chương thông minh hơn",
+                         "summary":  "Ảnh ổn định hơn trong bản dịch và việc nhập thêm chương thuận tiện hơn.",
+                         "highlights":  [
+                                            "Thêm tùy chọn Giữ vị trí ảnh bằng mã trong bản dịch, giúp ảnh không bị xê dịch khi AI gộp hoặc tách đoạn.",
+                                            "Khi không tìm thấy chương trùng làm điểm neo, Thêm chương tự đề xuất volume kế tiếp và bắt đầu từ chương đầu tiên.",
+                                            "Sửa lỗi tiêu đề chương bị lặp trong nội dung khi nhập truyện hoặc thêm chương từ EPUB.",
+                                            "Cải thiện kiểm tra vị trí ảnh khi dịch và hiệu đính; app sẽ báo lỗi nếu AI làm mất hoặc đảo thứ tự ảnh."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.2",
+                         "date":  "2026-09-11",
+                         "title":  "Nhập EPUB đầy đủ ảnh và hỗ trợ file lớn",
+                         "summary":  "Truyện đã nhập bị thiếu ảnh cần nhập lại EPUB để bổ sung.",
+                         "highlights":  [
+                                            "Khắc phục thiếu ảnh khi nhập EPUB: nhận diện thêm ảnh nhúng qua SVG, bao gồm ảnh WebP trong EPUB từ ESJ Zone.",
+                                            "Bỏ giới hạn nhập file 300 MB: áp dụng khi tạo truyện mới và thêm chương từ EPUB/TXT.",
+                                            "Giảm mức sử dụng RAM khi tải file lớn vào app."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.1",
+                         "date":  "2026-09-10",
+                         "title":  "Sao chép câu trả lời Google AI Studio ổn định hơn",
+                         "summary":  "Cải thiện thao tác tự động lấy nội dung từ Google AI Studio.",
+                         "highlights":  [
+                                            "Cải thiện độ ổn định khi tự động sao chép câu trả lời từ Google AI Studio.",
+                                            "Khắc phục trường hợp phải rê chuột vào câu trả lời thì ứng dụng mới sao chép được.",
+                                            "Giữ định dạng Markdown khi lấy nội dung qua “Copy as Markdown”."
+                                        ]
+                     },
+                     {
+                         "version":  "1.4.0",
+                         "date":  "2026-09-09",
+                         "title":  "Giao diện gọn hơn, hướng dẫn ngay trong từng trang",
+                         "summary":  "Tập trung hơn vào công việc chính, tìm chương cần sửa nhanh hơn và xem hướng dẫn mà không phải rời khỏi màn hình đang dùng.",
+                         "highlights":  [
+                                            "Tinh gọn tiêu đề, mô tả và khoảng trống thừa; sắp xếp lại các nút thao tác trên Kho chương, Thuật ngữ, Nhân vật, Edit Hako, Chia sẻ, R19 và Cài đặt.",
+                                            "Thêm nút hướng dẫn theo từng trang, giải thích chức năng, cách thao tác và các lưu ý quan trọng ngay trong ứng dụng.",
+                                            "Kho chương hiển thị điểm AI review, hỗ trợ sắp xếp điểm thấp trước và mở chi tiết review trực tiếp từ danh sách.",
+                                            "Tập trung lựa chọn model của từng công đoạn tại Quy trình dịch để việc cấu hình rõ ràng và nhất quán hơn.",
+                                            "Bổ sung hướng dẫn dùng cú pháp (note: ...) để tạo ghi chú đúng vị trí khi xuất bản hoặc cập nhật chương Hako bằng ứng dụng."
+                                        ]
+                     },
+                     {
+                         "version":  "1.3.0",
+                         "date":  "2026-09-08",
+                         "title":  "Tìm toàn truyện và trải nghiệm Aiko mới",
+                         "summary":  "Tìm nội dung nhanh hơn, mở truyện rõ ràng hơn và làm mới giao diện để sử dụng nhất quán trong những phiên biên tập dài.",
+                         "highlights":  [
+                                            "Thêm Tìm trong truyện, hỗ trợ tìm ở bản gốc, bản dịch hoặc cả hai; có thể phân biệt hoa thường, tìm nguyên từ và nhảy thẳng tới kết quả. Mở nhanh bằng Ctrl + Shift + F.",
+                                            "Hiển thị trạng thái rõ ràng khi mở hoặc chuyển truyện, đồng thời cho phép thử lại nếu tải dữ liệu thất bại.",
+                                            "Làm mới toàn bộ icon điều hướng và các nút chức năng để giao diện gọn, rõ và đồng bộ hơn.",
+                                            "Cập nhật bộ minh họa Aiko, gồm icon anime, nút chuyển chương và hình chờ khi mở truyện hoặc chạy review.",
+                                            "Aiko Midnight trở thành giao diện mặc định cho người dùng mới; lựa chọn theme đã lưu vẫn được giữ nguyên.",
+                                            "Cải thiện cập nhật nhiều chương lên Hako: tự chờ giữa các chương và có thể dừng an toàn trong thời gian chờ."
+                                        ]
+                     },
+                     {
+                         "version":  "1.2.2",
+                         "date":  "2026-08-29",
+                         "title":  "Hiệu đính đúng cấu hình đã chọn",
+                         "summary":  "Khắc phục cấu hình hiệu đính và tinh chỉnh trải nghiệm mặc định.",
+                         "highlights":  [
+                                            "Sửa lỗi Hiệu đính không sử dụng đúng nhà cung cấp và model đã chọn trong Cài đặt.",
+                                            "Minh họa Aiko giờ mặc định tắt trên lần sử dụng đầu tiên; người dùng vẫn có thể bật lại trong Cài đặt."
+                                        ]
+                     },
+                     {
+                         "version":  "1.2.1",
+                         "date":  "2026-08-28",
+                         "title":  "Dịch lại bản còn sót ngôn ngữ ổn định hơn",
+                         "summary":  "Cải thiện khả năng hoàn thiện bản dịch khi vẫn còn sót ngôn ngữ raw.",
+                         "highlights":  [
+                                            "Cải thiện bước tự động dịch lại khi bản dịch còn sót tiếng Trung, Hàn hoặc Thái.",
+                                            "Yêu cầu kết quả trả về đầy đủ để tránh lưu nội dung bị thiếu hoặc chưa hoàn tất."
+                                        ]
+                     },
+                     {
+                         "version":  "1.2.0",
+                         "date":  "2026-08-28",
+                         "title":  "Google AI Studio Web và model Gemini mới nhất",
+                         "summary":  "Bổ sung engine Google AI Studio Web, tùy chọn model và Thinking linh hoạt hơn.",
+                         "highlights":  [
+                                            "Thêm engine thứ 5: Google AI Studio Web.",
+                                            "Hỗ trợ chọn model AI Studio bằng tên model trên URL.",
+                                            "Hỗ trợ chọn mức Thinking: Low, Medium hoặc High.",
+                                            "Tự động sử dụng model Gemini mới nhất: gemini-flash-latest cho dịch và hiệu đính; gemini-flash-lite-latest cho review và xuất xưng hô.",
+                                            "Mỗi công đoạn hiển thị đúng model mặc định của engine đã chọn.",
+                                            "Sửa nút Review lại không hoạt động đúng theo engine đã chọn.",
+                                            "Tăng độ ổn định khi AI Studio xử lý nội dung dài."
+                                        ]
+                     },
+                     {
+                         "version":  "1.1.2",
+                         "date":  "2026-08-27",
+                         "title":  "Khắc phục lỗi khởi động Tạo Context",
+                         "summary":  "Bản vá khôi phục khả năng chạy tác vụ Tạo Context.",
+                         "highlights":  [
+                                            "Khắc phục lỗi khiến tác vụ Tạo Context không thể khởi động trên một số máy."
+                                        ]
+                     },
+                     {
+                         "version":  "1.1.1",
+                         "date":  "2026-08-27",
+                         "title":  "Khắc phục cấu hình model trong Quy trình dịch",
+                         "summary":  "Bản vá giúp việc thay đổi model hoạt động chính xác hơn và hiển thị rõ model thực tế đang được sử dụng.",
+                         "highlights":  [
+                                            "Khắc phục lỗi không thể thay đổi hoặc lưu model cho một số công đoạn trong Quy trình dịch.",
+                                            "Model Review và Tạo Context giờ được lưu chính xác, không còn bị đặt lại ngoài ý muốn.",
+                                            "Hồ sơ nhân vật giờ sử dụng đúng model Gemini API đã cấu hình.",
+                                            "Console hiển thị rõ công đoạn, provider và model thực tế đang được sử dụng."
+                                        ]
+                     },
+                     {
+                         "version":  "1.1.0",
+                         "date":  "2026-08-27",
+                         "title":  "Giao diện mới, dịch trực tiếp và trải nghiệm mượt mà hơn",
+                         "summary":  "Bản cập nhật mở rộng khả năng tùy biến giao diện, bổ sung streaming Gemini API và cải thiện độ ổn định trong suốt quá trình dịch.",
+                         "highlights":  [
+                                            "Thêm 5 giao diện mới: GitHub Theme, One Dark Pro, Everforest Dark Medium, Night Owl và Catppuccin Mocha.",
+                                            "Đổi tên Aiko Anime thành Aiko Midnight; có thể bật hoặc tắt minh họa Aiko độc lập trên mọi giao diện.",
+                                            "Làm mới bộ icon anime, cải thiện độ cân chỉnh và khả năng hiển thị trên nền tối.",
+                                            "Tối ưu Không gian dịch gọn gàng hơn, dành nhiều diện tích cho bản thảo và thích ứng tốt hơn với màn hình nhỏ.",
+                                            "Thêm tùy chọn Streaming thử nghiệm cho Gemini API, cho phép xem bản dịch xuất hiện trực tiếp trong editor.",
+                                            "Cải thiện trạng thái tiến trình AI: hiển thị thời điểm từng thông báo và cho biết khi prompt đã được gửi, đang chờ phản hồi.",
+                                            "Review và Nhật ký AI được cập nhật nhanh hơn trong lúc pipeline đang chạy.",
+                                            "Console không còn tự kéo xuống dưới khi người dùng đang đọc nội dung cũ.",
+                                            "Tăng độ ổn định khi Gemini quá tải hoặc gặp lỗi tạm thời; ứng dụng tự chờ và thử lại.",
+                                            "Giảm các lần gọi và làm mới không cần thiết để giao diện hoạt động nhẹ hơn."
+                                        ]
+                     },
+                     {
+                         "version":  "1.0.6",
+                         "date":  "2026-08-25",
+                         "title":  "Cải thiện độ chính xác khi dịch và kiểm tra bản dịch",
+                         "summary":  "ChatGPT Web giờ nhận đầy đủ tài liệu tham chiếu của chương trong quá trình dịch.",
+                         "highlights":  [
+                                            "Chức năng kiểm tra toàn bộ và kiểm tra nền giờ sử dụng hồ sơ nhân vật liên quan.",
+                                            "Cải thiện khả năng kiểm tra tên nhân vật, giới tính, cách xưng hô và tính nhất quán với bản dịch.",
+                                            "Ghi nhận tài liệu đã sử dụng trong nhật ký kiểm tra để hỗ trợ đối chiếu khi cần."
+                                        ]
+                     },
+                     {
+                         "version":  "1.0.5",
+                         "date":  "2026-08-24",
+                         "title":  "Cập nhật ứng dụng an toàn hơn",
+                         "summary":  "Bản vá khắc phục lỗi file của Launcher bị khóa trong lúc cài đặt phiên bản mới và cải thiện khả năng khôi phục khi cập nhật thất bại.",
+                         "highlights":  [
+                                            "Updater giờ tự đóng Aiko Launcher trước khi thay thế file ứng dụng.",
+                                            "Khắc phục lỗi aiko-blue-logo.png đang được tiến trình khác sử dụng khi cập nhật.",
+                                            "Cải thiện rollback để không xóa nhầm file cũ khi một bước thay thế chưa hoàn tất."
+                                        ]
+                     },
+                     {
+                         "version":  "1.0.4",
+                         "date":  "2026-08-24",
+                         "title":  "Áp dụng chính xác prompt tùy chỉnh",
+                         "summary":  "Bản vá bảo đảm prompt dịch và prompt hiệu đính tùy chỉnh theo từng truyện được sử dụng đúng trong quá trình xử lý.",
+                         "highlights":  [
+                                            "Sửa lỗi khiến prompt dịch và prompt hiệu đính tùy chỉnh theo từng truyện đôi khi không được áp dụng.",
+                                            "Prompt do bạn chọn hoặc tự viết trong phần Bộ nhớ truyện giờ sẽ được sử dụng chính xác khi dịch và hiệu đính."
+                                        ]
+                     },
+                     {
+                         "version":  "1.0.3",
+                         "date":  "2026-08-24",
+                         "title":  "Cập nhật rõ ràng, mở truyện nhanh hơn",
+                         "summary":  "Bản cập nhật cải thiện Launcher, quá trình cập nhật, tốc độ chuyển truyện và khả năng giữ định dạng khi xuất sách.",
+                         "highlights":  [
+                                            "Có thêm Aiko Launcher để mở ứng dụng, khởi động lại hoặc tắt server thuận tiện hơn.",
+                                            "Cải thiện cập nhật ứng dụng: hiển thị dung lượng đã tải, phần trăm, tốc độ và thời gian còn lại.",
+                                            "Có thể hủy tải bản cập nhật trước khi bắt đầu cài đặt.",
+                                            "Khắc phục lỗi font tiếng Việt trong cửa sổ cập nhật.",
+                                            "Mở và chuyển đổi giữa các truyện nhanh hơn, đặc biệt với dự án có hàng nghìn chương.",
+                                            "EPUB và DOCX giờ giữ nguyên chữ in đậm, in nghiêng và đậm-nghiêng."
+                                        ]
+                     },
+                     {
+                         "version":  "1.0.2",
+                         "date":  "2026-08-23",
+                         "title":  "Aiko ổn định và dễ sử dụng hơn",
+                         "summary":  "Bản cập nhật cải thiện Launcher, cấu hình quy trình dịch và độ ổn định khi sử dụng ChatGPT Web hoặc Gemini Web.",
+                         "highlights":  [
+                                            "Ra mắt Launcher mới với giao diện đẹp và dễ sử dụng hơn.",
+                                            "Chỉ cần tải một file EXE để cài đặt và cập nhật Aiko.",
+                                            "Sửa lỗi không lưu được cấu hình quy trình dịch.",
+                                            "ChatGPT giờ mở đúng cuộc trò chuyện đã thiết lập.",
+                                            "Khắc phục trình duyệt đóng mở liên tục khi dịch.",
+                                            "Cải thiện độ ổn định khi khởi động và chạy tác vụ."
+                                        ]
+                     },
+                     {
+                         "version":  "1.0.1",
+                         "date":  "2026-08-23",
+                         "title":  "Sửa lỗi mở ChatGPT Web và Gemini Web",
+                         "summary":  "Bản vá sửa lỗi trình duyệt của ứng dụng không thể khởi động trên một số bản portable.",
+                         "highlights":  [
+                                            "Sửa lỗi Binary Location Must be a String khi mở ChatGPT Web hoặc Gemini Web.",
+                                            "Chuẩn hóa đường dẫn Chrome và ChromeDriver portable để tương thích đúng với Selenium."
+                                        ]
+                     },
+                     {
+                         "version":  "1.0.0",
+                         "date":  "2026-08-23",
+                         "title":  "Aiko 1.0 — Quy trình dịch hợp nhất",
+                         "summary":  "Aiko 1.0 hợp nhất các engine cũ thành một quy trình dịch linh hoạt, cho phép chọn AI riêng cho từng công đoạn, đồng thời bổ sung launcher Windows và tự chuyển đổi project từ v0.13.",
+                         "highlights":  [
+                                            "Hợp nhất các chế độ V1, V2, V3 và GPT thành một quy trình dịch 1.0 dễ cấu hình hơn.",
+                                            "Cho phép chọn riêng Gemini API, Gemini Web, OpenAI API hoặc ChatGPT Web cho từng công đoạn: dịch, hiệu đính, xưng hô, review, tạo Context và hồ sơ nhân vật.",
+                                            "Mỗi công đoạn có thể chọn model và mức suy nghĩ riêng; các bước hiệu đính, xưng hô và review có thể tắt độc lập.",
+                                            "Thêm Aiko Launcher cho Windows với bảng điều khiển server, khởi động lại, tạo shortcut Desktop/Start Menu và tắt server.",
+                                            "Người dùng nâng cấp từ v0.13 được hướng dẫn mở launcher mới ngay trong ứng dụng và chỉ cần thiết lập một lần.",
+                                            "Project v0.13 được giữ nguyên và tự chuyển đổi an toàn khi mở lần đầu; dữ liệu YAML cũ được lưu lại dưới dạng .legacy.",
+                                            "Chuyển Context, glossary, xưng hô, review, publishing và trạng thái project sang định dạng JSON/TXT dễ kiểm tra và ổn định hơn.",
+                                            "Cải thiện độ ổn định của dịch, hiệu đính và review; giữ bản dịch cũ và dữ liệu project khi một công đoạn gặp lỗi.",
+                                            "Tổ chức lại giao diện cài đặt theo từng công đoạn, giúp nhìn rõ engine, model và mức suy nghĩ đang được sử dụng."
+                                        ]
+                     },
+                     {
+                         "version":  "0.13.0",
+                         "date":  "2026-08-17",
+                         "title":  "ChatGPT Web V2 và Chrome dùng chung",
+                         "summary":  "Thêm pipeline ChatGPT Web hoàn chỉnh, cho phép cấu hình riêng từng giai đoạn và cải thiện khả năng điều khiển trình duyệt tự động.",
+                         "highlights":  [
+                                            "Thêm ChatGPT Web V2, chạy toàn bộ quy trình dịch, hiệu đính, xuất xưng hô và review trực tiếp trên ChatGPT Web theo batch.",
+                                            "Cho phép bật/tắt từng bước hậu dịch và chọn model, mức suy luận riêng cho dịch, hiệu đính, xưng hô và review.",
+                                            "Mỗi giai đoạn sử dụng chat riêng, tự chọn model và mức suy luận qua menu ChatGPT; cải thiện việc chờ prompt, nhận response và kiểm tra kết quả hoàn tất.",
+                                            "Tự lưu bản dịch sau từng mốc quan trọng, giúp hạn chế mất kết quả khi một bước hậu dịch gặp lỗi.",
+                                            "Thêm Chrome của ứng dụng dùng chung cho ChatGPT, Gemini và duyệt web thông thường; người dùng có thể chủ động đăng nhập, đăng xuất hoặc đổi tài khoản.",
+                                            "Cải thiện nhật ký ChatGPT Web: tiến độ nhận response cập nhật trên một dòng và hỗ trợ tốt hơn terminal Windows dùng tiếng Việt."
+                                        ]
+                     },
+                     {
+                         "version":  "0.12.3",
+                         "date":  "2026-08-15",
+                         "title":  "Chỉnh lịch sử xưng hô, polish ổn định hơn",
+                         "summary":  "Bản cập nhật cho phép sửa chính xác từng mốc xưng hô và thống nhất cách gửi tài liệu tham chiếu trong bước polish.",
+                         "highlights":  [
+                                            "Cho phép chỉnh sửa trực tiếp từng mốc trong lịch sử xưng hô; app cập nhật đúng bản ghi được chọn, không ảnh hưởng các mốc còn lại và tự tạo pronouns.yaml.bak.",
+                                            "Chuyển tài liệu nhân vật và xưng hô của bước polish sang dạng văn bản tham chiếu, giống lượt dịch V1; áp dụng chung cho V1, V2 và V3, không còn phụ thuộc Gemini Files API."
+                                        ]
+                     },
+                     {
+                         "version":  "0.12.2",
+                         "date":  "2026-08-14",
+                         "title":  "V1 Interactions ổn định hơn, cấu hình Gemini gọn hơn",
+                         "summary":  "Bản cập nhật giúp V1 Interactions tự tiếp tục khi Gemini gặp lỗi tạm thời và đơn giản hóa cấu hình sinh nội dung.",
+                         "highlights":  [
+                                            "Giúp V1 Interactions tiếp tục chạy khi Gemini tạm thời quá tải hoặc gặp lỗi, thay vì dừng tác vụ và hiện traceback.",
+                                            "Loại bỏ Temperature, Top P và Top K khỏi toàn bộ lời gọi Gemini, để model tự sử dụng cấu hình mặc định."
+                                        ]
+                     },
+                     {
+                         "version":  "0.12.1",
+                         "date":  "2026-08-14",
+                         "title":  "Quản lý Gemini API key tốt hơn, ổn định dịch V1",
+                         "summary":  "Bản cập nhật cải thiện khả năng kiểm tra và lựa chọn Gemini API key, ghi nhớ key đang sử dụng, đồng thời sửa lỗi dừng tác vụ và tương thích tài liệu trong V1 Interactions.",
+                         "highlights":  [
+                                            "Thêm kiểm tra từng Gemini API key hoặc kiểm tra hàng loạt bằng yêu cầu sinh nội dung thật; hiển thị gọn mã lỗi, model và trạng thái của từng key.",
+                                            "Cho phép chọn API key bắt đầu; app ghi nhớ key hiện tại bằng fingerprint và tiếp tục từ đúng key khi chạy lại, thay vì luôn quay về key đầu tiên.",
+                                            "Hiển thị số thứ tự API key đang sử dụng trong phần cài đặt và nhật ký tác vụ.",
+                                            "Sửa lỗi nút Dừng ngay bị khóa ở lần chạy tiếp theo, khiến người dùng phải F5.",
+                                            "Sửa lỗi 400 unsupported mime_type của V1 Interactions bằng cách gửi hồ sơ nhân vật và xưng hô dưới dạng văn bản tham chiếu."
+                                        ]
+                     },
+                     {
+                         "version":  "0.12.0",
+                         "date":  "2026-08-13",
+                         "title":  "Sidebar tùy biến, nhật ký AI và xuất truyện hoàn chỉnh",
+                         "summary":  "Bản cập nhật bổ sung khả năng tùy biến giao diện, kiểm tra dữ liệu gửi AI, đối chiếu chương Hako và xuất truyện sang các định dạng phổ biến.",
+                         "highlights":  [
+                                            "Thêm menu quản lý sidebar: tìm kiếm, ghim, bỏ ghim và kéo thả sắp xếp.",
+                                            "Thêm Nhật ký AI để xem prompt, phản hồi, model và tệp đính kèm.",
+                                            "Gửi snapshot nhân vật và xưng hô vào Gemini/GPT khi dịch và hiệu đính.",
+                                            "Thêm công cụ đối chiếu, cập nhật chương Hako theo phạm vi.",
+                                            "Thêm xuất truyện EPUB, DOCX và Markdown từ Kho chương.",
+                                            "Chuyển API key, từ R19 và tùy chỉnh sidebar vào thư mục data."
+                                        ]
+                     },
+                     {
+                         "version":  "0.11.0",
+                         "date":  "2026-08-12",
+                         "title":  "Review chính xác hơn, chia sẻ và nhập truyện linh hoạt hơn",
+                         "summary":  "Bản cập nhật bổ sung trang quản lý Dịch R19, đồng bộ hệ thống review đa ngôn ngữ và cải thiện quy trình tạo glossary, chia sẻ chương cùng khả năng nhập EPUB.",
+                         "highlights":  [
+                                            "Thêm trang quản lý Dịch R19 với danh sách từ dùng chung và số chương ngữ cảnh riêng.",
+                                            "Review nền chạy bằng worker riêng song song với quá trình dịch, tự đổi API key khi gặp lỗi 4xx và thử lại cùng key khi gặp 408/5xx.",
+                                            "Đồng bộ Review nền và Review toàn bộ về cùng một prompt, cùng tiêu chí tùy chỉnh và hỗ trợ mọi ngôn ngữ nguồn sang tiếng Việt.",
+                                            "Review nhận đầy đủ raw và bản dịch cuối cùng sau hiệu đính; sửa lỗi cắt độc lập tự gây báo thiếu nội dung hoặc còn ngoại ngữ sai.",
+                                            "Cải thiện prompt tạo glossary cho tiếng Hàn, Trung, Nhật, Anh và các ngôn ngữ khác; nhận diện tên riêng và cách chuyển tự phù hợp với từng nguồn.",
+                                            "Tự gộp các segment s1, s2… thành một chương khi Share, giữ một tiêu đề và dọn dữ liệu segment cũ trên R2.",
+                                            "Cải thiện giao diện đọc Share với cột nội dung cân đối, điều hướng chương thuận tiện hơn trên desktop và thiết bị di động.",
+                                            "Hỗ trợ EPUB chứa nhiều chương dạng \u003csection\u003e trong cùng một file XHTML, kết hợp tiêu đề từ NCX mà vẫn giữ cơ chế nhập EPUB cũ làm dự phòng.",
+                                            "Sửa một số lỗi bố cục biểu mẫu và cải thiện hiển thị các thiết lập dài."
+                                        ]
+                     },
+                     {
+                         "version":  "0.10.0",
+                         "date":  "2026-08-06",
+                         "title":  "Chia sẻ truyện riêng tư qua R2, quản lý chương thuận tiện hơn",
+                         "summary":  "Bản cập nhật bổ sung hệ thống chia sẻ truyện trực tiếp trên Cloudflare R2, tự động thiết lập Cloudflare, cải thiện quản lý glossary và tinh chỉnh phạm vi chạy tác vụ dịch.",
+                         "highlights":  [
+                                            "Thêm hệ thống chia sẻ truyện private qua Cloudflare R2 và giao diện đọc truyện trực tuyến.",
+                                            "Chương được tải theo nhu cầu khi người đọc chuyển chương, không tải toàn bộ truyện ngay từ đầu.",
+                                            "Tự động tạo bucket, triển khai Share Worker và điền cấu hình R2 từ Cloudflare Account ID cùng API Token.",
+                                            "Thêm tự động thiết lập R2 Xuất bản, tạo bucket ảnh public và lấy đường dẫn r2.dev.",
+                                            "Cho phép tìm kiếm, thêm, chỉnh sửa và xóa glossary ngay tại giao diện chính.",
+                                            "Thêm số chương muốn chạy cho tác vụ dịch đơn; tác vụ batch dùng số lần chạy batch và nhập 0 để chạy đến hết."
+                                        ]
+                     },
+                     {
+                         "version":  "0.9.0",
+                         "date":  "2026-08-05",
+                         "title":  "Prompt theo phong cách riêng, dịch web chính xác hơn",
+                         "summary":  "Bản cập nhật mở rộng khả năng tùy chỉnh prompt theo từng truyện và ngăn Gemini, ChatGPT lấy nhầm bản dịch cũ trong cùng cuộc trò chuyện.",
+                         "highlights":  [
+                                            "Cho phép chọn prompt dịch mẫu hoặc tự chỉnh vai trò và nhiệm vụ theo từng truyện.",
+                                            "Thêm prompt hiệu đính tùy chỉnh với các mẫu cân bằng, sát nguyên tác, biên tập văn học và sửa lỗi tối thiểu.",
+                                            "Áp dụng prompt hiệu đính riêng cho cả Gemini API và GPT API.",
+                                            "Ngăn ChatGPT Web và Gemini Web lấy nhầm câu trả lời cũ khi tiếp tục dùng cùng cuộc trò chuyện.",
+                                            "Bổ sung đầy đủ dấu tiếng Việt cho prompt hiệu đính Gemini.",
+                                            "Thêm cửa sổ Có gì mới để giới thiệu nội dung sau khi cập nhật.",
+                                            "Tinh gọn danh sách tác vụ bằng cách ẩn Chèn thuật ngữ và Tách review khỏi giao diện chính."
+                                        ]
+                     },
+                     {
+                         "version":  "0.8.0",
+                         "date":  "2026-08-04",
+                         "title":  "Dịch linh hoạt hơn, xuất bản liền mạch hơn",
+                         "summary":  "Bản cập nhật tập trung vào khả năng tùy chỉnh engine dịch, độ an toàn của glossary và quy trình đăng chương lên Hako.",
+                         "highlights":  [
+                                            "Mở cuộc trò chuyện ChatGPT đã chuẩn bị sẵn prompt mớm trước khi gửi prompt dịch chính.",
+                                            "Cho phép bỏ qua các model phụ Gemini API và GPT API khi để trống hoặc nhập none.",
+                                            "Thêm model cập nhật xưng hô riêng cho Gemini API và GPT API.",
+                                            "Cảnh báo khi chương dịch vượt quá phạm vi glossary đã duyệt.",
+                                            "Tự tạo ghi chú Hako từ cú pháp (note: nội dung) và gắn note đúng vị trí.",
+                                            "Thay logo, brandmark và favicon mới; cải thiện hiển thị tên truyện dài.",
+                                            "Bản portable có thể tự chuẩn bị môi trường build khi máy không cài Python hệ thống."
+                                        ]
+                     }
+                 ]
 }
