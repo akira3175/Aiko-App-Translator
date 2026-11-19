@@ -156,8 +156,15 @@ namespace AikoLauncher
                     if (size > 4L * 1024 * 1024 * 1024) throw new InvalidDataException("Gói giải nén quá lớn.");
                     if (name.EndsWith("\\")) { Directory.CreateDirectory(target); continue; }
                     Directory.CreateDirectory(Path.GetDirectoryName(target));
-                    using (var input = entry.Open())
-                    using (var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write)) input.CopyTo(output);
+                    using (var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write))
+                    {
+                        // .NET Framework can expose the 03 00 deflate marker for
+                        // empty entries produced by tar. Preserve their zero size.
+                        if (entry.Length > 0)
+                            using (var input = entry.Open()) input.CopyTo(output);
+                        if (output.Length != entry.Length)
+                            throw new InvalidDataException("Kích thước file giải nén không khớp: " + name);
+                    }
                 }
             }
             string payload = Child(staging, "NovelTranslatorStudio");

@@ -43,6 +43,21 @@ internal static class LauncherUpdaterTests
             Test("missing digest blocked", root => Reject(() => PortableUpdater.ParseRelease(metadata.Replace("sha256:" + new string('a', 64), ""))));
             Test("hash mismatch", root => Reject(() => PortableUpdater.VerifyHash(Archive(root), new string('0', 64))));
             Test("valid archive", root => Assert(File.Exists(Path.Combine(PortableUpdater.Extract(Archive(root), Path.Combine(root, "out"), "1.2.3", CancellationToken.None), "runtime", "python.exe")), "runtime missing"));
+            Test("tar empty Python module remains empty", root =>
+            {
+                string payload = Path.Combine(root, "NovelTranslatorStudio");
+                Write(payload, "VERSION", "1.2.3");
+                Write(payload, "app.py", "fixture");
+                Write(payload, "runtime/python.exe", "fixture");
+                string empty = Path.Combine(payload, "empty.py");
+                File.WriteAllBytes(empty, new byte[0]);
+                var info = new System.Diagnostics.ProcessStartInfo("tar.exe", "-a -c -f fixture.zip NovelTranslatorStudio")
+                { WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true };
+                using (var process = System.Diagnostics.Process.Start(info))
+                { process.WaitForExit(); Assert(process.ExitCode == 0, "tar fixture failed"); }
+                string result = PortableUpdater.Extract(Path.Combine(root, "fixture.zip"), Path.Combine(root, "out"), "1.2.3", CancellationToken.None);
+                Assert(new FileInfo(Path.Combine(result, "empty.py")).Length == 0, "empty module gained bytes");
+            });
             Test("long runtime paths", root =>
             {
                 string name = "NovelTranslatorStudio/" + new string('a', 100) + "/" + new string('b', 100) + "/file.txt";

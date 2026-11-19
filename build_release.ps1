@@ -178,7 +178,8 @@ if ($privateHits) {
 
 Push-Location $releaseRoot
 try {
-    & tar.exe -a -c -f $zipPath ([IO.Path]::GetFileName($stageRoot))
+    # Python writes empty ZIP entries consistently for older .NET launchers too.
+    & (Join-Path $runtimeRoot "python.exe") -m zipfile -c $zipPath ([IO.Path]::GetFileName($stageRoot))
     if ($LASTEXITCODE -ne 0) {
         throw "Nen goi phat hanh that bai"
     }

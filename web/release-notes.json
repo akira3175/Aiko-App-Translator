@@ -1,6 +1,15 @@
 {
     "versions":  [
                      {
+                         "version":  "1.4.15",
+                         "date":  "2026-11-19",
+                         "title":  "Sửa lỗi cập nhật",
+                         "summary":  "Sửa lỗi cập nhật thất bại khiến Aiko không khởi động được.",
+                         "highlights":  [
+                                            "Sửa lỗi cập nhật thất bại khiến Aiko không khởi động được."
+                                        ]
+                     },
+                     {
                          "version":  "1.4.14",
                          "date":  "2026-11-19",
                          "title":  "Cải thiện trích xuất xưng hô",
