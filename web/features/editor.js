@@ -97,8 +97,9 @@ export function createEditorFeature({api,escapeHtml,positionPopover,saveChapter,
       const isImage=/^!\[[^\]]*\]\([^)]+\)$/.test(trimmed)||/^\[img(?:=[^\]]+)?\].+\[\/img\]$/i.test(trimmed);
       if(isImage){
         const local=trimmed.match(/^!\[[^\]]*\]\((?:\.\.\/)?image\/([\w.-]+\.(?:jpg|jpeg|png|gif|webp|svg))\)$/i);
+        const remote=trimmed.match(/^!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)$/i)||trimmed.match(/^\[img(?:=[^\]]+)?\](https?:\/\/[^\s\[]+)\[\/img\]$/i);
         const fallback=images?.[imageIndex++];
-        const image=local?{id:local[1].replace(/\.[^.]+$/,''),url:`/api/image/${encodeURIComponent(local[1])}?project=${encodeURIComponent(state.project)}`}:fallback;
+        const image=local?{id:local[1].replace(/\.[^.]+$/,''),url:`/api/image/${encodeURIComponent(local[1])}?project=${encodeURIComponent(state.project)}`}:remote?{id:'Ảnh',url:remote[1]}:fallback;
         return image?`<div data-source-line="${lineIndex}"><a href="${escapeHtml(image.url)}" target="_blank" rel="noopener"><img class="inline-story-image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.id)}" loading="lazy"></a><span class="image-caption">${escapeHtml(image.id)}</span></div>`:'';
       }
       if(!trimmed)return `<div class="paragraph-space" data-source-line="${lineIndex}"></div>`;

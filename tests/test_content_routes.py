@@ -36,6 +36,10 @@ class ContentRouteTests(unittest.TestCase):
             "characters": SimpleNamespace(
                 data=lambda project: {"project": project},
                 save=lambda project, _body: {"project": project},
+                preview_snapshot=lambda project, body: {
+                    "project": project,
+                    "chapter": body.get("chapter"),
+                },
             ),
             "pronouns": SimpleNamespace(
                 data=lambda project: {"project": project},
@@ -98,6 +102,20 @@ class ContentRouteTests(unittest.TestCase):
             )
 
         self.assertEqual(["原文"], received)
+
+    def test_character_snapshot_route_forwards_payload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            handler = _Handler({"chapter": "v7_c11_s1.md"})
+            handled = self._routes(Path(directory)).handle_post(
+                handler, "/api/characters/snapshot", {"project": ["Demo"]}
+            )
+
+        self.assertTrue(handled)
+        self.assertEqual(200, handler.responses[0][0])
+        self.assertEqual(
+            {"project": "Demo", "chapter": "v7_c11_s1.md"},
+            handler.responses[0][1],
+        )
 
     def test_unknown_route_is_left_for_next_dispatcher(self):
         with tempfile.TemporaryDirectory() as directory:

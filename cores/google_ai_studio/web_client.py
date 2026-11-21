@@ -2,6 +2,7 @@
 
 import re
 import time
+from cores.web_errors import RetryableWebError, WebQuotaError, check_quota, retryable_transport
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from uuid import uuid4
 
@@ -327,6 +328,7 @@ def generate_content(
         try:
             driver = get_driver()
             driver.get(_prompt_url(ai_studio_model, ai_studio_link))
+            check_quota(driver)
             wait = WebDriverWait(driver, 60)
             input_area = wait.until(
                 EC.visibility_of_element_located(
@@ -349,6 +351,7 @@ def generate_content(
             last_text = ""
             stable_count = 0
             while time.time() < deadline:
+                check_quota(driver)
                 turns = _model_turns(driver)
                 if len(turns) > old_count:
                     turn = turns[-1]
@@ -376,9 +379,15 @@ def generate_content(
                         stable_count = 0
                         last_text = current_text
                 time.sleep(1)
+            if last_text:
+                raise ValueError("Google AI Studio trả về nội dung chưa đúng định dạng yêu cầu")
             raise TimeoutException("Quá thời gian chờ Google AI Studio trả lời")
         except Exception as error:
+            if isinstance(error, WebQuotaError):
+                raise
             last_error = error
             if attempt + 1 < max_retries:
                 time.sleep(3)
+    if retryable_transport(last_error):
+        raise RetryableWebError(f"Google AI Studio Web thất bại: {last_error}") from last_error
     raise ValueError(f"Google AI Studio Web thất bại: {last_error}")

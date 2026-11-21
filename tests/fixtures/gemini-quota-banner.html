@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<!-- Minimal reproduction of the user's captured quota UI, without account data. -->
+<input-container>
+  <span role="status" class="inline-upgrade-banner-live-region"></span>
+  <gemini-quota-banner>
+    <gem-banner data-test-id="gemini-quota-banner-lm">
+      <section class="gem-banner-container">
+        <h2 data-test-id="gem-banner-title-input">Bạn đã đạt đến hạn mức sử dụng hiện tại</h2>
+        <div data-test-id="gem-banner-description-input">Bạn sẽ có thể tiếp tục thực hiện các nhiệm vụ lúc 23:39 ngày 20 thg 11 hoặc nâng cấp để có hạn mức cao hơn.</div>
+      </section>
+    </gem-banner>
+  </gemini-quota-banner>
+  <input-area-v2>
+    <div class="inline-upgrade-banner-row">
+      <span class="inline-upgrade-banner-text">Đã đạt đến hạn mức · Đặt lại lúc 23:39</span>
+    </div>
+    <fieldset disabled>
+      <rich-textarea><div class="ql-editor" contenteditable="false"> </div></rich-textarea>
+    </fieldset>
+  </input-area-v2>
+</input-container>

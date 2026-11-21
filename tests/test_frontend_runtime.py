@@ -31,6 +31,18 @@ class FrontendRuntimeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("runtime-import-ok", result.stdout)
 
+    def test_character_editor_workflow(self):
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            ["node", "tests/character_editor_check.mjs"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("character-editor-check-ok", result.stdout)
+
     def test_project_loading_delay_retry_and_stale_completion(self):
         root = Path(__file__).resolve().parents[1]
         result = subprocess.run(

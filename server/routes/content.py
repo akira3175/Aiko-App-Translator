@@ -34,7 +34,7 @@ class ContentRoutes:
             return self._json_call(
                 handler,
                 lambda: self.characters.data(project),
-                (ValueError, OSError),
+                (UnicodeError, ValueError, OSError),
             )
         if path == "/api/pronouns":
             return self._json_call(
@@ -55,11 +55,17 @@ class ContentRoutes:
                 lambda: self.context.save(project, handler.body()),
                 (Exception,),
             )
+        if path == "/api/characters/snapshot":
+            return self._json_call(
+                handler,
+                lambda: self.characters.preview_snapshot(project, handler.body()),
+                (UnicodeError, ValueError, OSError, TypeError, json.JSONDecodeError),
+            )
         if path == "/api/characters":
             return self._json_call(
                 handler,
                 lambda: self.characters.save(project, handler.body()),
-                (ValueError, OSError, json.JSONDecodeError),
+                (UnicodeError, ValueError, OSError, json.JSONDecodeError),
             )
         if path == "/api/pronouns":
             return self._json_call(

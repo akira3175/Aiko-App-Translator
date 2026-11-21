@@ -1,5 +1,6 @@
 """Foreign-character checks and manual-review persistence."""
 
+from cores.web_errors import WebTaskStopped
 import os
 import time
 
@@ -79,6 +80,8 @@ Nội dung dịch hiện tại:
                 attempt += 1
                 time.sleep(5)
         except Exception as e:
+            if isinstance(e, WebTaskStopped):
+                raise
             err = str(e)
             if "429" in err and runtime.provider("polish") == "gemini-api":
                 runtime.switch_key_for("polish")

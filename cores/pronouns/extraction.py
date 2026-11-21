@@ -1,5 +1,6 @@
 """AI extraction and timeline updates for pronoun memory."""
 
+from cores.web_errors import WebTaskStopped
 import json
 import time
 
@@ -152,6 +153,8 @@ def extract_pronouns_from_translation(
             pairs = validate_pronoun_payload(data)
             return _records_from_pairs(pairs, chapter_id, chapter_number, resolver)
         except Exception as error:
+            if isinstance(error, WebTaskStopped):
+                raise
             message = str(error)
             print(f"⚠️ Lỗi khi trích xuất xưng hô (lần {attempt}/{MAX_ATTEMPTS}): {message}")
             print(f"🔍 [DEBUG] raw_result_text là: {raw_result_text!r}")

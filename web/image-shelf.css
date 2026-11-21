@@ -1,0 +1,23 @@
+﻿#imageShelf {
+  box-sizing:border-box; width:min(960px,94vw); max-height:86vh; max-height:86dvh;
+  margin:auto; padding:0; overflow:hidden; border:1px solid var(--line);
+  border-radius:16px; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font:inherit;
+}
+#imageShelf[open] {display:flex; flex-direction:column}
+#imageShelf::backdrop {background:var(--modal-backdrop,rgba(8,10,16,.72))}
+#imageShelf .shelf-head {display:flex; align-items:center; gap:10px; padding:18px 22px; border-bottom:1px solid var(--line)}
+.shelf-head>div {flex:1; min-width:0}
+#imageShelfTitle {font-size:21px; margin:0; line-height:1.25}
+#imageShelfStatus {font-size:12px; color:var(--muted); margin:4px 0 0; overflow-wrap:anywhere}
+#imageShelfClose {width:36px; height:36px; padding:0; font-size:22px; line-height:1}
+#imageShelfItems {display:grid; grid-template-columns:repeat(auto-fill,minmax(min(165px,100%),1fr)); gap:18px 14px; padding:20px; overflow:auto; scrollbar-color:var(--line) transparent}
+#imageShelfItems article {min-width:0; display:flex; flex-direction:column; align-items:stretch}
+#imageShelfItems img {width:100%; aspect-ratio:4/3; display:block; object-fit:contain; background:var(--bg); border:1px solid var(--line); border-radius:9px; box-sizing:border-box}
+#imageShelfItems p {font-size:13px; font-weight:600; margin:9px 0 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.shelf-copy {align-self:flex-start; background:transparent; color:var(--accent); font:inherit; font-size:12px; font-weight:600; border:0; padding:4px 0; cursor:pointer}
+.shelf-copy:hover {text-decoration:underline}
+@media(max-width:540px){
+  #imageShelf .shelf-head {padding:14px; gap:6px}
+  #imageShelfItems {padding:14px; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 10px}
+}
+#imageShelfSearch {margin:12px 20px 0;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}

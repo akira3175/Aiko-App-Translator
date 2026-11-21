@@ -8,6 +8,7 @@ const elements=new Map();
 const element=selector=>{
   if(!elements.has(selector))elements.set(selector,{
     value:'',innerHTML:'',textContent:'',disabled:false,files:[],style:{},dataset:{},
+    closest(){return null;},
     classList:{add(){},remove(){},toggle(){}},
   });
   return elements.get(selector);

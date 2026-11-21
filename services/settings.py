@@ -4,6 +4,7 @@ import json
 import os
 import re
 import secrets
+from cores.link_rotation import parse_links
 
 
 class ConfigurationService:
@@ -109,7 +110,7 @@ class ConfigurationService:
                     )
             else:
                 value = str(value).strip()
-                max_length = 5000 if key == "review_bg_criteria" else 500
+                max_length = 10000 if key.endswith("_rotation_links") else (5000 if key == "review_bg_criteria" else 500)
                 if (
                     (not value and key not in self.optional_settings)
                     or len(value) > max_length
@@ -122,6 +123,10 @@ class ConfigurationService:
                     not in {"auto", "off", "minimal", "low", "medium", "high"}
                 ):
                     raise ValueError("Cấp độ suy nghĩ Gemini API không hợp lệ")
+                if key.endswith(("_rotation_enabled", "_rotation_loop", "_rotation_on_error")) and value not in {"off", "on"}:
+                    raise ValueError(f"{self.setting_labels[key]} không hợp lệ")
+                if key.endswith("_rotation_links"):
+                    value = "\n".join(parse_links(value, key.removesuffix("_rotation_links")))
                 if key == "lan_enabled" and value not in {"off", "on"}:
                     raise ValueError("Chế độ truy cập LAN không hợp lệ")
                 if key == 'pipeline_import_provider' and value not in {'gemini-api', 'gemini-web', 'google-ai-studio-web', 'openai-api', 'chatgpt-web', 'chatgpt-plan'}:
@@ -159,6 +164,14 @@ class ConfigurationService:
                         )
             if value != default:
                 cleaned[key] = value
+        for prefix in ("gemini_web", "ai_studio"):
+            if cleaned.get(f"{prefix}_rotation_on_error") == "on" and not cleaned.get(f"{prefix}_rotation_links"):
+                raise ValueError("Hãy nhập danh sách link trước khi bật chuyển link khi gặp lỗi.")
+            if cleaned.get(f"{prefix}_rotation_enabled") == "on":
+                if not cleaned.get(f"{prefix}_rotation_links"):
+                    raise ValueError("Hãy nhập danh sách link trước khi bật tự chuyển link.")
+                if not (cleaned.get(f"{prefix}_rotation_minutes") or cleaned.get(f"{prefix}_rotation_chapters")):
+                    raise ValueError("Tự chuyển link cần ít nhất một ngưỡng phút hoặc số chương lớn hơn 0.")
         if cleaned.get("lan_enabled") == "on" and not cleaned.get("lan_pin"):
             cleaned["lan_pin"] = f"{secrets.randbelow(1_000_000):06d}"
         path.parent.mkdir(exist_ok=True)

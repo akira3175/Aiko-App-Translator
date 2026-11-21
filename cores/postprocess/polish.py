@@ -1,5 +1,6 @@
 """Polish translated chapters with provider-neutral reference snapshots."""
 
+from cores.web_errors import WebTaskStopped
 import os
 import time
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 from cores.postprocess.snapshots import build_characters_snapshot
 from cores.postprocess.outputs import parse_polish_output
 from cores.chapters.images import IMAGE_INSTRUCTION, validate_image_markers
+from cores.characters.store import format_chapter_code
 from cores.pronouns.extraction import build_pronoun_instructions
 from cores.pronouns.normalize import NameResolver, default_characters_file, load_character_roster
 
@@ -53,6 +55,7 @@ def polish_translation(
             max_characters=min(
                 runtime.int_option("character_snapshot_limit", 20, minimum=1), 50
             ),
+            chapter_id=chapter_id,
         )
         attachments = []
         if tmp_characters:
@@ -93,6 +96,7 @@ Giữ nguyên đầy đủ nội dung, Markdown ảnh và dấu hội thoại. K
 {pronoun_context}
 
 ## Nguyên tác
+Mã chương: {format_chapter_code(chapter_id)}
 Tiêu đề: {raw_title}
 {raw_content}
 
@@ -150,6 +154,8 @@ Chỉ trả về:
                     pronoun_output.update(payload)
                 return title_out, content_out
             except Exception as error:
+                if isinstance(error, WebTaskStopped):
+                    raise
                 message = str(error)
                 print(f"[POLISH] Lỗi: {message}")
                 if provider == "gemini-api" and (

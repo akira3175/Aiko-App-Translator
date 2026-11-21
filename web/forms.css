@@ -72,7 +72,7 @@
 .cloudflare-deploy-head strong,.cloudflare-deploy-head small { display:block; }
 .cloudflare-deploy-head small { margin-top:5px; color:var(--muted); }
 .cloudflare-deploy-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-.cloudflare-deploy-fields label { display:grid; gap:6px; }
+.cloudflare-deploy-fields label { display:grid; gap:6px; align-content:start; min-width:0; }
 .cloudflare-deploy-fields small,.cloudflare-deploy-actions small { color:var(--muted); }
 .cloudflare-deploy-fields input { width:100%; min-width:0; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); outline:0; }
 .cloudflare-deploy-fields input:focus { border-color:var(--accent); }
@@ -126,6 +126,7 @@
 .publishing-range { grid-template-columns: 1fr 1fr; }
 .python-setting { display: grid; gap: 6px; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .python-setting.textarea-setting { grid-column: 1 / -1; }
+.python-setting[hidden] { display: none; }
 .python-setting > span { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 650; }
 .python-setting em { color: var(--accent); font-size: 10px; font-style: normal; }
 .python-setting input,.python-setting select,.python-setting textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); padding: 9px 10px; outline: 0; }
@@ -312,6 +313,8 @@
 .python-settings-grid { gap: 10px; }
 .python-setting {
   gap: 8px;
+  align-content: start;
+  grid-template-rows: auto auto 1fr;
   min-width: 0;
   padding: 12px 2px 14px;
   border: 0;
@@ -322,6 +325,11 @@
 .python-setting input,
 .python-setting select,
 .python-setting textarea { min-height: 44px; background: var(--surface); }
+.python-setting input,
+.python-setting select { height: 44px; min-width: 0; font: inherit; }
+.python-setting > span { align-items: baseline; line-height: 1.45; }
+.python-setting em { flex-shrink: 0; font-style: normal; }
+.python-setting textarea { min-width: 0; }
 .python-setting input:hover,
 .python-setting select:hover,
 .python-setting textarea:hover { border-color: color-mix(in srgb,var(--accent) 42%,var(--line)); }
@@ -331,7 +339,7 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent);
 }
-.python-setting small { min-height: 2.8em; line-height: 1.4; }
+.python-setting small { min-height: 0; line-height: 1.5; overflow-wrap: anywhere; align-self: start; }
 .pipeline-stage-list {
   gap: 0;
   border: 1px solid var(--line);
@@ -360,6 +368,17 @@
 }
 .pipeline-stage-body .python-setting input,
 .pipeline-stage-body .python-setting select { height: 44px; }
+/* Share label/control/help rows so wrapped labels stay aligned as well. */
+@supports (grid-template-rows: subgrid) {
+  .python-settings-grid > .python-setting,
+  .publishing-advanced-fields > .python-setting,
+  .pipeline-stage-body > .python-setting {
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    row-gap: 8px;
+  }
+}
+
 .pipeline-intro { margin-bottom: 22px; }
 .pipeline-tabs { border-radius: 10px; }
 .pipeline-group-head { padding: 28px 2px 13px; }
@@ -391,7 +410,7 @@
 #pipelineView .console { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; }
 @media (max-width: 900px) {
   .settings-layout { max-width: 100%; }
-  .settings-tabs { margin-right: -18px; border-radius: 12px 0 0 12px; }
+  .settings-tabs { margin-right: 0; max-width: 100%; border-radius: 12px; }
   .python-settings-head { margin-top: 20px; }
 }
 @media (max-width: 700px) {

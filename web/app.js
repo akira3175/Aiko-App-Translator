@@ -1,3 +1,4 @@
+import {bindImageShelf} from './features/image-shelf.js';
 import { chapterReviewMap } from './features/chapter-review.js';
 import { createStorySearchFeature } from './features/story-search.js';
 import { createProjectLoadingFeature } from './features/project-loading.js';
@@ -127,7 +128,7 @@ let pipelineFeature;
 const editorFeature=createEditorFeature({api,escapeHtml,positionPopover,saveChapter,state,toast});
 const {markdownToHtml,refreshFind,renderMarkdownEditors,runtime:editorRuntime,setEditorValue,updateCounts,updateLineNumbers,value:editorValue,views:editorViews}=editorFeature;
 const polishReviewFeature=createPolishReviewFeature({api,state,toast,escapeHtml,editorFeature,reload:async(name,project)=>{if(state.project!==project||state.current!==name)return;await openChapter(name);await loadChapters();}});
-const projectMemoryFeature=createProjectMemoryFeature({api,escapeHtml,executePipeline:(...args)=>pipelineFeature.execute(...args),getSetting:key=>settingsFeature.getValue(key),onReviewsChanged:()=>renderChapterList(),markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast});
+const projectMemoryFeature=createProjectMemoryFeature({api,copyPlainText,escapeHtml,executePipeline:(...args)=>pipelineFeature.execute(...args),getSetting:key=>settingsFeature.getValue(key),onReviewsChanged:()=>renderChapterList(),markdownToHtml,navigationCounts,prettyName,saveChapter,state,toast});
 const {loadCharacters,loadContext,loadPronouns,loadReviews,renderContext,renderWorkspaceReview,requireProject,saveCharacters,saveGlossaryChanges}=projectMemoryFeature;
 const aiLogFeature=createAiLogFeature({api,copyPlainText,escapeHtml,getProject:()=>state.project,toast});
 const apiKeyFeature=createApiKeyFeature({api,escapeHtml,toast});
@@ -354,6 +355,7 @@ $('#chapterSearch').oninput = e => renderChapterList(e.target.value);
 bookExportFeature.bind();
 sharingFeature.bind();
 $('#popoverSearch').oninput = e => renderPopover(e.target.value);
+bindImageShelf({api,state,toast,openChapter,editorFeature,showView});
 projectMemoryFeature.bind();
 editorFeature.bind();
 const storySearchFeature=createStorySearchFeature({api,escapeHtml,state,saveChapter,openChapter,showView,editorFeature,toast});
@@ -363,6 +365,7 @@ document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){
     editorFeature.closeSelectionTranslation();
     closeAiLog();
+    projectMemoryFeature.closeCharacterModals();
     if($('#whatsNewModal').classList.contains('open'))updateFeature.closeWhatsNew();
   }
   if(r19Feature.handleShortcut(event))return;

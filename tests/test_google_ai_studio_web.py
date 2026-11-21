@@ -15,6 +15,17 @@ from cores.google_ai_studio.web_client import (
 )
 from providers import ProviderRequest
 from providers.google_ai_studio_web import GoogleAiStudioWebProvider
+from cores.google_ai_studio import web_client as client
+from cores.web_errors import WebQuotaError
+
+
+class AiStudioQuotaTests(unittest.TestCase):
+    def test_quota_skips_local_retries(self):
+        driver = Mock()
+        with patch.object(client, 'check_quota', side_effect=WebQuotaError('quota')):
+            with self.assertRaises(WebQuotaError):
+                client.generate_content('prompt', get_driver=lambda: driver, max_retries=3)
+        self.assertEqual(1, driver.get.call_count)
 
 
 class _Element:

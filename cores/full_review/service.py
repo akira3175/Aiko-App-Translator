@@ -1,5 +1,6 @@
 """Prompting, API retry, and result normalization for full review."""
 
+from cores.web_errors import WebTaskStopped
 import json
 import time
 
@@ -77,6 +78,8 @@ def call_review_api(prompt, provider, attachments=()):
                 print(f"  ⚠️ Lỗi parse JSON: {error}, thử lại (lần {attempt})...")
                 time.sleep(3)
         except Exception as error:
+            if isinstance(error, WebTaskStopped):
+                raise
             message = str(error)
             if provider == "gemini-api" and (
                 "429" in message or "RESOURCE_EXHAUSTED" in message

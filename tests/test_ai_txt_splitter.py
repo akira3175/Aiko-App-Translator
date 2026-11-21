@@ -85,7 +85,7 @@ class AiTxtSplitterTests(unittest.TestCase):
                 self.assertTrue(transport.called)
                 if provider == 'gemini-web':
                     self.assertTrue(transport.call_args.kwargs['force_upload'])
-                    self.assertEqual(1, transport.call_args.kwargs['max_retries'])
+                    self.assertEqual(3, transport.call_args.kwargs['max_retries'])
 
     def test_preview_then_confirm_with_selected_model_and_original_content(self):
         with tempfile.TemporaryDirectory() as directory:

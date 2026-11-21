@@ -51,6 +51,22 @@ Mỗi truyện được lưu trong `truyen/<tên-truyện>`. Khi thêm truyện,
 
 Trong **Cài đặt → Chung**, mục **Số chương trước làm ngữ cảnh dịch** quyết định số bản dịch liền trước được đưa vào prompt; mặc định là 3.
 
+### Ảnh SFACG khi đăng Hako
+
+Khi đăng Hako, app tự nhận thẻ `[img=536,887]https://…[/img]` hoặc `[img]https://…[/img]`, kể cả URL bị escape thành `https\://…`. Ảnh được tải vào thư mục `image` của truyện, kiểm tra định dạng rồi đưa lên Cloudflare R2 bằng cấu hình Xuất bản hiện có. Ảnh giữ đúng vị trí trong nội dung và được lưu lại để tránh tải lại cùng URL. Nếu tải ảnh hoặc upload R2 thất bại, chương đó dừng đăng để tránh thiếu ảnh. Không cần sửa file bản dịch.
+
+### Tự chuyển link Gemini Web / Google AI Studio Web
+
+Trong tab cài đặt của từng dịch vụ, bật **Tự chuyển link**, nhập mỗi link trên một dòng và đặt ngưỡng phút hoặc số chương. Nhập `0` để bỏ qua một ngưỡng; cần ít nhất một ngưỡng lớn hơn `0`. Nếu đặt cả hai, ngưỡng nào đạt trước sẽ kích hoạt chuyển. Danh sách chỉ nhận link HTTPS của đúng dịch vụ, có thể là link tài khoản, cuộc trò chuyện, Gem hoặc prompt đã lưu.
+
+Quy trình dịch bắt đầu từ link đầu, giữ link trong các bước xử lý chương và chỉ chuyển trước chương tiếp theo sau khi lưu thành công. Không tính chương bị lỗi lưu hoặc bị bỏ qua. Bật **Quay vòng danh sách** để trở về link đầu; tắt để giữ link cuối. Mỗi dịch vụ có bộ đếm riêng và bộ đếm bắt đầu lại mỗi lần chạy tác vụ. Các tác vụ riêng ngoài quy trình dịch dùng link đầu, không tự chuyển theo số chương hay thời gian.
+
+Lưu cài đặt trước khi bắt đầu tác vụ mới. Hãy đăng nhập sẵn các tài khoản trong trình duyệt mà app sử dụng. App mở nguyên link đã nhập và tiếp tục gửi prompt/ngữ cảnh theo luồng hiện có; không tự tạo cuộc trò chuyện mới nếu link trỏ đến một cuộc trò chuyện đã lưu.
+
+**Chuyển link khi gặp lỗi** là tùy chọn riêng trong mỗi tab Gemini Web / Google AI Studio Web, mặc định tắt. Có thể bật chỉ tùy chọn này và nhập danh sách link, không cần đặt ngưỡng phút/chương. Khi nhận diện thông báo hết usage/quota, app chuyển ngay; upload hoặc kết nối bị lỗi sẽ thử lại trên link hiện tại trước khi chuyển. App gửi lại nguyên prompt và tài liệu của bước đang chạy, không chạy lại những bước trước đó. Link thành công được giữ cho bước tiếp theo.
+
+Trong mỗi đợt lỗi, mỗi URL chỉ được thử một lượt (với số lần thử lại nội bộ), kể cả khi bật quay vòng định kỳ. Hết danh sách thì dừng tác vụ và báo lỗi. Lỗi định dạng nội dung và lỗi lưu file không kích hoạt đổi link. Nhận diện quota dựa trên thông báo giao diện có thể đọc được; nếu dịch vụ đổi cách hiển thị, app có thể chỉ chuyển sau khi hết thời gian chờ. Kết quả bước trước được giữ trong lần chạy hiện tại; đây không phải chức năng lưu checkpoint để tiếp tục sau khi đóng app.
+
 ## Yêu cầu
 
 - Windows 10/11 64-bit.

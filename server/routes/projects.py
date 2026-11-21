@@ -9,6 +9,7 @@ from services.importing.uploads import write_upload
 from dataclasses import dataclass
 from http import HTTPStatus
 from urllib.parse import unquote
+from services.library.image_shelf import add_image, list_images
 from services.library.search import search_chapters
 from services.polish_review import ReviewConflict, change_review, load_review, save_translation
 
@@ -34,6 +35,12 @@ class ProjectRoutes:
 
     def handle_get(self, handler, path, query):
         project = query.get("project", [""])[0]
+        if path == "/api/image-shelf":
+            try:
+                handler.json_response({"items": list_images(self.safe_project(project))})
+            except (ValueError, OSError) as exc:
+                handler.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
         if path == "/api/story-search":
             try:
                 raw, translated = self.project_folders(project)
@@ -107,6 +114,19 @@ class ProjectRoutes:
 
     def handle_post(self, handler, path, query):
         project = query.get("project", [""])[0]
+        if path == "/api/image-shelf":
+            try:
+                length = int(handler.headers.get("Content-Length", 0))
+                if not 0 < length <= 20 * 1024 * 1024:
+                    raise ValueError("Chọn ảnh có dung lượng tối đa 20 MB")
+                data = handler.rfile.read(length)
+                if len(data) != length:
+                    raise ValueError("Tải ảnh chưa hoàn tất")
+                name = add_image(self.safe_project(project), query.get("name", ["anh"])[0], data)
+                handler.json_response({"name": name}, HTTPStatus.CREATED)
+            except (ValueError, OSError) as exc:
+                handler.json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return True
         if path.startswith("/api/polish-review/"):
             try:
                 _, translated = self.project_folders(project)

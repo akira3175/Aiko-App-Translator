@@ -24,6 +24,7 @@ from cores.config.models import (
 )
 from cores.config.project_paths import (
     APP_ROOT,
+    CHARACTERS_JSON,
     CHARACTERS_MD,
     CONTEXT_JSON,
     LOG_DIR,

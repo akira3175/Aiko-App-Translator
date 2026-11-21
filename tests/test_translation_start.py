@@ -9,7 +9,7 @@ from cores.translation.orchestration import run_requested_chapters
 
 
 class TranslationStartTests(unittest.TestCase):
-    def run_translation(self, start, limit, translated=(14,)):
+    def run_translation(self, start, limit, translated=(14,), observe=None):
         with tempfile.TemporaryDirectory() as folder, ExitStack() as stack:
             root=Path(folder)
             raw=root/'raw'; raw.mkdir()
@@ -29,6 +29,8 @@ class TranslationStartTests(unittest.TestCase):
             stack.enter_context(patch('cores.translation.orchestration.stop_requested',return_value=False))
             seen=[]
             def translate(chapter,*args):
+                if observe:
+                    observe()
                 seen.append(chapter['id'])
                 return 'Dịch','Nội dung dịch đủ dài'
             count=run_requested_chapters(limit,lambda:runner.run_single_translation(
@@ -49,3 +51,19 @@ class TranslationStartTests(unittest.TestCase):
     def test_deleted_start_is_not_silently_ignored(self):
         with self.assertRaisesRegex(ValueError,'không còn tồn tại'):
             self.run_translation('v1_c99_s1.md',5)
+
+    def test_rotation_counts_real_saves_and_keeps_link_on_save_failure(self):
+        from cores import link_rotation
+
+        values = {"gemini_web_rotation_enabled": "on", "gemini_web_rotation_chapters": 1,
+                  "gemini_web_rotation_links": "https://gemini.google.com/u/1/\nhttps://gemini.google.com/u/2/"}
+        seen = []
+        def observe():
+            seen.append(runner.rotation.link("gemini_web", "fallback"))
+        with patch.object(link_rotation, "option", side_effect=lambda key, default=None: values.get(key, default)), patch.dict(runner.rotation.states, {}, clear=True), patch.object(runner.rotation, "can_advance", True):
+            with patch.object(runner, "save_translated_md", side_effect=OSError("save failed")):
+                with self.assertRaises(OSError):
+                    self.run_translation('', 1, observe=observe)
+            self.assertEqual(0, runner.rotation.states["gemini_web"]["count"])
+            self.run_translation('', 2, observe=observe)
+        self.assertEqual(["https://gemini.google.com/u/1/", "https://gemini.google.com/u/1/", "https://gemini.google.com/u/2/"], seen)

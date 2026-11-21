@@ -13,7 +13,8 @@ class GeminiWebProvider(ProviderAdapter):
             prompt = prompt_with_attachments(prompt, request.attachments)
         options = dict(request.options)
         if request.stage == 'import':
-            options.update(force_upload=True, max_retries=1)
+            options['force_upload'] = True
+            options.setdefault('max_retries', 3)
         text = self._generate(
             prompt,
             web_model=request.model,

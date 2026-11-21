@@ -35,6 +35,26 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
   let chatgptPlanModelsLoading=false;
   const cloudflareSettingsFeature=createCloudflareSettingsFeature({api,getSettingsItems:()=>items,renderSettings:render,toast});
 
+  function updateLinkFields() {
+    for(const [prefix,defaultKey] of [['gemini_web','link_gemini'],['ai_studio','link_ai_studio']]) {
+      const field=key=>$(`[data-python-setting="${key}"]`);
+      const useList=['enabled','on_error'].some(suffix=>field(`${prefix}_rotation_${suffix}`)?.value==='on');
+      const periodic=field(`${prefix}_rotation_enabled`)?.value==='on';
+      const defaultRow=field(defaultKey)?.closest('.python-setting');
+      const listRow=field(`${prefix}_rotation_links`)?.closest('.python-setting');
+      if(defaultRow)defaultRow.hidden=useList;
+      if(listRow)listRow.hidden=!useList;
+      for(const suffix of ['minutes','chapters','loop']) {
+        const row=field(`${prefix}_rotation_${suffix}`)?.closest('.python-setting');
+        if(row)row.hidden=!periodic;
+      }
+      for(const suffix of ['enabled','on_error']) {
+        const toggle=field(`${prefix}_rotation_${suffix}`);
+        if(toggle)toggle.onchange=updateLinkFields;
+      }
+    }
+  }
+
   function planModelOptions(value) {
     const models=chatgptPlanModels||[];
     const fallback=items.find(item=>item.key==='chatgpt_plan_model')?.value||'';
@@ -93,9 +113,9 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       const control=item.type==='select'
         ? `<select data-python-setting="${escapeHtml(item.key)}">${item.options.map(([value,label])=>`<option value="${escapeHtml(value)}" ${value===item.value?'selected':''}>${escapeHtml(label)}</option>`).join('')}</select>`
         : item.type==='textarea'
-          ? `<textarea data-python-setting="${escapeHtml(item.key)}" rows="10" spellcheck="false">${escapeHtml(item.value)}</textarea>`
+          ? `<textarea data-python-setting="${escapeHtml(item.key)}" rows="${item.key.endsWith('_rotation_links')?5:item.key==='gemini_web_upload_instruction'?4:10}" spellcheck="false">${escapeHtml(item.value)}</textarea>`
         : `<input data-python-setting="${escapeHtml(item.key)}" type="${item.type}" value="${escapeHtml(item.value)}" ${item.inputmode?`inputmode="${item.inputmode}"`:''} ${item.type==='number'?`min="${item.min}" max="${item.max}"`:''} autocomplete="off">`;
-      return `<label class="python-setting ${item.type==='textarea'?'textarea-setting':''}"><span>${escapeHtml(item.label)}${item.overridden?'<em>Đã tùy chỉnh</em>':''}</span>${control}<small>${item.description?escapeHtml(item.description)+' · ':''}${item.type==='textarea'?'Dùng “Khôi phục mặc định” để lấy lại tiêu chí chuẩn.':`Mặc định: ${escapeHtml(item.default||'để trống')}`}</small></label>`;
+      return `<label class="python-setting ${item.type==='textarea'?'textarea-setting':''}"><span>${escapeHtml(item.label)}${item.overridden?'<em>Đã tùy chỉnh</em>':''}</span>${control}<small>${item.description?escapeHtml(item.description)+' · ':''}${item.type==='textarea'?'Dùng “Khôi phục mặc định” để đặt lại nội dung.':`Mặc định: ${escapeHtml(item.default??'để trống')}`}</small></label>`;
     };
     const groupItems=visibleSettingsForGroup(items,activeGroup);
     const settingFields=groupItems.filter(item=>activeGroup!=='chatgpt-plan'||item.key!=='chatgpt_plan_model').map(renderSetting).join('');
@@ -166,6 +186,7 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       activeGroup=button.dataset.settingsTab;
       render(items);
     });
+    updateLinkFields();
     $$('[data-stage-engine]').forEach(select=>select.onchange=()=>{
       $$('[data-python-setting]').forEach(input=>{ const item=items.find(entry=>entry.key===input.dataset.pythonSetting); if(item)item.value=settingValue(input); });
       const stage=select.dataset.stageEngine;

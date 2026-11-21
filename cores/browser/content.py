@@ -2,6 +2,7 @@
 
 from cores.browser.chrome import apply_portable_chrome, create_chrome_service
 from cores.browser.runtime import BrowserRuntime
+from cores.link_rotation import rotation
 from cores.chatgpt.web_client import generate_content as generate_chatgpt_content
 from cores.config import (
     CHATGPT_SELECT_MODEL,
@@ -49,7 +50,7 @@ def close_gemini_driver():
 
 
 def _gemini_link():
-    return str(option("link_gemini", LINK_GEMINI) or LINK_GEMINI).strip()
+    return rotation.link("gemini_web", str(option("link_gemini", LINK_GEMINI) or LINK_GEMINI).strip())
 
 
 def setup_gemini_browser(*, skip_login_prompt=None):
@@ -63,15 +64,15 @@ def setup_gemini_browser(*, skip_login_prompt=None):
 def generate_content_with_selenium(
     prompt, max_retries=3, web_model=SELECT_MODEL, thinking_level=None, force_upload=False
 ):
-    return browser_runtime.generate_gemini(
+    return rotation.run("gemini_web", _gemini_link(), lambda link: browser_runtime.generate_gemini(
         prompt,
-        link=_gemini_link(),
+        link=link,
         default_thinking=WEB_THINKING_LEVEL,
         max_retries=max_retries,
         web_model=web_model,
         thinking_level=thinking_level,
         **({'force_upload': True} if force_upload else {}),
-    )
+    ))
 
 
 def get_chatgpt_driver():
@@ -115,7 +116,7 @@ def generate_content_with_chatgpt(
 
 def _ai_studio_link():
     link = str(option("link_ai_studio", "")).strip()
-    return link if link else "https://aistudio.google.com/prompts/new_chat"
+    return rotation.link("ai_studio", link if link else "https://aistudio.google.com/prompts/new_chat")
 
 
 def setup_ai_studio_browser():
@@ -131,13 +132,17 @@ def generate_content_with_ai_studio(
     ai_studio_thinking="high", ai_studio_references=(), ai_studio_stage="",
     ai_studio_link=None,
 ):
-    return generate_ai_studio_content(
-        prompt,
-        get_driver=browser_runtime.get_chatgpt_driver,
-        max_retries=max_retries,
-        ai_studio_model=ai_studio_model,
-        ai_studio_thinking=ai_studio_thinking,
-        reference_documents=ai_studio_references,
-        stage=ai_studio_stage,
-        ai_studio_link=ai_studio_link,
-    )
+    def generate(link):
+        return generate_ai_studio_content(
+            prompt,
+            get_driver=browser_runtime.get_chatgpt_driver,
+            max_retries=max_retries,
+            ai_studio_model=ai_studio_model,
+            ai_studio_thinking=ai_studio_thinking,
+            reference_documents=ai_studio_references,
+            stage=ai_studio_stage,
+            ai_studio_link=link,
+        )
+    if ai_studio_link is not None:
+        return generate(ai_studio_link)
+    return rotation.run("ai_studio", _ai_studio_link(), generate)

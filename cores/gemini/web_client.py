@@ -1,6 +1,7 @@
 """Send prompts through Gemini Web and wait for the matching response."""
 
 import time
+from cores.web_errors import RetryableWebError, WebQuotaError, WebTaskStopped, WebSubmissionUncertain, check_quota, retryable_transport
 
 from selenium.common.exceptions import (
     NoSuchElementException,
@@ -26,6 +27,8 @@ from cores.gemini.web_response import (
     copy_response_text,
     find_new_response as _find_new_gemini_response,
     response_text as _gemini_response_text,
+    response_finished as _gemini_response_finished,
+    submission_state as _gemini_submission_state,
     snapshot_conversation as _snapshot_gemini_conversation,
 )
 from cores.json_output import parse_complete_json_object
@@ -99,9 +102,11 @@ def _upload_prompt_file(driver, input_area, content, timeout=60):
     driver.execute_script(PASTE_FILE_SCRIPT, input_area, content, UPLOAD_FILE_NAME)
     deadline = time.time() + timeout
     while time.time() < deadline:
+        check_quota(driver)
         if _attachment_count(driver) > before:
             # Đợi thêm để Gemini tải file lên server xong.
             time.sleep(3)
+            check_quota(driver)
             return True
         time.sleep(0.5)
     return False
@@ -140,6 +145,49 @@ def _is_known_structured_response(text):
 
 def _has_end_marker(text):
     return "###END###" in text or "###CHAR_END###" in text
+
+
+def _wait_for_submission(driver, token, old_response_count, timeout=30, processing_timeout=90):
+    started = time.monotonic()
+    seen_pending = False
+    while True:
+        check_quota(driver)
+        state = _gemini_submission_state(driver, token, old_response_count)
+        if state == 'processing':
+            return
+        if state == 'pending' and not seen_pending:
+            print(f"[INFO] Đã thấy lượt tin nhắn; chờ Gemini bắt đầu xử lý (tối đa {processing_timeout} giây từ lúc gửi).")
+            seen_pending = True
+        elapsed = time.monotonic() - started
+        if elapsed >= (processing_timeout if seen_pending else timeout):
+            state = _gemini_submission_state(driver, token, old_response_count)
+            if state == 'processing':
+                return
+            if state == 'pending' and not seen_pending:
+                seen_pending = True
+                continue
+            if seen_pending:
+                raise WebSubmissionUncertain(
+                    f"Đã thấy tin nhắn nhưng chưa xác nhận Gemini xử lý sau {processing_timeout} giây. "
+                    "Dừng để tránh gửi trùng; hãy kiểm tra lượt tin nhắn trong Chrome trước khi chạy lại."
+                )
+            raise RetryableWebError(
+                f"Chưa xác nhận Gemini nhận prompt sau {timeout} giây; thử gửi lại đầy đủ prompt/file."
+            )
+        time.sleep(0.5)
+
+
+def _validate_answer(text, prompt):
+    if '###TITLE###' in prompt and '###CONTENT###' in prompt:
+        from cores.stages.outputs import parse_title_content
+
+        title = text.find('###TITLE###')
+        content = text.find('###CONTENT###')
+        end = text.find('###END###')
+        if not (0 <= title < content < end):
+            raise ValueError('Gemini trả sai thứ tự hoặc thiếu TITLE/CONTENT/END; thử lại bước hiện tại.')
+        parse_title_content(text, 'Gemini Web')
+    return text
 
 
 def normalize_web_model(value):
@@ -195,6 +243,7 @@ def generate_content(
 
             driver.get(link)
             time.sleep(3)
+            check_quota(driver)
 
             # Selectors theo cấu trúc HTML mới (test.html):
             # <rich-textarea> → <div class="ql-editor ... new-input-ui" contenteditable="true"
@@ -212,11 +261,15 @@ def generate_content(
                 local_wait = WebDriverWait(driver, timeout_sec)
                 for selector in input_selectors:
                     try:
-                        found = local_wait.until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-                        )
+                        def input_or_quota(active_driver):
+                            check_quota(active_driver)
+                            return EC.presence_of_element_located((By.CSS_SELECTOR, selector))(active_driver)
+
+                        found = local_wait.until(input_or_quota)
                         if found:
                             return found
+                    except WebQuotaError:
+                        raise
                     except Exception:
                         continue
                 return None
@@ -273,15 +326,18 @@ def generate_content(
                 print(f"📎 Prompt dài {len(prompt)} ký tự → gửi dưới dạng {UPLOAD_FILE_NAME}...")
                 try:
                     uploaded = _upload_prompt_file(driver, input_area, prompt)
+                except WebQuotaError:
+                    raise
                 except Exception as e:
                     print(f"⚠️ Upload file lỗi: {e}")
                 if not uploaded:
-                    if force_upload:
-                        raise ValueError('Không đính kèm được toàn bộ TXT. Hãy thử lại hoặc dùng cách tách thường.')
-                    print("⚠️ Không xác nhận được file đã gắn, quay về dán text.")
+                    raise RetryableWebError(
+                        "Không đính kèm được toàn bộ file prompt.md; chưa gửi yêu cầu cho Gemini."
+                    )
             # Thay vì dùng pyperclip và phím tắt dán (chiếm OS clipboard), ta dùng js execCommand
             _insert_text(driver, input_area, _upload_instruction() if uploaded else prompt)
             time.sleep(1)
+            check_quota(driver)
 
             # Đánh dấu lịch sử ngay trước khi gửi để không nhận lại câu trả lời
             # cuối của lần dịch trước trong cùng cuộc chat Gemini.
@@ -329,7 +385,9 @@ def generate_content(
                 # Fallback cuối: dùng Enter key
                 ActionChains(driver).send_keys(Keys.RETURN).perform()
 
-            print(f"📤 Đã gửi prompt ({len(prompt)} ký tự). Đang chờ response...")
+            print("[INFO] Đang xác nhận Gemini đã nhận prompt (tối đa 30 giây)...")
+            _wait_for_submission(driver, response_token, old_response_count)
+            print(f"📤 Đã xác nhận Gemini xử lý prompt ({len(prompt)} ký tự). Đang chờ response...")
             time.sleep(5)
 
             max_wait = 1800
@@ -341,6 +399,7 @@ def generate_content(
             require_end = "###END###" in prompt or "###CHAR_END###" in prompt
 
             while time.monotonic() - start_time < max_wait:
+                check_quota(driver)
                 current_text = ""
                 try:
                     latest_root = _find_new_gemini_response(
@@ -350,8 +409,14 @@ def generate_content(
                         response_root = latest_root
                     if response_root is not None:
                         current_text = _gemini_response_text(response_root)
+                    finished = _gemini_response_finished(response_root)
                 except StaleElementReferenceException:
                     response_root = None
+                    continue
+
+                if not finished:
+                    last_text = current_text
+                    time.sleep(1)
                     continue
 
                 current_len = len(current_text) if current_text else 0
@@ -376,6 +441,9 @@ def generate_content(
                         )
                         if response_root is not None:
                             current_text = _gemini_response_text(response_root)
+                    if not _gemini_response_finished(response_root):
+                        last_text = current_text
+                        continue
                     final_text = copy_response_text(
                         driver, response_root, token=response_token
                     )
@@ -385,9 +453,9 @@ def generate_content(
                         else current_text
                     )
                     if not _has_end_marker(result):
-                        raise TimeoutException("Gemini mất dấu kết thúc sau khi đọc lại phản hồi.")
+                        raise ValueError("Gemini mất dấu kết thúc sau khi đọc lại phản hồi.")
                     print("✅ Streaming hoàn tất.")
-                    return result
+                    return _validate_answer(result, prompt)
 
                 # 2. Nếu prompt không yêu cầu ###END### nhưng đã có JSON hợp lệ
                 if not require_end and _is_known_structured_response(current_text):
@@ -404,7 +472,7 @@ def generate_content(
                         )
                         if response_root is not None:
                             current_text = _gemini_response_text(response_root)
-                    if _is_known_structured_response(current_text):
+                    if _gemini_response_finished(response_root) and _is_known_structured_response(current_text):
                         final_text = copy_response_text(
                             driver, response_root, token=response_token
                         )
@@ -439,18 +507,23 @@ def generate_content(
                 time.sleep(1)
 
             if require_end:
+                if last_text:
+                    raise ValueError("Gemini trả về nội dung thiếu ###END### hoặc ###CHAR_END###.")
                 raise TimeoutException("Gemini chưa hoàn tất sau 30 phút: thiếu ###END### hoặc ###CHAR_END###.")
-            if last_text:
-                return last_text
             raise TimeoutException("Timeout chờ response")
 
         except Exception as e:
+            if isinstance(e, (WebQuotaError, WebTaskStopped)):
+                raise
             print(f"⚠️ Lỗi Selenium lần {attempt + 1}/{max_retries}: {e}")
             if attempt < max_retries - 1:
+                print(f"[THỬ LẠI] Tải lại trang và gửi lại đầy đủ prompt (lần {attempt + 2}/{max_retries}).")
                 time.sleep(5)
                 try:
                     driver.refresh()
                 except:
                     pass
             else:
+                if retryable_transport(e):
+                    raise RetryableWebError(str(e)) from e
                 raise ValueError(f"❌ Thất bại: {e}")

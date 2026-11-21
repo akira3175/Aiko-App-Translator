@@ -162,48 +162,57 @@ def find_new_response(driver, token, old_response_count):
     return driver.execute_script(NEW_RESPONSE_SCRIPT, token, old_response_count)
 
 
+def submission_state(driver, token, old_response_count):
+    """Separate a local user bubble from actual activity in the new response."""
+    new_user = driver.execute_script(r"""
+        const token = arguments[0];
+        return Array.from(document.querySelectorAll(
+            'user-query,.user-query,[data-test-id="user-query"],.query-content'
+        )).some(el => {
+            const root = el.closest('user-query') || el.closest('.user-query') ||
+                el.closest('[data-test-id="user-query"]') || el;
+            return root.getAttribute('data-novel-before-user') !== token;
+        });
+    """, token)
+    root = find_new_response(driver, token, old_response_count)
+    if root is not None:
+        if response_text(root) or root.find_elements(By.CSS_SELECTOR, '[aria-busy="true"]'):
+            return 'processing'
+        for thinking in root.find_elements(By.CSS_SELECTOR, 'spark-thinking-steps'):
+            if thinking.text.strip():
+                return 'processing'
+        return 'pending'
+    return 'pending' if new_user is True else 'absent'
+
+
+ANSWER_SELECTOR = (
+    "message-content:not(spark-thinking-steps *, .thinking-collapsible *), "
+    ".model-response-text:not(spark-thinking-steps *, .thinking-collapsible *)"
+    ":not(:has(spark-thinking-steps)), "
+    ".markdown-main-panel:not(spark-thinking-steps *, .thinking-collapsible *)"
+)
+
+
 def response_text(response_root):
-    content_blocks = response_root.find_elements(
-        By.CSS_SELECTOR,
-        "message-content .model-response-text, .model-response-text, "
-        "message-content, .response-container-content, .markdown-main-container",
-    )
+    """Read answer content only; never fall back to a container containing thoughts."""
     texts = []
-    for block in content_blocks:
-        try:
-            t = block.text.strip()
-            if t:
-                texts.append(t)
-        except Exception:
-            continue
+    for block in response_root.find_elements(By.CSS_SELECTOR, ANSWER_SELECTOR):
+        text = block.text.strip()
+        if text:
+            texts.append(text)
+    return max(reversed(texts), key=len) if texts else ""
 
-    try:
-        root_text = response_root.text.strip()
-    except Exception:
-        root_text = ""
 
-    if not texts:
-        return root_text
-
-    # 1. Nếu có block chứa marker kết thúc, lấy block dài nhất chứa marker
-    end_blocks = [t for t in texts if "###END###" in t or "###CHAR_END###" in t]
-    if end_blocks:
-        return max(end_blocks, key=len)
-
-    # Nếu không có block con nào chứa marker nhưng root_text có chứa marker
-    if "###END###" in root_text or "###CHAR_END###" in root_text:
-        return root_text
-
-    # 2. Nếu có block chứa cấu trúc TITLE & CONTENT
-    title_content_blocks = [
-        t for t in texts if "###TITLE###" in t and "###CONTENT###" in t
-    ]
-    if title_content_blocks:
-        return max(title_content_blocks, key=len)
-
-    # 3. Khi đang stream: ưu tiên block dài nhất để không bị cắt xén vào sub-block con.
-    # Nếu các block cùng độ dài, ưu tiên block sau cùng (mới hơn).
-    return max(reversed(texts), key=len)
+def response_finished(response_root):
+    """Completion signals observed in the supplied Gemini response DOM."""
+    if response_root is None:
+        return False
+    if response_root.find_elements(By.CSS_SELECTOR, '[aria-busy="true"]'):
+        return False
+    # Gemini may leave this state container empty until its action buttons mount.
+    return bool(response_root.find_elements(
+        By.CSS_SELECTOR, '.response-footer.complete'
+    ))
 
 
 def _resolve_button(element):
@@ -267,7 +276,8 @@ def _is_valid_copy_button(button, token=None):
         excluded_ancestors = button.find_elements(
             By.XPATH,
             "ancestor::user-query | ancestor::*[contains(@class, 'user-query')] "
-            "| ancestor::pre | ancestor::code | ancestor::code-block",
+            "| ancestor::pre | ancestor::code | ancestor::code-block | ancestor::spark-thinking-steps "
+            "| ancestor::*[contains(@class, 'thinking-collapsible')]",
         )
         if excluded_ancestors:
             return False

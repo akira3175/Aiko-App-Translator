@@ -24,6 +24,18 @@ CHAPTER = {
 
 
 class StagePipelineTests(unittest.TestCase):
+    def test_polish_stops_when_all_browser_links_fail(self):
+        from cores.web_errors import WebLinksExhausted
+        generate = Mock(side_effect=WebLinksExhausted('all links failed'))
+        values = {"polish_provider": "gemini-web", "gemini_web_model": "pro"}
+        with patch.object(runtime_module, "option", side_effect=lambda key, default=None: values.get(key, default)), patch.dict(
+            translation_stage.TRANSPORT_OVERRIDES, {"gemini-web": generate}, clear=True
+        ), patch.object(polish_module, "build_characters_snapshot", return_value=None), patch.object(polish_module.time, 'sleep') as sleep:
+            with self.assertRaises(WebLinksExhausted):
+                configured_runtime.polish_translation(dict(CHAPTER), 1, 'context', 'pronouns', pronouns_file=None)
+        generate.assert_called_once()
+        sleep.assert_not_called()
+
     def test_chatgpt_plan_uses_account_model_when_settings_are_blank(self):
         values = {"translate_stage_model": "", "chatgpt_plan_model": ""}
         with patch.object(stage_runtime, "chatgpt_plan_default_model", return_value="account-model") as fallback:

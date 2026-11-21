@@ -28,9 +28,10 @@ export const pageHelp = {
     ['Chỉnh context', 'Dùng các tab để sửa tiến độ context, ghi chú phong cách, prompt dịch, prompt hiệu đính hoặc glossary. Đọc chú thích từng trường; bấm Kiểm tra và lưu an toàn để xác nhận.'],
   ],
   characters: [
-    ['Hồ sơ nhân vật', 'Hồ sơ thuộc truyện đang mở. Ghi tên, đặc điểm, vai trò và quan hệ bằng Markdown để tiện đọc và chỉnh sửa.'],
-    ['Soạn thảo và xem trước', 'Soạn thảo cho phép sửa văn bản; Preview Markdown hiển thị cách trình bày. Bấm Lưu hồ sơ để lưu nội dung đã chỉnh.'],
-    ['Phân tích bằng AI', 'Mở cấu hình tác vụ bằng nút Phân tích bằng AI. Kiểm tra phạm vi segment, provider và tùy chọn chạy lại trước khi bắt đầu. Theo dõi kết quả trong nhật ký tác vụ.'],
+    ['Hồ sơ nhân vật có cấu trúc', 'Nguồn chỉnh sửa duy nhất là characters.json, giúp giữ đúng bố cục và lưu lịch sử thay đổi theo từng mã chương (vX_cY_sZ.md). File characters.md chỉ là bản xuất một chiều để xem hoặc sao chép.'],
+    ['Thay đổi theo chương & khóa bảo vệ', 'Khi nhân vật đổi địa vị, phe, trạng thái, giọng điệu hoặc xưng hô, hãy bấm + Thêm mốc và chọn mã chương tiết lộ (ví dụ v7_c11_s1.md) thay vì xóa giá trị cũ. Các mục gắn 🔒 Đã khóa được bảo vệ để AI không tự ghi đè.'],
+    ['Xem dữ liệu gửi AI', 'Dùng nút Xem dữ liệu gửi AI để chọn một chương bất kỳ và kiểm tra chính xác bản Markdown snapshot sẽ đính kèm cho AI (chỉ gồm trạng thái đã xác lập trước chương đó).'],
+    ['Phân tích bằng AI & khôi phục', 'Nút Phân tích bằng AI sẽ trích xuất cập nhật mới theo từng chương và gộp an toàn. Mọi lần lưu đều tạo bản sao characters.json.bak và có nút Khôi phục .bak khi cần.'],
   ],
   pronouns: [
     ['Tìm cặp nhân vật', 'Tìm tên hoặc lọc tất cả, đã khóa, có thay đổi. Chọn một cặp để xem cách gọi hiện tại và lịch sử.'],

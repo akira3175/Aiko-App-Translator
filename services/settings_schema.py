@@ -292,6 +292,22 @@ SETTING_META = {
         "description": "6–12 chữ số. Để trống khi bật để app tự sinh mã 6 số.",
     },
 }
+for _prefix, _group in (("gemini_web", "gemini-web"), ("ai_studio", "google-ai-studio-web")):
+    for _suffix, _default, _label, _meta in (
+        ("on_error", "off", "Chuyển link khi gặp lỗi", {"type": "select", "options": [["off", "Tắt"], ["on", "Bật"]], "description": "Hết usage/quota: chuyển ngay khi nhận diện được thông báo. Lỗi upload hoặc kết nối: thử lại trước khi chuyển. Mỗi đợt lỗi chỉ thử mỗi link một lần, rồi dừng; áp dụng cả tác vụ riêng. Có thể bật riêng, không cần ngưỡng phút/chương."}),
+        ("enabled", "off", "Tự chuyển link", {"type": "select", "options": [["off", "Tắt"], ["on", "Bật"]], "description": "Áp dụng cho quy trình dịch chương. Chỉ chuyển trước chương kế tiếp sau khi lưu thành công. Bộ đếm bắt đầu lại mỗi lần chạy."}),
+        ("links", "", "Danh sách link (mỗi dòng một link)", {"type": "textarea", "description": "Dùng theo thứ tự từ dòng đầu, thay cho link mặc định khi bật. Nhập link của đúng dịch vụ; giữ nguyên tài khoản, cuộc trò chuyện hoặc prompt bạn chọn."}),
+        ("minutes", 0, "Chuyển sau số phút", {"description": "0 = bỏ qua ngưỡng thời gian. Nếu dùng cả hai ngưỡng, đạt ngưỡng nào trước thì chuyển sau chương hiện tại."}),
+        ("chapters", 0, "Chuyển sau số chương", {"description": "0 = bỏ qua ngưỡng số chương. Chỉ đếm chương đã lưu có sử dụng dịch vụ này."}),
+        ("loop", "on", "Quay vòng danh sách", {"type": "select", "options": [["on", "Quay về link đầu"], ["off", "Giữ link cuối"]]}),
+    ):
+        _key = f"{_prefix}_rotation_{_suffix}"
+        SETTING_DEFAULTS[_key] = _default
+        SETTING_LABELS[_key] = _label
+        SETTING_META[_key] = {"group": _group, **_meta}
+        if isinstance(_default, int):
+            SETTING_RANGES[_key] = (0, 100000)
+
 OPTIONAL_SETTINGS = set(SETTING_DEFAULTS) - {
     "link_gemini", "translate_model", "r19_model", "gemini_web_model", "gemini_thinking", "ai_studio_model", "ai_studio_pronoun_model", "ai_studio_review_model", "ai_studio_thinking",
     "link_chatgpt", "chatgpt_model", "chatgpt_thinking", "fix_max_retry",

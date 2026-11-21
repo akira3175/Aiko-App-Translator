@@ -110,6 +110,13 @@ class StageReferenceTests(unittest.TestCase):
         )
         self.assertEqual(prompts[0], "prompt")
 
+    def test_gemini_import_preserves_explicit_retry_limit(self):
+        calls = []
+        provider = GeminiWebProvider(lambda prompt, **kwargs: calls.append(kwargs) or "ok")
+        provider.generate(ProviderRequest("import", "prompt", "model", options={"max_retries": 2}))
+        self.assertEqual(2, calls[0]["max_retries"])
+        self.assertTrue(calls[0]["force_upload"])
+
 
 if __name__ == "__main__":
     unittest.main()

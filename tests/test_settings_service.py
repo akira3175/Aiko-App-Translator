@@ -29,6 +29,32 @@ class _ApiKeys:
 
 
 class SettingsServiceTests(unittest.TestCase):
+    def test_rotation_settings_validate_and_round_trip(self):
+        from services.settings_schema import OPTIONAL_SETTINGS
+
+        with tempfile.TemporaryDirectory() as folder:
+            service, _ = self._service(Path(folder))
+            service.setting_defaults = SETTING_DEFAULTS
+            service.setting_labels = SETTING_LABELS
+            service.setting_ranges = SETTING_RANGES
+            service.setting_meta = SETTING_META
+            service.optional_settings = OPTIONAL_SETTINGS
+            for prefix, host in (("gemini_web", "gemini.google.com"), ("ai_studio", "aistudio.google.com")):
+                values = {f"{prefix}_rotation_enabled": "on", f"{prefix}_rotation_links": f"https://{host}/u/1/\nhttps://{host}/u/2/", f"{prefix}_rotation_minutes": 30}
+                service.write_settings({"values": values})
+                self.assertEqual(values, service.saved_settings())
+                for suffix, value in (("links", ""), ("links", "https://example.com/"), ("minutes", 0), ("minutes", -1), ("loop", "invalid")):
+                    with self.subTest(prefix=prefix, suffix=suffix, value=value), self.assertRaises(ValueError):
+                        service.write_settings({"values": {**values, f"{prefix}_rotation_{suffix}": value}})
+                    self.assertEqual(values, service.saved_settings())
+                failure_only = {f"{prefix}_rotation_on_error": "on", f"{prefix}_rotation_links": values[f"{prefix}_rotation_links"]}
+                service.write_settings({"values": failure_only})
+                self.assertEqual(failure_only, service.saved_settings())
+                with self.assertRaises(ValueError):
+                    service.write_settings({"values": {f"{prefix}_rotation_on_error": "on"}})
+                with self.assertRaises(ValueError):
+                    service.write_settings({"values": {f"{prefix}_rotation_on_error": "invalid"}})
+
     def _service(self, root):
         api_keys = _ApiKeys()
         service = ConfigurationService(

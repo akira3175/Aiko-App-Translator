@@ -9,16 +9,31 @@ from cores.config.runtime import bool_option, option
 from cores.chapters.images import IMAGE_INSTRUCTION
 
 
-CHARACTER_DOCUMENT_INSTRUCTION = """Đọc kỹ file `characters.md` đính kèm trước khi xử lý văn bản. Dùng toàn bộ thông tin trong hồ sơ về giới tính, thân phận, vai trò, tên, bí danh, quan hệ và cách xưng hô. Với nhân vật chuyển sinh, TS hoặc biến đổi giới tính/cơ thể, phải phân biệt trạng thái trước và sau biến đổi, cơ thể hiện tại, nhận thức bản thân, góc nhìn của người khác và thời điểm của cảnh; không giản lược thành một giới tính cố định. Không tự suy đoán khi hồ sơ và nguyên tác chưa đủ căn cứ."""
+CHARACTER_DOCUMENT_INSTRUCTION = """Đọc kỹ file `characters.md` đính kèm trước khi xử lý văn bản. Dùng thông tin trong hồ sơ về giới tính, thân phận, vai trò, tên, bí danh, quan hệ, giọng điệu và cách xưng hô. Với nhân vật chuyển sinh, TS hoặc biến đổi giới tính/cơ thể, phải phân biệt trạng thái trước và sau biến đổi, cơ thể hiện tại, nhận thức bản thân, góc nhìn của người khác và thời điểm của cảnh; không giản lược thành một giới tính cố định.
+Hồ sơ cung cấp trạng thái đã xác lập trước chương đang xử lý (xem Mã chương). Với biến cố xuất hiện trong chính chương này, chỉ áp dụng thay đổi từ vị trí phù hợp trong nguyên tác. Phân biệt lời kể, nhận thức của từng nhân vật và các cảnh hồi tưởng. Không dùng thông tin về sau để sửa danh xưng hoặc xưng hô của cảnh trước. Mục "chưa rõ mốc" chỉ dùng khi phù hợp với nguyên tác. Giữ quy tắc xưng hô đã khóa trong phạm vi áp dụng. Không tự suy đoán khi hồ sơ và nguyên tác chưa đủ căn cứ."""
 
 
 def with_character_document_instruction(prompt):
     """Place the attachment instruction immediately before chapter source data."""
     block = f"## Hồ sơ nhân vật đính kèm\n{CHARACTER_DOCUMENT_INSTRUCTION}\n\n"
-    for marker in ("## 📜 Dữ liệu đầu vào", "### Tiêu đề gốc:", "## Văn bản gốc"):
+    for marker in (
+        "## 📜 Dữ liệu đầu vào",
+        "## Thuật ngữ và quy tắc",
+        "## Thuật ngữ tham chiếu:",
+        "## Bản gốc:",
+        "## Văn bản gốc",
+        "### Tiêu đề gốc:",
+    ):
         if marker in prompt:
             return prompt.replace(marker, block + marker, 1)
     return block + prompt
+
+
+def chapter_code(chapter):
+    """Chapter id (``v1_c2_s1.md``) shown to the AI, or an empty string."""
+    from cores.characters.store import format_chapter_code
+
+    return format_chapter_code((chapter or {}).get("id"))
 
 
 DEFAULT_ROLE = """Bạn là một **biên tập viên dịch thuật tài hoa**, với trái tim dành trọn cho từng con chữ.
@@ -218,6 +233,8 @@ def build_single_prompt(
     *,
     previous_heading="Các chương trước:",
 ):
+    code = chapter_code(chapter)
+    code_block = f"### Mã chương đang dịch:\n{code}\n\n" if code else ""
     prompt = f"""
 {_prompt_header()}
 
@@ -234,7 +251,7 @@ def build_single_prompt(
 Quy tắc dịch:
 {context_text}
 
-### Tiêu đề gốc:
+{code_block}### Tiêu đề gốc:
 {chapter.get("title", "")}
 
 ### Nội dung gốc:
@@ -275,8 +292,11 @@ def build_batch_prompt(
 
     content_input = ""
     for i, ch in enumerate(batch):
+        code = chapter_code(ch)
+        code_line = f"Mã chương: {code}\n" if code else ""
         content_input += (
             f"###CHAPTER {i + 1}###\n"
+            f"{code_line}"
             f"Tiêu đề gốc:\n{ch.get('title', '')}\n\n"
             f"Nội dung gốc:\n{ch.get('content', '')}\n\n"
         )

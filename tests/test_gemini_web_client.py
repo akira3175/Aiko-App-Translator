@@ -13,6 +13,69 @@ from cores.gemini.web_client import (
 
 
 class GeminiWebClientTests(unittest.TestCase):
+    def test_ambiguous_submission_does_not_retry_or_refresh(self):
+        from cores.web_errors import WebSubmissionUncertain
+        driver, copy = self.response_fixture([], [])
+        client._wait_for_submission.side_effect = WebSubmissionUncertain('pending')
+        with self.assertRaises(WebSubmissionUncertain):
+            self.generate(driver, retries=3)
+        self.assertEqual(1, driver.get.call_count)
+        self.assertEqual(1, client._insert_text.call_count)
+        driver.refresh.assert_not_called()
+        copy.assert_not_called()
+
+    def test_unconfirmed_send_retries_before_response_wait(self):
+        from cores.web_errors import RetryableWebError
+        complete = 'complete ###END###'
+        driver, copy = self.response_fixture([complete, complete], [0, 1], complete)
+        client._wait_for_submission.side_effect = [RetryableWebError('not sent'), None]
+        self.assertEqual(complete, self.generate(driver))
+        self.assertEqual(2, driver.get.call_count)
+        self.assertEqual(2, client._insert_text.call_count)
+        self.assertEqual(2, client._wait_for_submission.call_count)
+        copy.assert_called_once()
+
+    def test_end_marker_while_generating_does_not_finish(self):
+        complete = 'complete ###END###'
+        driver, copy = self.response_fixture([complete, complete, complete], [0, 1, 2], complete)
+        with patch.object(client, '_gemini_response_finished', side_effect=[False, True, True]):
+            self.assertEqual(complete, self.generate(driver, retries=1))
+        copy.assert_called_once()
+        self.assertEqual(3, client._gemini_response_text.call_count)
+
+    def test_bad_title_content_response_retries_same_request(self):
+        complete = '###TITLE### T\n###CONTENT### C\n###END###'
+        driver, copy = self.response_fixture(['bad ###END###', 'bad ###END###', complete, complete], [0, 1, 0, 1])
+        self.assertEqual(complete, self.generate(driver, prompt='###TITLE### ###CONTENT### ###END###'))
+        self.assertEqual(2, driver.get.call_count)
+
+    def test_unfinished_response_never_returned_at_timeout(self):
+        driver, copy = self.response_fixture(['some partial text'], [0, 1, 1801])
+        with patch.object(client, '_gemini_response_finished', return_value=False):
+            with self.assertRaises(ValueError):
+                self.generate(driver, prompt='plain prompt', retries=1)
+        copy.assert_not_called()
+
+    def test_quota_while_waiting_for_input_is_not_swallowed(self):
+        from cores.web_errors import WebQuotaError
+        driver, _copy = self.response_fixture([], [])
+        client.WebDriverWait.return_value.until.side_effect = lambda condition: condition(driver)
+        with patch.object(client, 'check_quota', side_effect=[None, WebQuotaError('quota')]):
+            with self.assertRaises(WebQuotaError):
+                self.generate(driver, retries=3)
+        self.assertEqual(1, driver.get.call_count)
+        driver.refresh.assert_not_called()
+        client._insert_text.assert_not_called()
+
+    def test_quota_skips_local_retries(self):
+        from cores.web_errors import WebQuotaError
+        driver, _copy = self.response_fixture([], [])
+        with patch.object(client, 'check_quota', side_effect=WebQuotaError('quota')):
+            with self.assertRaises(WebQuotaError):
+                self.generate(driver, retries=3)
+        self.assertEqual(1, driver.get.call_count)
+        driver.refresh.assert_not_called()
+
     def response_fixture(self, texts, clock, copied=''):
         stack = ExitStack()
         self.addCleanup(stack.close)
@@ -23,10 +86,12 @@ class GeminiWebClientTests(unittest.TestCase):
         for name in ('select_task_mode', '_insert_text', 'WebDriverWait'):
             stack.enter_context(patch.object(client, name))
         stack.enter_context(patch.object(client, '_upload_threshold', return_value=0))
+        stack.enter_context(patch.object(client, '_wait_for_submission'))
         stack.enter_context(patch.object(client.time, 'sleep'))
         stack.enter_context(patch.object(client.time, 'monotonic', side_effect=clock))
         stack.enter_context(patch.object(client, '_snapshot_gemini_conversation', return_value=0))
         stack.enter_context(patch.object(client, '_find_new_gemini_response', return_value=Mock()))
+        stack.enter_context(patch.object(client, '_gemini_response_finished', return_value=True))
         stack.enter_context(patch.object(client, '_gemini_response_text', side_effect=texts))
         copy = stack.enter_context(patch.object(client, 'copy_response_text', return_value=copied))
         return driver, copy
@@ -47,7 +112,7 @@ class GeminiWebClientTests(unittest.TestCase):
         self.assertEqual('translate ###END###', upload.call_args.args[2])
         client._insert_text.assert_called_once_with(driver, unittest.mock.ANY, client._upload_instruction())
 
-    def test_forced_upload_failure_never_pastes_source_or_retries(self):
+    def test_forced_upload_failure_respects_single_attempt_limit(self):
         driver, _copy = self.response_fixture([], [])
         with patch.object(client, '_upload_prompt_file', return_value=False) as upload:
             with self.assertRaisesRegex(ValueError, 'Không đính kèm'):
@@ -55,6 +120,30 @@ class GeminiWebClientTests(unittest.TestCase):
         upload.assert_called_once()
         client._insert_text.assert_not_called()
         driver.refresh.assert_not_called()
+
+    def test_upload_failure_retries_file_before_sending_instruction(self):
+        complete = 'complete ###END###'
+        driver, _copy = self.response_fixture([complete, complete], [0, 1], complete)
+        with patch.object(client, '_upload_threshold', return_value=1), patch.object(
+            client, '_upload_prompt_file', side_effect=[False, True]
+        ) as upload:
+            self.assertEqual(complete, self.generate(driver))
+        self.assertEqual(2, upload.call_count)
+        self.assertEqual(2, driver.get.call_count)
+        driver.refresh.assert_called_once()
+        client._insert_text.assert_called_once_with(driver, unittest.mock.ANY, client._upload_instruction())
+        client._snapshot_gemini_conversation.assert_called_once()
+        self.assertEqual(upload.call_args_list[0].args[2], upload.call_args_list[1].args[2])
+
+    def test_upload_exception_retries_and_exhaustion_never_sends_prompt(self):
+        driver, _copy = self.response_fixture([], [])
+        with patch.object(client, '_upload_prompt_file', side_effect=RuntimeError('upload failed')) as upload:
+            with self.assertRaisesRegex(ValueError, 'Không đính kèm'):
+                self.generate(driver, retries=3, force_upload=True)
+        self.assertEqual(3, upload.call_count)
+        self.assertEqual(3, driver.get.call_count)
+        client._insert_text.assert_not_called()
+        client._snapshot_gemini_conversation.assert_not_called()
 
     def test_missing_end_retries_and_never_returns_partial_text(self):
         driver, copy = self.response_fixture(['partial', 'partial'], [0, 1, 1801] * 2)
@@ -93,7 +182,7 @@ class GeminiWebClientTests(unittest.TestCase):
     def test_compatibility_wrapper_forwards_runtime_configuration(self):
         with patch.object(
             content, "generate_gemini_content", return_value="result"
-        ) as generate:
+        ) as generate, patch.object(content, '_gemini_link', return_value=content.LINK_GEMINI):
             original = content.browser_runtime._gemini_generate
             content.browser_runtime._gemini_generate = generate
             result = content.generate_content_with_selenium(

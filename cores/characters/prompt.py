@@ -1,24 +1,52 @@
-"""Prompt construction for character analysis."""
+"""Prompt construction for chapter-aware structured character analysis."""
 
+from cores.characters.store import (
+    FIELDS,
+    format_chapter_code,
+    summarize_document_for_prompt,
+)
 from cores.r19 import strip_r19_terms
 from cores.translation.prompts import wrap_r19_prompt
 
 
-def build_character_prompt(chapters: list, existing_md: str, glossary: str = "") -> str:
-    content_blocks = [
-        f"### {chapter.get('title', '')}\n{chapter.get('content', '')}"
-        for chapter in chapters
-        if chapter.get("content")
-    ]
+def _format_existing(existing):
+    if isinstance(existing, dict):
+        return summarize_document_for_prompt(existing)
+    text = str(existing or "").strip()
+    return text if text else "(Chưa có dữ liệu nhân vật)"
+
+
+def build_character_prompt(chapters: list, existing, glossary: str = "") -> str:
+    content_blocks = []
+    chapter_codes = []
+    for chapter in chapters:
+        content = chapter.get("content", "")
+        if not content:
+            continue
+        code = format_chapter_code(chapter.get("id", ""))
+        if code:
+            chapter_codes.append(code)
+            heading = f"### [{code}] {chapter.get('title', '')}".strip()
+        else:
+            heading = f"### {chapter.get('title', '')}".strip()
+        content_blocks.append(f"{heading}\n{content}")
+
     full_text = strip_r19_terms("\n\n".join(content_blocks))
     glossary = strip_r19_terms(glossary)
-    existing_md = strip_r19_terms(existing_md)
-    return wrap_r19_prompt(f"""
+    existing_summary = strip_r19_terms(_format_existing(existing))
+    field_guide = "\n".join(f"- `{key}`: {label}" for key, label in FIELDS)
+    allowed_list = ", ".join(chapter_codes) if chapter_codes else "(không có)"
+
+    return wrap_r19_prompt(
+        f"""
 # Vai trò
-Bạn là trợ lý biên tập chuyên phân tích nhân vật trong tiểu thuyết.
+Bạn là trợ lý biên tập chuyên phân tích nhân vật trong tiểu thuyết để phục vụ dịch thuật chính xác theo tiến độ từng chương.
 
 # Nhiệm vụ
-Đọc văn bản gốc, sau đó trích xuất hoặc cập nhật thông tin nhân vật bằng tiếng Việt.
+Đọc văn bản gốc của các chương bên dưới, sau đó xuất **chỉ những thông tin mới hoặc thay đổi mới** phát hiện được trong batch chương này dưới dạng JSON hợp lệ bằng tiếng Việt.
+
+# Danh sách mã chương hợp lệ trong batch này
+{allowed_list}
 
 # Văn bản gốc
 {full_text}
@@ -26,42 +54,42 @@ Bạn là trợ lý biên tập chuyên phân tích nhân vật trong tiểu thu
 # Glossary tên nhân vật và thuật ngữ
 {glossary if glossary else "(Chưa có glossary)"}
 
-# Dữ liệu nhân vật hiện có
-{existing_md if existing_md else "(Chưa có dữ liệu nhân vật)"}
+# Hồ sơ nhân vật hiện có (tóm tắt)
+{existing_summary}
 
-# Yêu cầu
-1. Trích xuất nhân vật quan trọng có thoại, hành động hoặc tác động đến cốt truyện.
-2. Bỏ qua NPC phụ không đáng kể, chỉ xuất hiện một lần.
-3. Nếu nhân vật đã có, chỉ hợp nhất và bổ sung, không xóa dữ liệu cũ.
-4. Header `## Tên nhân vật` phải dùng tên đầy đủ theo glossary.
-5. Nếu nhân vật đã có, giữ nguyên tên header hiện tại.
-6. Không dùng biệt danh, danh hiệu hoặc tên tắt làm header.
+# Danh sách `field` hợp lệ
+{field_guide}
 
-# Template bắt buộc
+# Quy tắc bắt buộc
+1. Chỉ trích xuất nhân vật quan trọng có thoại, hành động hoặc tác động đến cốt truyện; bỏ qua NPC phụ thoáng qua.
+2. Nếu nhân vật đã có trong "Hồ sơ nhân vật hiện có", điền đúng `id` và `name` hiện tại. Nếu là nhân vật mới, để `"id": ""` và dùng tên đầy đủ theo glossary cho `name` (không dùng biệt danh hay danh hiệu làm `name`).
+3. **Chỉ ghi thông tin mới hoặc thay đổi thực sự phát sinh** trong batch này; KHÔNG chép lại các thuộc tính đã có sẵn mà không thay đổi.
+4. Mọi mục trong `updates` và `events` **bắt buộc** có `chapter` lấy chính xác từ danh sách mã chương hợp lệ ở trên (ví dụ `"v7_c11_s1.md"`).
+5. `chapter` là **chương tiết lộ hoặc xác lập thông tin đó trong nguyên tác**. Nếu chương sau mới tiết lộ quá khứ của chương trước, vẫn gắn mã chương hiện tại đang tiết lộ (KHÔNG tự suy ngược về chương cũ).
+6. Không tự ghi đè hay bác bỏ các mục đã gắn `🔒` (do người dùng xác nhận), trừ khi có biến cố thay đổi mới ở chương về sau.
+7. `events` chỉ ghi biến cố/thông tin thực sự có ích cho việc dịch (lộ thân phận, đổi phe, bái sư, đổi xưng hô, biến đổi cơ thể/giới tính, bí mật quan trọng), ngắn gọn 1 câu; không viết tóm tắt nhật ký vụn vặt.
+8. Các mục `voice`, `narration_pronoun`, `self_reference`, `address` chỉ điền khi văn bản có căn cứ rõ ràng, không phỏng đoán.
+9. Nếu batch này không có cập nhật nhân vật đáng kể nào, trả về `{{"characters": []}}`.
+
+# Định dạng JSON bắt buộc
+Bọc duy nhất một đối tượng JSON giữa `###START###` và `###END###` (trong code block `json`), không thêm giải thích bên ngoài:
+```json
+###START###
+{{
+  "characters": [
+    {{
+      "id": "ch_xxxxxxxxxx hoặc để trống nếu nhân vật mới",
+      "name": "Tên đầy đủ theo glossary",
+      "updates": [
+        {{"field": "status", "value": "Giá trị mới", "chapter": "v7_c11_s1.md"}}
+      ],
+      "events": [
+        {{"chapter": "v7_c11_s1.md", "text": "Biến cố hoặc lưu ý dịch thuật quan trọng"}}
+      ]
+    }}
+  ]
+}}
+###END###
 ```
-## [Tên nhân vật]
-
-### Thông tin cơ bản
-- **Tên gốc**:
-- **Biệt danh / Danh hiệu**:
-- **Giới tính**: Nam / Nữ / Không xác định
-- **Tuổi / Độ tuổi ước lượng**:
-- **Chủng tộc / Xuất thân**:
-- **Địa vị / Chức vụ**:
-- **Phe / Tổ chức**:
-
-### Xưng hô
-- **Đại từ dẫn truyện (ngôi thứ ba)**: (anh / cậu / hắn / gã / cô / nàng / con bé...)
-- **Tự xưng thường dùng**:
-- **Xưng hô với nhân vật quan trọng**: (Tên → tự xưng / gọi đối phương; ghi lý do nếu đặc biệt)
-
-### Ghi chú dịch thuật
-- (Tên gốc, cách dịch đặc biệt, lưu ý khi dịch thoại...)
-```
-
-Mục Xưng hô chỉ điền khi văn bản có căn cứ; chưa rõ thì để trống, không phỏng đoán.
-
-Bọc toàn bộ kết quả trong duy nhất một code block `markdown` để giữ nguyên các dấu `##`.
-Bên trong code block, bắt đầu bằng `###START###` và kết thúc bằng `###END###`.
-Không thêm giải thích hoặc nội dung ngoài code block.
-""")
+"""
+    )

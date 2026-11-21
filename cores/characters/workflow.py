@@ -1,19 +1,17 @@
-"""Incremental character-profile workflow."""
+"""Incremental chapter-aware character-profile workflow."""
 
 import time
+from pathlib import Path
 
 from cores.chapters.files import load_md_chapter, scan_md_dir
-from cores.characters.generation import request_character_block
-from cores.characters.parser import merge_characters
+from cores.characters.generation import request_character_updates
 from cores.characters.prompt import build_character_prompt
-from cores.characters.storage import (
-    build_document,
-    document_body,
-    load_glossary,
-    load_index,
-    load_markdown,
-    save_index,
-    save_markdown,
+from cores.characters.storage import load_glossary, load_index, save_index
+from cores.characters.store import (
+    JSON_NAME,
+    format_chapter_code,
+    load_document,
+    commit_ai_updates,
 )
 from cores.config.runtime import int_option, option, stop_requested
 
@@ -37,7 +35,10 @@ def run_character_generation(
     requested_start = int_option("character_start", 1, minimum=1) - 1
     requested_end = int_option("character_end", total_files, minimum=1)
     force = str(option("character_force", "false")).lower() in {
-        "1", "true", "yes", "on"
+        "1",
+        "true",
+        "yes",
+        "on",
     }
     saved_index = load_index(state_path)
     start_index = requested_start if force else max(saved_index, requested_start)
@@ -47,8 +48,9 @@ def run_character_generation(
         print("Chọn 'Chạy lại phạm vi' nếu muốn phân tích lại.")
         return
 
+    project_dir = Path(characters_path).parent
     files = raw_files[start_index:end_index]
-    body = document_body(load_markdown(characters_path))
+    document = load_document(project_dir, migrate=True)
     glossary = load_glossary(context_path)
     print(
         f"Tổng chương raw: {total_files} | Sẽ xử lý: {len(files)} "
@@ -67,16 +69,37 @@ def run_character_generation(
                 return
             batch_files = files[offset : offset + batch_size]
             batch = [load_md_chapter(path) for path in batch_files]
+            allowed_chapters = [
+                format_chapter_code(chapter.get("id", "")) for chapter in batch
+            ]
             first = start_index + offset + 1
             last = start_index + offset + len(batch)
-            print(f"\n[Batch {offset // batch_size + 1}] Chương {first} -> {last} ({len(batch)} chương)...")
-
-            prompt = build_character_prompt(batch, body, glossary)
-            new_block = request_character_block(
-                prompt, provider=provider, max_retries=max_retries
+            chapter_range = (
+                f"{allowed_chapters[0]} -> {allowed_chapters[-1]}"
+                if allowed_chapters
+                else ""
             )
-            body = merge_characters(body, new_block)
-            save_markdown(build_document(body), characters_path)
+            print(
+                f"\n[Batch {offset // batch_size + 1}] Chương {first} -> {last} "
+                f"({len(batch)} chương: {chapter_range})..."
+            )
+
+            if offset > 0:
+                document = load_document(project_dir, migrate=True)
+            prompt = build_character_prompt(batch, document, glossary)
+            payload = request_character_updates(
+                prompt,
+                provider=provider,
+                max_retries=max_retries,
+                allowed_chapters=allowed_chapters,
+            )
+            document, stats = commit_ai_updates(project_dir, payload, allowed_chapters)
+            print(
+                f"   +{stats['added_characters']} nhân vật mới, "
+                f"+{stats['added_entries']} mốc thuộc tính, "
+                f"+{stats['added_notes']} diễn biến "
+                f"(bỏ qua trùng/đã khóa: {stats['skipped']}, từ chối sai định dạng: {stats['rejected']})"
+            )
 
             new_index = start_index + offset + len(batch)
             save_index(max(saved_index, new_index), state_path)
@@ -87,5 +110,7 @@ def run_character_generation(
     except KeyboardInterrupt:
         print("\nĐã dừng bởi Ctrl+C. Tiến độ đã được lưu.")
 
-    print(f"\nXong! File nhân vật: {characters_path}")
-    print(f"Tổng chương đã phân tích: {min(start_index + len(files), total_files)} / {total_files}")
+    print(f"\nXong! Dữ liệu chính: {project_dir / JSON_NAME} (xuất đọc: {characters_path})")
+    print(
+        f"Tổng chương đã phân tích: {min(start_index + len(files), total_files)} / {total_files}"
+    )

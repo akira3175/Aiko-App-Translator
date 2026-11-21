@@ -2,6 +2,7 @@
 
 import os
 from collections.abc import Callable
+from cores.link_rotation import rotation
 
 from cores.chapters.files import (
     export_recent_translations,
@@ -38,6 +39,7 @@ def _export_recent_translations(target_chapter_id, count):
     )
 
 
+@rotation.chapter_task
 def run_single_translation(
     translate: TranslateOne, raw_dir, translated_dir, context_path, postprocess=None
 ):

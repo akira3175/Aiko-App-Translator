@@ -1,5 +1,6 @@
 """Concurrent execution for full-novel review requests."""
 
+from cores.web_errors import WebTaskStopped
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
 
@@ -54,6 +55,7 @@ def run_review_items(
                 "translation": content,
             },
             include_translation=True,
+            chapter_id=chapter_id,
         )
         if any(document["name"] == "characters.md" for document in documents):
             prompt = with_character_document_instruction(prompt)
@@ -69,6 +71,8 @@ def run_review_items(
             )
             reviewed += 1
         except Exception as error:
+            if isinstance(error, WebTaskStopped):
+                raise
             errors += 1
             print(f"  ❌ Exception: {error}")
 

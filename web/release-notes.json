@@ -1,6 +1,21 @@
 {
     "versions":  [
                      {
+    "version": "1.4.16",
+    "date": "2026-11-21",
+    "title": "Có gì mới?",
+    "summary": "",
+    "highlights": [
+        "**Hồ sơ nhân vật theo mốc chương.** Khi dịch, hiệu đính hoặc rà soát, app tham khảo thân phận, quan hệ và cách xưng hô phù hợp với chương đang xử lý. Bạn có thể chỉnh từng mốc, khóa thông tin đã xác nhận và xem trước hồ sơ gửi cho AI.",
+        "**Kho ảnh riêng cho từng truyện.** Xem ảnh có trong truyện, thêm ảnh từ máy và sao chép mã ảnh để dán vào bản dịch.",
+        "**Tìm ảnh và mở đúng chương.** Tìm theo ID, tên file, số tập hoặc số chương. Ảnh được sắp theo thứ tự số. Nhấp đúp vào ảnh để mở chương chứa ảnh. Nếu bản dịch có ảnh đó, con trỏ sẽ đến cuối dòng chứa ảnh.",
+        "**Tự chuyển link Gemini Web và Google AI Studio Web.** Bạn có thể đặt ngưỡng theo số phút hoặc số chương. App chuyển sang link kế tiếp sau khi lưu xong chương hiện tại.",
+        "**Chuyển link khi gặp lỗi.** Khi bật tùy chọn này, app tự đổi link nếu phát hiện hết hạn mức. Với lỗi tải tệp hoặc mất kết nối, app thử lại trước khi chuyển và chỉ gửi lại bước đang xử lý.",
+        "**Hạn chế gửi trùng trên Gemini Web.** Khi Gemini phản hồi chậm, app kiểm tra tin nhắn đã được gửi hay chưa trước khi thử lại.",
+        "**Giữ ảnh minh họa SFACG khi đăng Hako.** App tự tải ảnh từ thẻ `[img]`, đưa lên Cloudflare R2 và giữ đúng vị trí trong chương. Nếu xử lý ảnh thất bại, app dừng đăng chương đó để tránh thiếu ảnh."
+    ]
+},
+                     {
                          "version":  "1.4.15",
                          "date":  "2026-11-19",
                          "title":  "Sửa lỗi cập nhật",

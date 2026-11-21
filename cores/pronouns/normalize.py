@@ -148,7 +148,14 @@ def parse_character_roster(markdown):
 
 
 def load_character_roster(characters_file):
-    if not characters_file or not os.path.exists(characters_file):
+    if not characters_file:
+        return []
+    from cores.characters.store import roster_for_characters_file
+
+    structured = roster_for_characters_file(characters_file)
+    if structured is not None:
+        return structured
+    if not os.path.exists(characters_file):
         return []
     try:
         with open(characters_file, "r", encoding="utf-8") as file:

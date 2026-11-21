@@ -53,6 +53,7 @@ if _PROJECT_ROOT not in sys.path:
 
 from cores.config.runtime import bool_option, int_option, option, web_mode
 from cores.storage.project import load_json
+from up.remote_images import localize_bbcode_images
 
 PORTABLE_CHROME = os.path.join(
     _PROJECT_ROOT, "runtime", "chromium", "chrome-win64", "chrome.exe"
@@ -385,6 +386,7 @@ def elements_to_html_parts(elements: list, chapter_title: str) -> list:
     Ảnh được upload và thay thế bằng <img> tag ngay tại đây.
     Trả về (html_parts, image_count)
     """
+    elements = localize_bbcode_images(elements, os.path.join(_PROJECT_ROOT, IMAGE_DIR))
     html_parts = []
     image_count = 0
 

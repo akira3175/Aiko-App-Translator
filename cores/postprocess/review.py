@@ -1,5 +1,6 @@
 """Background translation review and shared review prompt."""
 
+from cores.web_errors import WebTaskStopped
 import json
 import os
 import re
@@ -102,6 +103,7 @@ def run_background_review(
             "translation": content,
         },
         include_translation=True,
+        chapter_id=chapter_id,
     )
     if any(item["name"] == "characters.md" for item in documents):
         prompt = runtime.with_character_document_instruction(prompt)
@@ -114,6 +116,8 @@ def run_background_review(
                 text, provider, model = runtime.generate("review", prompt, documents)
                 break
             except Exception as exc:
+                if isinstance(exc, WebTaskStopped):
+                    raise
                 error = str(exc)
                 if "408" in error or any(code in error for code in ["500", "502", "503", "504"]):
                     print(f"[REVIEW BG] Lỗi API tạm thời, giữ key và thử lại: {error}")
@@ -186,6 +190,8 @@ def run_background_review(
         emit_job_event("review_saved", chapter=chapter_id)
 
     except Exception as e:
+        if isinstance(e, WebTaskStopped):
+            raise
         runtime.log_api_call(
             chapter_id, "review", f"{provider}:{model}", prompt, str(e), ok=False,
             attachments=list(documents),

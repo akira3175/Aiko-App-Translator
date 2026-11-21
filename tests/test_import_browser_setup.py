@@ -19,6 +19,7 @@ class ImportBrowserSetupTests(unittest.TestCase):
     def test_setup_and_generation_use_current_saved_url(self):
         for url in ('https://gemini.google.com/gem/first', 'https://gemini.google.com/gem/changed'):
             with self.subTest(url=url), patch.object(content, 'option', side_effect=lambda key, default=None: url if key == 'link_gemini' else default), \
+                 patch('cores.link_rotation.option', side_effect=lambda key, default=None: default), \
                  patch.object(content.browser_runtime, 'setup_gemini') as setup, \
                  patch.object(content.browser_runtime, 'generate_gemini', return_value='ok') as generate:
                 content.setup_gemini_browser(skip_login_prompt=True)

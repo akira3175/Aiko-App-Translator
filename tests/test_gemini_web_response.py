@@ -1,9 +1,10 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from cores.gemini.web_response import (
     copy_response_text,
     response_text,
+    response_finished,
     snapshot_conversation,
 )
 
@@ -26,6 +27,22 @@ class _Root:
 
 
 class GeminiWebResponseTests(unittest.TestCase):
+    def test_completion_requires_footer_and_no_busy_state(self):
+        root = Mock()
+        root.find_elements.side_effect = [[], []]
+        self.assertFalse(response_finished(root))
+        root.find_elements.side_effect = [[Mock()]]
+        self.assertFalse(response_finished(root))
+        root.find_elements.side_effect = [[], [Mock()]]
+        self.assertTrue(response_finished(root))
+        self.assertFalse(response_finished(None))
+
+    def test_thinking_only_root_is_not_a_fallback(self):
+        root = Mock()
+        root.text = '###TITLE### thinking ###CONTENT### planning ###END###'
+        root.find_elements.return_value = []
+        self.assertEqual('', response_text(root))
+
     def test_snapshot_returns_existing_response_count(self):
         self.assertEqual(3, snapshot_conversation(_Driver(), "token"))
 
@@ -74,7 +91,7 @@ class GeminiWebResponseTests(unittest.TestCase):
             response_text(_CustomRoot()),
         )
 
-    def test_response_text_falls_back_to_root_text_if_root_has_end(self):
+    def test_response_text_never_uses_root_markers_from_thinking(self):
         class _CustomRoot:
             text = "###TITLE### A\n###CONTENT### B\n###END###"
 
@@ -82,7 +99,7 @@ class GeminiWebResponseTests(unittest.TestCase):
                 return [_Block("thiếu end marker")]
 
         self.assertEqual(
-            "###TITLE### A\n###CONTENT### B\n###END###",
+            "thiếu end marker",
             response_text(_CustomRoot()),
         )
 

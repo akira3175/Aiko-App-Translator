@@ -50,8 +50,77 @@ def character_alias_score(alias, searchable):
     )
 
 
-def build_characters_snapshot(characters_file, relevant_text, max_characters=20):
-    """Create a temporary Markdown file containing only relevant character profiles."""
+def _write_snapshot(snapshot, detail):
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix="_characters_snapshot.md",
+        encoding="utf-8",
+        delete=False,
+    )
+    tmp.write(snapshot.rstrip() + "\n")
+    tmp.close()
+    print(f"[UPLOAD] Characters snapshot: {detail} -> {tmp.name}")
+    return tmp.name
+
+
+def _structured_snapshot(characters_file, relevant_text, max_characters, chapter_id):
+    """Render from sibling ``characters.json`` when present. ``False`` = fallback to legacy md."""
+    from pathlib import Path
+
+    from cores.characters.store import JSON_NAME, format_chapter_code, load_document, render_snapshot
+
+    path = Path(characters_file)
+    if not path.with_name(JSON_NAME).exists():
+        return False
+    try:
+        document = load_document(path.parent, migrate=False)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        print(f"[UPLOAD] Không đọc được characters.json ({error}); bỏ qua hồ sơ để giữ đúng mốc chương.")
+        return None
+    snapshot = render_snapshot(document, chapter_id, relevant_text, max_characters)
+    if not snapshot:
+        return None
+    count = snapshot.count("\n## ")
+    code = format_chapter_code(chapter_id)
+    label = f" trước {code}" if code else ""
+    return _write_snapshot(snapshot, f"{count}/{len(document['characters'])} hồ sơ{label}")
+
+
+def build_batch_characters_snapshot(characters_file, chapter_ids, relevant_text, max_characters=20):
+    """Create a temporary Markdown snapshot for a batch of chapters."""
+    if not characters_file:
+        return None
+    from pathlib import Path
+
+    from cores.characters.store import JSON_NAME, load_document, render_batch_snapshot
+
+    path = Path(characters_file)
+    if path.with_name(JSON_NAME).exists():
+        try:
+            document = load_document(path.parent, migrate=False)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            print(f"[UPLOAD] Không đọc được characters.json ({error}); bỏ qua hồ sơ để giữ đúng mốc chương.")
+            return None
+        else:
+            snapshot = render_batch_snapshot(document, chapter_ids, relevant_text, max_characters)
+            if not snapshot:
+                return None
+            count = snapshot.count("\n## ")
+            return _write_snapshot(snapshot, f"{count}/{len(document['characters'])} hồ sơ (batch)")
+    return build_characters_snapshot(characters_file, relevant_text, max_characters=max_characters)
+
+
+def build_characters_snapshot(characters_file, relevant_text, max_characters=20, chapter_id=None):
+    """Create a temporary Markdown file containing only relevant character profiles.
+
+    With ``chapter_id`` the snapshot only contains the state established before
+    that chapter (see ``cores.characters.store.render_snapshot``).
+    """
+    if not characters_file:
+        return None
+    structured = _structured_snapshot(characters_file, relevant_text, max_characters, chapter_id)
+    if structured is not False:
+        return structured
     if not os.path.exists(characters_file):
         return None
     try:
@@ -84,18 +153,7 @@ def build_characters_snapshot(characters_file, relevant_text, max_characters=20)
     snapshot = "# Hồ Sơ Nhân Vật Liên Quan\n\n" + "\n\n---\n\n".join(
         item[3] for item in selected
     )
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w",
-        suffix="_characters_snapshot.md",
-        encoding="utf-8",
-        delete=False,
-    )
-    tmp.write(snapshot.rstrip() + "\n")
-    tmp.close()
-    print(
-        f"[UPLOAD] Characters snapshot: {len(selected)}/{len(blocks)} hồ sơ -> {tmp.name}"
-    )
-    return tmp.name
+    return _write_snapshot(snapshot, f"{len(selected)}/{len(blocks)} hồ sơ")
 
 
 def build_pronouns_snapshot(pronouns_file, n_chapters=50):

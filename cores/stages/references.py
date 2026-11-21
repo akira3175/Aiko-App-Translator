@@ -27,15 +27,23 @@ def build_reference_documents(
     characters_file=CHARACTERS_MD,
     pronouns_file=PRONOUNS_JSON,
     include_translation=False,
+    chapter_id=None,
 ):
-    """Return relevant character and recent-pronoun documents without leaking temp files."""
+    """Return relevant character and recent-pronoun documents without leaking temp files.
+
+    The character snapshot holds the state established before ``chapter_id``
+    (defaults to ``chapter["id"]``).
+    """
     relevant = [chapter.get("title", ""), chapter.get("content", ""), pronoun_context]
     if include_translation:
         relevant.extend(
             [chapter.get("title_translation", ""), chapter.get("translation", "")]
         )
     character_path = build_characters_snapshot(
-        characters_file, "\n".join(str(item or "") for item in relevant), max_characters=20
+        characters_file,
+        "\n".join(str(item or "") for item in relevant),
+        max_characters=20,
+        chapter_id=chapter_id or chapter.get("id"),
     )
     documents = (
         _read_and_remove(character_path, "characters.md", "text/markdown"),
