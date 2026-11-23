@@ -1,5 +1,16 @@
 {
     "versions":  [
+{
+    "version": "1.4.17",
+    "date": "2026-11-23",
+    "title": "Có gì mới?",
+    "summary": "",
+    "highlights": [
+        "**AI Studio:** Thêm mức suy nghĩ Extra High, cho phép nhập tên mức mới khi AI Studio bổ sung.",
+        "**Đăng Hako:** Sửa lỗi thiếu file cấu hình dù đã thiết lập trong app.",
+        "**Ảnh minh họa:** Sửa lỗi đọc một số link ảnh và cache ảnh khi xuất bản."
+    ]
+},
                      {
     "version": "1.4.16",
     "date": "2026-11-21",

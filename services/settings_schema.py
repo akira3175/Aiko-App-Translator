@@ -247,7 +247,7 @@ SETTING_META = {
     "ai_studio_model": {"group": "google-ai-studio-web", "description": "Tên model được truyền qua tham số ?model= trên URL AI Studio."},
     "ai_studio_pronoun_model": {"group": "google-ai-studio-web", "description": "Model mặc định cho công đoạn xuất xưng hô."},
     "ai_studio_review_model": {"group": "google-ai-studio-web", "description": "Model mặc định cho review nền và review toàn bộ."},
-    "ai_studio_thinking": {"group": "google-ai-studio-web", "type": "select", "options": [["low", "Low"], ["medium", "Medium"], ["high", "High"]], "description": "Chọn theo nội dung trong dropdown Thinking Level của AI Studio."},
+    "ai_studio_thinking": {"group": "google-ai-studio-web", "type": "text", "options": [["low", "Low"], ["medium", "Medium"], ["high", "High"], ["extra high", "Extra High"]], "description": "Chọn gợi ý hoặc nhập tên mức mới đúng như trong Thinking Level của AI Studio. Không phân biệt chữ hoa/thường. Nếu model không có mức đó, app sẽ báo lỗi."},
     "link_chatgpt": {"group": "chatgpt-web"},
     "chatgpt_mode": {
         "group": "chatgpt-web",

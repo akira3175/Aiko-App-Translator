@@ -252,9 +252,48 @@ class GoogleAiStudioWebTests(unittest.TestCase):
         )
         self.assertEqual(_prompt_url("current"), _prompt_url("gemini-flash-latest"))
 
-    def test_rejects_unknown_thinking_level(self):
-        with self.assertRaisesRegex(ValueError, "low, medium hoặc high"):
-            _select_thinking_level(None, "maximum")
+    def thinking_driver(self, labels, current='High'):
+        dropdown = Mock(text=current)
+        options = [Mock(text=label) for label in labels]
+        driver = Mock()
+        driver.find_elements.return_value = options
+
+        def click(script, element):
+            if element in options:
+                dropdown.text = element.text
+        driver.execute_script.side_effect = click
+        return driver, dropdown, options
+
+    def test_selects_extra_high_and_future_levels(self):
+        for requested, label in [(' EXTRA   HIGH ', 'Extra High'), ('ultra deep', 'Ultra Deep')]:
+            with self.subTest(requested=requested):
+                driver, dropdown, options = self.thinking_driver(['Low', 'High', label])
+                with patch.object(client.EC, 'visibility_of_element_located', return_value=lambda _: dropdown):
+                    _select_thinking_level(driver, requested)
+                self.assertEqual(dropdown.text, label)
+                self.assertEqual(driver.execute_script.call_args.args[1], options[-1])
+
+    def test_existing_level_does_not_open_dropdown(self):
+        driver, dropdown, _ = self.thinking_driver([], 'Extra High')
+        with patch.object(client.EC, 'visibility_of_element_located', return_value=lambda _: dropdown):
+            _select_thinking_level(driver, 'extra high')
+        driver.execute_script.assert_not_called()
+
+    def test_missing_level_reports_available_choices(self):
+        driver, dropdown, _ = self.thinking_driver(['Low', 'High'])
+
+        def until(predicate):
+            result = predicate(driver)
+            if not result:
+                raise client.TimeoutException()
+            return result
+
+        with patch.object(client.EC, 'visibility_of_element_located', return_value=lambda _: dropdown), patch.object(client, 'WebDriverWait') as wait:
+            wait.return_value.until.side_effect = until
+            with self.assertRaisesRegex(ValueError, 'Low, High'):
+                _select_thinking_level(driver, 'maximum')
+        self.assertEqual(dropdown.text, 'High')
+        dropdown.send_keys.assert_called_once_with(client.Keys.ESCAPE)
 
     def test_provider_includes_reference_documents(self):
         calls = []

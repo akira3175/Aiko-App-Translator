@@ -16,6 +16,10 @@ MAX_IMAGE_BYTES = 25 * 1024 * 1024
 
 def download_image(value, directory):
     url = html.unescape(value).replace('\\:', ':').replace('\\/', '/').strip()
+    url = re.sub(r'\\([\[\]()])', r'\1', url)
+    markdown_link = re.fullmatch(r'\[[^\r\n]*\]\((.*)\)', url)
+    if markdown_link:
+        url = markdown_link.group(1).strip()
     parsed = urlsplit(url)
     if parsed.scheme not in {'http', 'https'} or not parsed.hostname:
         raise ValueError('Link ảnh phải là HTTP hoặc HTTPS.')

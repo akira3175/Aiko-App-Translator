@@ -26,6 +26,30 @@ class HakoRemoteImageTests(unittest.TestCase):
             fetch.assert_called_once()
             self.assertEqual('https://rss.sfacg.com/web/image.jpg', fetch.call_args.args[0].full_url)
 
+    def test_markdown_links_inside_bbcode_download_destination(self):
+        data = io.BytesIO()
+        Image.new('RGB', (2, 2)).save(data, format='JPEG')
+        url = 'https://rss.sfacg.com/web/image.jpg'
+        escaped = url.replace(':', r'\:')
+        for value in (f'[{url}]({url})', rf'[{escaped}]\({escaped}\)',
+                      f'[picture]({url})'):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as folder, patch.object(
+                remote_images, 'urlopen', return_value=self.response(data.getvalue())
+            ) as fetch:
+                elements = remote_images.localize_bbcode_images(
+                    [{'type': 'text', 'content': f'[img=700,396]{value}[/img]'}], folder)
+                self.assertEqual('image', elements[0]['type'])
+                self.assertEqual(url, fetch.call_args.args[0].full_url)
+                self.assertEqual(remote_images.download_image(url, folder),
+                                 elements[0]['content'][9:-1])
+                fetch.assert_called_once()
+
+    def test_markdown_link_cannot_bypass_scheme_validation(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(remote_images, 'urlopen') as fetch:
+            with self.assertRaises(ValueError):
+                remote_images.download_image('[picture](file:///private/image.jpg)', folder)
+            fetch.assert_not_called()
+
     def test_inline_images_keep_text_order_and_use_r2(self):
         with tempfile.TemporaryDirectory() as folder:
             local = str(Path(folder, 'picture.jpg'))

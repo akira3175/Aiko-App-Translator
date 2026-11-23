@@ -112,6 +112,8 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       if(item.key==='image_markers')return `<div class="setting-row image-marker-setting"><span><strong id="imageMarkerSettingLabel">${escapeHtml(item.label)}</strong><small id="imageMarkerSettingHint">${escapeHtml(item.description)} Mặc định: Tắt.</small></span><label class="switch"><input data-python-setting="image_markers" type="checkbox" role="switch" aria-labelledby="imageMarkerSettingLabel" aria-describedby="imageMarkerSettingHint" ${item.value==='on'?'checked':''}><i aria-hidden="true"></i></label></div>`;
       const control=item.type==='select'
         ? `<select data-python-setting="${escapeHtml(item.key)}">${item.options.map(([value,label])=>`<option value="${escapeHtml(value)}" ${value===item.value?'selected':''}>${escapeHtml(label)}</option>`).join('')}</select>`
+        : item.type==='text' && item.options?.length
+          ? `<input data-python-setting="${escapeHtml(item.key)}" type="text" value="${escapeHtml(item.value)}" list="suggestions-${escapeHtml(item.key)}" autocomplete="off"><datalist id="suggestions-${escapeHtml(item.key)}">${item.options.map(([value,label])=>`<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join('')}</datalist>`
         : item.type==='textarea'
           ? `<textarea data-python-setting="${escapeHtml(item.key)}" rows="${item.key.endsWith('_rotation_links')?5:item.key==='gemini_web_upload_instruction'?4:10}" spellcheck="false">${escapeHtml(item.value)}</textarea>`
         : `<input data-python-setting="${escapeHtml(item.key)}" type="${item.type}" value="${escapeHtml(item.value)}" ${item.inputmode?`inputmode="${item.inputmode}"`:''} ${item.type==='number'?`min="${item.min}" max="${item.max}"`:''} autocomplete="off">`;
@@ -159,6 +161,11 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       const thinkingValue=settingItem(`pipeline_${stage}_thinking`);
       const model={...modelValue,default:sourceModel?.default||'',overridden:modelValue.value!==(sourceModel?.default||''),description:`Model riêng cho ${label.toLowerCase()}.`};
       const thinking={...thinkingValue,default:sourceThinking?.default||'',overridden:thinkingValue.value!==(sourceThinking?.default||''),description:provider.value==='openai-api'?'Reasoning riêng cho công đoạn này.':'Thinking riêng cho công đoạn này.'};
+      if(provider.value==='google-ai-studio-web'){
+        thinking.type='text';
+        thinking.options=sourceThinking?.options;
+        thinking.description=sourceThinking?.description;
+      }
       const modelField=provider.value==='chatgpt-plan'
         ? `<label class="python-setting"><span>Model</span><select data-python-setting="${model.key}" data-plan-stage-model="${stage}">${planModelOptions(model.value)}</select><small>Model của tài khoản ChatGPT dùng riêng cho ${label.toLowerCase()}.</small></label>`
         : renderSetting(model);

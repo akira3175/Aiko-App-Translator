@@ -21,7 +21,6 @@ AI_STUDIO_HOST = "aistudio.google.com"
 AI_STUDIO_URL = f"https://{AI_STUDIO_HOST}/prompts/new_chat"
 DEFAULT_MODEL = "gemini-flash-latest"
 DEFAULT_THINKING = "high"
-THINKING_LEVELS = {"low", "medium", "high"}
 
 _UI_ONLY_LINES = {
     "thinking",
@@ -274,13 +273,12 @@ def _generation_running(driver):
 
 
 def _select_thinking_level(driver, level):
-    selected_level = str(level or DEFAULT_THINKING).strip().lower()
+    def normalized(value):
+        return ' '.join(str(value or '').casefold().split())
+
+    selected_level = normalized(level) or DEFAULT_THINKING
     if selected_level == "current":
         selected_level = DEFAULT_THINKING
-    if selected_level not in THINKING_LEVELS:
-        raise ValueError(
-            "Thinking level Google AI Studio phải là low, medium hoặc high"
-        )
     wait = WebDriverWait(driver, 30)
     dropdown = wait.until(
         EC.visibility_of_element_located(
@@ -291,22 +289,33 @@ def _select_thinking_level(driver, level):
             )
         )
     )
-    if (dropdown.text or "").strip().lower() == selected_level:
+    if normalized(dropdown.text) == selected_level:
         return
     driver.execute_script("arguments[0].click();", dropdown)
 
+    available = []
+
     def matching_option(active_driver):
+        available.clear()
         for option in _visible(
             active_driver.find_elements(By.CSS_SELECTOR, '[role="option"], mat-option')
         ):
-            if (option.text or "").strip().lower() == selected_level:
+            available.append((option.text or '').strip())
+            if normalized(option.text) == selected_level:
                 return option
         return False
 
-    option = wait.until(matching_option)
+    try:
+        option = wait.until(matching_option)
+    except TimeoutException as error:
+        dropdown.send_keys(Keys.ESCAPE)
+        raise ValueError(
+            f"Không tìm thấy mức Thinking '{level}' trên AI Studio. "
+            f"Các mức hiện có: {', '.join(available) or '(không đọc được)'}."
+        ) from error
     driver.execute_script("arguments[0].click();", option)
     wait.until(
-        lambda _driver: (dropdown.text or "").strip().lower() == selected_level
+        lambda _driver: normalized(dropdown.text) == selected_level
     )
 
 

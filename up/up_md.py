@@ -213,7 +213,7 @@ def _load_cache() -> dict:
     """Load persistent image cache từ file JSON."""
     if os.path.exists(_CACHE_FILE):
         try:
-            with open(_CACHE_FILE, "r", encoding="utf-8") as f:
+            with open(_CACHE_FILE, "r", encoding="utf-8-sig") as f:
                 data = json.load(f)
             print(f"  [CACHE] Đã load {len(data)} ảnh từ cache ({_CACHE_FILE})")
             return data
@@ -570,23 +570,29 @@ async def upload_chapter_to_site(chapter_key, segments_data, upload_url, page, s
 # MAIN
 # ============================================================
 
+def load_publish_config():
+    if web_mode():
+        return {}
+    config_path = os.path.join(_PROJECT_ROOT, "up", "config_md.json")
+    try:
+        with open(config_path, "r", encoding="utf-8-sig") as f:
+            config = json.load(f)
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Không tìm thấy cấu hình đăng bằng script: {config_path}") from error
+    except (OSError, ValueError) as error:
+        raise RuntimeError(f"Không đọc được cấu hình đăng bằng script: {config_path} ({error})") from error
+    if not isinstance(config, dict):
+        raise RuntimeError(f"Cấu hình đăng bằng script phải là JSON object: {config_path}")
+    return config
+
+
 async def main():
     print("=" * 60)
     print(" UP_MD \u2014 Upload t\u1eeb MD files (truyen/translated/)")
     print("=" * 60)
 
     # \u0110\u1ecdc config
-    config_path = "up/config_md.json"
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-    except FileNotFoundError:
-        print(f"Lỗi: Không tìm thấy {config_path}")
-        print("Vui lòng tạo file config_md.json theo hướng dẫn.")
-        return
-    except Exception as e:
-        print(f"Lỗi đọc config: {e}")
-        return
+    config = load_publish_config()
 
     # Khởi tạo Cloudflare R2 config
     if configure_r2(config):
