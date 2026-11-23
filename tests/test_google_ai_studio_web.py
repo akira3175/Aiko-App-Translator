@@ -224,6 +224,17 @@ class GoogleAiStudioWebTests(unittest.TestCase):
             _is_complete_response("###START###\n## An", "characters")
         )
 
+    def test_character_json_completion(self):
+        for body, expected in [
+            ('{"characters":[{"name":"An"}]}', True),
+            ('{"characters":[]}', True),
+            ('{"characters":[{"name":"An"}]', False),
+            ('{"characters":{}}', False),
+        ]:
+            with self.subTest(body=body):
+                response = f"###START###\n{body}\n###END###"
+                self.assertEqual(_is_complete_response(response, "characters"), expected)
+
     def test_copy_as_markdown_preserves_unicode_and_restores_clipboard(self):
         clipboard = _Clipboard("nội dung clipboard cũ")
         driver = _CopyDriver(clipboard)

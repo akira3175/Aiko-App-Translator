@@ -1,6 +1,7 @@
 """Polish translated chapters with provider-neutral reference snapshots."""
 
 from cores.web_errors import WebTaskStopped
+from cores.translation.prompts import NEUTRAL_REFERENCE_RULE
 import os
 import time
 from pathlib import Path
@@ -85,6 +86,9 @@ Không sao chép các cặp chỉ có trong bộ nhớ nhưng không xuất hi�
 
 # Nhiệm vụ hiệu đính
 {task}
+
+{NEUTRAL_REFERENCE_RULE}
+Đối chiếu nguyên tác và sửa những chỗ bản dịch đã tự thêm giới tính hoặc chủ ngữ.
 
 Giữ nguyên đầy đủ nội dung, Markdown ảnh và dấu hội thoại. Không giải thích thay đổi.
 {runtime._r19_placeholder_instruction()}

@@ -103,3 +103,28 @@ input.character-value-input{height:36px;padding:0 10px}
   .character-detail{padding:16px}
   .character-chapter-input{width:130px}
 }
+
+/* The directory and the open profile share the available reading space. */
+.character-layout { display: block; }
+.character-list-panel { height: 100%; max-height: none; border: 0; }
+.character-list { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(260px,100%),1fr)); align-content: start; gap: 10px; padding: 16px; }
+.character-row { box-sizing: border-box; min-width: 0; grid-template-columns: minmax(0,1fr); align-content: start; border: 1px solid var(--line); padding: 14px 16px; }
+.character-row > span { min-width: 0; }
+.character-row strong { font-size: 16px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+.character-row small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; margin-top: 5px; }
+.character-row-meta:empty { display: none; }
+.character-list-head select { color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; }
+.character-row:hover,.character-row:focus-visible { border-color: var(--accent); }
+.character-row-meta { justify-content: flex-start; }
+#charactersView:not(.profile-open) .character-detail-shell,
+#charactersView.profile-open .character-list-panel,
+#charactersView.profile-open .character-toolbar-left { display: none; }
+.profile-reader { width: min(100%,78ch); margin: 0 auto; color: var(--ink); }
+.profile-reader nav,.profile-nav { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.profile-reader h2 { font-size: clamp(24px,3vw,36px); margin: 28px 0 20px; overflow-wrap: anywhere; }
+.profile-section { border-top: 1px solid var(--line); padding: 16px 0; }
+.profile-section summary { font-size: 17px; font-weight: 650; cursor: pointer; }
+.profile-section h4 { margin: 18px 0 5px; }
+.profile-section p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; margin: 6px 0; }
+.profile-section small { color: var(--muted); white-space: nowrap; }
+@media(max-width:800px){.character-layout { height: calc(100dvh - 200px); min-height: 350px; } .character-detail { min-height: 0; }}

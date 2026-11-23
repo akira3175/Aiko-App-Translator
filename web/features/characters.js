@@ -140,6 +140,8 @@ export function createCharactersFeature({
   toast,
 }) {
   let selectedId=null;
+  let profileMode='list';
+  let listScroll=0;
   let snapshotMode='rendered';
   let snapshotMarkdown='';
   let snapshotRevision=0;
@@ -185,6 +187,7 @@ export function createCharactersFeature({
   function updateFooterAndBadges() {
     const store=ensureStore();
     const total=store.characters.length;
+    if($('#saveCharacters'))$('#saveCharacters').textContent=state.characterDirty?'Lưu thay đổi •':'Lưu hồ sơ';
     navigationCounts.characters=total;
     if($('#characterBadge'))$('#characterBadge').textContent=total;
 
@@ -224,7 +227,9 @@ export function createCharactersFeature({
   function renderCharacterList() {
     const store=ensureStore();
     const query=($('#characterSearch')?.value||'').trim().toLocaleLowerCase('vi');
-    const items=store.characters.filter(character=>characterMatchesQuery(character,query));
+    const filter=$('#characterFilter')?.value;
+    const items=store.characters.filter(character=>characterMatchesQuery(character,query)
+      && (!filter || (filter==='locked'?characterSummary(character).confirmed:character.unclassified?.trim())));
     if($('#characterCount'))$('#characterCount').textContent=`${items.length}/${store.characters.length} nhân vật`;
     const listEl=$('#characterList');
     if(!listEl)return;
@@ -278,6 +283,8 @@ export function createCharactersFeature({
     const store=ensureStore();
     const detail=$('#characterDetail');
     const empty=$('#characterEmpty');
+    const showDetail=store.recovery_required||!store.characters.length||profileMode!=='list';
+    $('#charactersView').classList.toggle('profile-open',Boolean(showDetail));
     if(store.recovery_required){
       if(empty)empty.classList.remove('open');
       if(detail){
@@ -298,6 +305,24 @@ export function createCharactersFeature({
       return;
     }
 
+    const notes=character.notes||[];
+    const hasUnclassified=Boolean(String(character.unclassified||'').trim());
+    const back='<button type="button" class="secondary" data-profile-list>← Danh sách nhân vật</button>';
+    if(profileMode==='read'){
+      const section=(title,content)=>content?`<details open class="profile-section"><summary>${escapeHtml(title)}</summary>${content}</details>`:'';
+      const line=(value,chapter)=>{
+        const label=String(chapter||'').replace(/^v(\d+)_c(\d+)_s(\d+)\.md$/i,'Q$1 · Ch$2 · Phần $3');
+        return `<p>${escapeHtml(value)}${label?` <small>${escapeHtml(label)}</small>`:''}</p>`;
+      };
+      const groups=FIELD_GROUPS.map(group=>section(group.title,group.keys.map(key=>{
+        const entries=character.fields[key]||[];
+        return entries.length?`<h4>${escapeHtml(fieldLabel(key))}</h4>${entries.map(e=>line(e.value,e.chapter)).join('')}`:'';
+      }).join(''))).join('');
+      const content=groups+section('Diễn biến',notes.map(n=>line(n.text,n.chapter)).join(''))+
+        section('Ghi chú chưa phân loại',hasUnclassified?line(character.unclassified):'');
+      detail.innerHTML=`<article class="profile-reader"><nav>${back}<button class="secondary" data-profile-edit>Sửa hồ sơ</button></nav><h2>${escapeHtml(character.name)}</h2>${content||'<p>Hồ sơ chưa có thông tin.</p>'}</article>`;
+      return;
+    }
     const groupsHtml=FIELD_GROUPS.map(group=>{
       const cards=group.keys.map(key=>{
         const entries=character.fields[key]||[];
@@ -318,25 +343,24 @@ export function createCharactersFeature({
       </section>`;
     }).join('');
 
-    const notes=character.notes||[];
+
     const notesHtml=notes.length
       ? notes.map((note,index)=>renderNoteRow(note,index)).join('')
       : '<p class="character-field-empty">Chưa có diễn biến nào. Chỉ nên ghi biến cố ảnh hưởng tới cách dịch hoặc xưng hô.</p>';
 
-    const hasUnclassified=Boolean(String(character.unclassified||'').trim());
+
     const unclassifiedHtml=`<details class="character-unclassified" ${hasUnclassified?'open':''}>
       <summary>Ghi chú chưa phân loại ${hasUnclassified?'(có dữ liệu bảo toàn)':''}</summary>
       <p>Nội dung cũ chưa phân loại tự động được giữ nguyên ở đây (chưa rõ mốc thời điểm). Bạn có thể chuyển dần lên các trường theo chương ở trên.</p>
       <textarea id="characterUnclassifiedInput" rows="4" spellcheck="false" placeholder="Không có ghi chú chưa phân loại.">${escapeHtml(character.unclassified||'')}</textarea>
     </details>`;
 
-    detail.innerHTML=`<div class="character-detail-head">
+    detail.innerHTML=`<div class="profile-nav">${back}<button type="button" class="secondary" data-profile-read>Xem hồ sơ</button></div><div class="character-detail-head">
       <div class="character-name-box">
         <label for="characterNameInput">Tên chuẩn (dùng làm header khi gửi AI)</label>
         <input id="characterNameInput" value="${escapeHtml(character.name)}" placeholder="Tên đầy đủ theo glossary">
       </div>
       <div class="character-detail-actions">
-        <span class="character-id-pill" title="ID ổn định nội bộ">${escapeHtml(character.id)}</span>
         <button type="button" class="secondary character-delete-btn" id="deleteSelectedCharacter">Xóa nhân vật</button>
       </div>
     </div>
@@ -399,6 +423,7 @@ export function createCharactersFeature({
     const created={id:makeLocalId('ch'),name,fields:{},notes:[],unclassified:''};
     store.characters.push(created);
     selectedId=created.id;
+    profileMode='edit';
     if($('#characterSearch'))$('#characterSearch').value='';
     markDirty();
     renderCharacterList();
@@ -414,6 +439,7 @@ export function createCharactersFeature({
     const store=ensureStore();
     const index=store.characters.findIndex(item=>item.id===character.id);
     if(index>=0)store.characters.splice(index,1);
+    profileMode='list';
     selectedId=store.characters[Math.min(index,store.characters.length-1)]?.id||null;
     markDirty();
     renderCharacterList();
@@ -726,6 +752,15 @@ export function createCharactersFeature({
   }
 
   function handleDetailClick(event) {
+    for(const [selector,mode] of [['[data-profile-list]','list'],['[data-profile-edit]','edit'],['[data-profile-read]','read']]){
+      if(event.target.closest(selector)){
+        profileMode=mode;
+        renderCharacterDetail();
+        if(mode==='list')$('#characterList').scrollTop=listScroll;
+        else $('#characterDetail').scrollTop=0;
+        return;
+      }
+    }
     if(event.target.closest?.('#recoveryRestoreBackup')){
       restoreBackup();
       return;
@@ -809,9 +844,12 @@ export function createCharactersFeature({
   function handleDocumentClick(event) {
     const row=event.target.closest('[data-character-id]');
     if(row){
+      listScroll=$('#characterList').scrollTop;
+      profileMode='read';
       selectedId=row.dataset.characterId;
       renderCharacterList();
       renderCharacterDetail();
+      $('#characterDetail').scrollTop=0;
       return true;
     }
     return false;
@@ -823,6 +861,7 @@ export function createCharactersFeature({
   }
 
   function bind() {
+    $('#characterFilter').onchange=renderCharacterList;
     if($('#characterSearch'))$('#characterSearch').oninput=renderCharacterList;
     if($('#addCharacterButton'))$('#addCharacterButton').onclick=addCharacter;
     if($('#emptyAddCharacter'))$('#emptyAddCharacter').onclick=addCharacter;

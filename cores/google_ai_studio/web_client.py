@@ -1,5 +1,6 @@
 """Send one prompt through Google AI Studio and return the new model turn."""
 
+import json
 import re
 import time
 from cores.web_errors import RetryableWebError, WebQuotaError, check_quota, retryable_transport
@@ -130,9 +131,17 @@ def _is_complete_response(text, stage):
     if stage in {"context", "glossary"}:
         return "###START###" in value and "###END###" in value
     if stage == "characters":
-        has_start = "###START###" in value or "###CHAR_START###" in value
-        has_end = "###END###" in value or "###CHAR_END###" in value
-        return has_start and has_end and "## " in value
+        block = re.search(r"###(?:CHAR_)?START###(.*?)###(?:CHAR_)?END###", value, re.S)
+        if not block:
+            return False
+        body = re.sub(r"^\x60\x60\x60(?:json|markdown)?\s*|\s*\x60\x60\x60$", "", block[1].strip()).strip()
+        if body.startswith("{"):
+            try:
+                profile = json.loads(body)
+            except ValueError:
+                return False
+            return isinstance(profile.get("characters"), list)
+        return bool(re.search(r"^\s*##\s+\S", body, re.M))
     parsed = parse_complete_json_object(value, strict=False)
     if stage == "pronouns":
         return isinstance(parsed, dict) and isinstance(

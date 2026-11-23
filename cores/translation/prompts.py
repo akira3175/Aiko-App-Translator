@@ -193,6 +193,10 @@ def project_polish_prompt():
     return role, task
 
 
+NEUTRAL_REFERENCE_RULE = """Giữ mức độ xác định của nguyên tác trong từng câu, kể cả khi hồ sơ cho biết giới tính thật. Nếu nguyên tác chỉ nói quan hệ em, dùng “em”, “đứa em” hoặc “người em” tùy giọng kể. Chỉ dùng “em trai”, “em gái” khi nguyên tác nêu rõ sự phân biệt đó.
+Khi câu lược chủ ngữ, ưu tiên lược trong tiếng Việt nếu vẫn tự nhiên và rõ nghĩa. Nếu phải nhắc lại một người chưa rõ giới tính hoặc danh tính, dùng “người đó”, “người ấy” hoặc lặp danh từ trung tính phù hợp với cảnh. Không tự thêm “ông ta”, “bà ta”, “anh ấy”, “cô ấy” dựa vào tên, nghề nghiệp hay hồ sơ. Áp dụng đại từ trong hồ sơ và xưng hô của cặp thoại khi đã xác định đúng người và cách gọi phù hợp với điểm nhìn của câu. Giữ dấu hiệu giới tính khi nguyên tác nói rõ."""
+
+
 def _prompt_header():
     role, task = _project_prompt()
     return f"""# 🌸 Vai trò
@@ -201,7 +205,9 @@ def _prompt_header():
 ---
 
 # 🎯 Nhiệm vụ
-{task}"""
+{task}
+
+{NEUTRAL_REFERENCE_RULE}"""
 
 
 def _r19_placeholder_instruction():

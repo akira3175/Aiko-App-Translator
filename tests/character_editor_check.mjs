@@ -108,6 +108,12 @@ function setup() {
 
   // 2. Editing an AI entry automatically protects (confirms) it
   const detail=t.get('#characterDetail');
+  t.feature.handleDocumentClick({target:{closest:()=>({dataset:{characterId:'ch_lin'}})}});
+  assert.match(detail.innerHTML,/profile-reader/);
+  assert.match(detail.innerHTML,/Q1 · Ch1/);
+  assert.doesNotMatch(detail.innerHTML,/character-value-input/);
+  detail.trigger('click',{target:{closest:s=>s==='[data-profile-edit]'}});
+  assert.match(detail.innerHTML,/character-value-input/);
   detail.trigger('input',{
     target:{
       value:'Trưởng lão',

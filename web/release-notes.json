@@ -1,6 +1,18 @@
 {
     "versions":  [
 {
+    "version": "1.4.18",
+    "date": "2026-11-23",
+    "title": "Có gì mới",
+    "summary": "",
+    "highlights": [
+        "**Hồ sơ nhân vật dễ đọc hơn:** Chọn một thẻ nhân vật để mở hồ sơ rộng, xem các mốc theo chương và thu gọn từng nhóm thông tin. Có thể lọc nhanh nhân vật có ghi chú chưa phân loại hoặc có mục đã khóa.",
+        "**Dịch và hiệu đính giữ cách gọi trung tính:** Khi nguyên tác chỉ nói “đứa em”, AI được hướng dẫn giữ “em” hoặc “người em”. Nếu chưa rõ giới tính, ưu tiên “người đó”, “người ấy”. Câu lược chủ ngữ có thể giữ nguyên nếu tiếng Việt vẫn tự nhiên.",
+        "**Tạo hồ sơ nhân vật:** AI được hướng dẫn chỉ ghi giới tính khi nguyên tác có căn cứ rõ ràng.",
+        "**Sửa lỗi Google AI Studio Web** liên tục sao chép dù kết quả tạo hồ sơ đã hoàn tất, kể cả khi chạy lại và không có thông tin mới."
+    ]
+},
+{
     "version": "1.4.17",
     "date": "2026-11-23",
     "title": "Có gì mới?",
