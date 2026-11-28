@@ -11,12 +11,13 @@ const settingsGroups={
   'google-ai-studio-web':['Google AI Studio Web','Gắn link prompt AI Studio, chọn model và mức suy nghĩ trong Run settings.'],
   'chatgpt-web':['ChatGPT Web','Model và mức suy nghĩ khi tự động hóa trình duyệt ChatGPT.'],
   'chatgpt-plan':['ChatGPT Plan','Đăng nhập ChatGPT để thử dùng gói của tài khoản qua OpenAI Responses API.'],
+  'antigravity-cli':['Antigravity CLI','Dùng gói thuê bao và AI Credits của tài khoản Antigravity đã đăng nhập qua lệnh agy trên máy.'],
   'gpt-api':['OpenAI API','Khóa, model và thông số cho các công đoạn dùng OpenAI API.'],
   publishing:['Xuất bản','Tài khoản Hako và kho ảnh Cloudflare R2.'],
   sharing:['Chia sẻ','Bucket R2 private và Worker phục vụ bản đọc chia sẻ.'],
   general:['Chung','Hành vi chung của workspace và quy trình hậu xử lý.'],
 };
-const PROVIDER_LABELS={'gemini-api':'Gemini API','gemini-web':'Gemini Web','google-ai-studio-web':'Google AI Studio Web','openai-api':'OpenAI API','chatgpt-web':'ChatGPT Web','chatgpt-plan':'ChatGPT Plan'};
+const PROVIDER_LABELS={'gemini-api':'Gemini API','gemini-web':'Gemini Web','google-ai-studio-web':'Google AI Studio Web','openai-api':'OpenAI API','chatgpt-web':'ChatGPT Web','chatgpt-plan':'ChatGPT Plan','antigravity-cli':'Antigravity CLI'};
 const PIPELINE_OWNED_SETTING_KEYS=new Set([
   'translate_model','polish_model','pronoun_model','review_bg_model','review_model','context_model','gemini_api_thinking',
   'gemini_web_model','gemini_thinking',
@@ -33,6 +34,8 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
   let activeGroup='pipeline';
   let chatgptPlanModels=null;
   let chatgptPlanModelsLoading=false;
+  let antigravityCliModels=null;
+  let antigravityCliModelsLoading=false;
   const cloudflareSettingsFeature=createCloudflareSettingsFeature({api,getSettingsItems:()=>items,renderSettings:render,toast});
 
   function updateLinkFields() {
@@ -83,6 +86,34 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
     finally { chatgptPlanModelsLoading=false; }
   }
 
+  function antigravityModelOptions(value) {
+    const models=antigravityCliModels||[];
+    const fallback=items.find(item=>item.key==='antigravity_cli_model')?.value||'';
+    const selected=value||fallback||models[0]?.slug||'';
+    if(!models.length)return `<option value="${escapeHtml(selected)}">${selected?escapeHtml(selected):antigravityCliModels?'Kiểm tra đăng nhập ở tab Antigravity CLI':'Đang tải model từ agy…'}</option>`;
+    const unavailable=selected&&!models.some(model=>model.slug===selected)
+      ? `<option value="${escapeHtml(selected)}" selected>${escapeHtml(selected)} (không có trong danh sách hiện tại)</option>`:'';
+    return unavailable+models.map(model=>`<option value="${escapeHtml(model.slug)}" ${model.slug===selected?'selected':''}>${escapeHtml(model.display_name)}</option>`).join('');
+  }
+
+  function refreshAntigravityStageModels() {
+    $$('[data-agy-stage-model]').forEach(select=>{
+      const selected=select.value;
+      select.innerHTML=antigravityModelOptions(selected);
+    });
+  }
+
+  async function ensureAntigravityModels() {
+    if(antigravityCliModels!==null||antigravityCliModelsLoading)return;
+    antigravityCliModelsLoading=true;
+    try {
+      const data=await api('/api/antigravity-cli/status');
+      antigravityCliModels=data.models||[];
+      refreshAntigravityStageModels();
+    } catch(error) { toast(`Không tải được danh sách model Antigravity CLI: ${error.message}`); }
+    finally { antigravityCliModelsLoading=false; }
+  }
+
   function render(nextItems) {
     items=nextItems;
     if(!$('#openAppBrowser')){
@@ -120,7 +151,10 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
       return `<label class="python-setting ${item.type==='textarea'?'textarea-setting':''}"><span>${escapeHtml(item.label)}${item.overridden?'<em>Đã tùy chỉnh</em>':''}</span>${control}<small>${item.description?escapeHtml(item.description)+' · ':''}${item.type==='textarea'?'Dùng “Khôi phục mặc định” để đặt lại nội dung.':`Mặc định: ${escapeHtml(item.default??'để trống')}`}</small></label>`;
     };
     const groupItems=visibleSettingsForGroup(items,activeGroup);
-    const settingFields=groupItems.filter(item=>activeGroup!=='chatgpt-plan'||item.key!=='chatgpt_plan_model').map(renderSetting).join('');
+    const settingFields=groupItems.filter(item=>
+      (activeGroup!=='chatgpt-plan'||item.key!=='chatgpt_plan_model') &&
+      (activeGroup!=='antigravity-cli'||item.key!=='antigravity_cli_model')
+    ).map(renderSetting).join('');
     const settingItem=key=>items.find(item=>item.key===key);
     const providerDefaults={
       'gemini-api':{
@@ -147,8 +181,12 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
         translate:['chatgpt_plan_model','chatgpt_plan_effort'],polish:['chatgpt_plan_model','chatgpt_plan_effort'],
         pronouns:['chatgpt_plan_model','chatgpt_plan_effort'],review:['chatgpt_plan_model','chatgpt_plan_effort'],context:['chatgpt_plan_model','chatgpt_plan_effort'],characters:['chatgpt_plan_model','chatgpt_plan_effort'],import:['chatgpt_plan_model','chatgpt_plan_effort'],
       },
+      'antigravity-cli':{
+        translate:['antigravity_cli_model','antigravity_cli_effort'],polish:['antigravity_cli_model','antigravity_cli_effort'],
+        pronouns:['antigravity_cli_model','antigravity_cli_effort'],review:['antigravity_cli_model','antigravity_cli_effort'],context:['antigravity_cli_model','antigravity_cli_effort'],characters:['antigravity_cli_model','antigravity_cli_effort'],import:['antigravity_cli_model','antigravity_cli_effort'],
+      },
     };
-    const engineOptions=(stage,value)=>[['gemini-api','Gemini API'],['gemini-web','Gemini Web'],['google-ai-studio-web','Google AI Studio Web'],['openai-api','OpenAI API'],['chatgpt-web','ChatGPT Web'],['chatgpt-plan','ChatGPT Plan']].map(([key,label])=>{
+    const engineOptions=(stage,value)=>[['gemini-api','Gemini API'],['gemini-web','Gemini Web'],['google-ai-studio-web','Google AI Studio Web'],['openai-api','OpenAI API'],['chatgpt-web','ChatGPT Web'],['chatgpt-plan','ChatGPT Plan'],['antigravity-cli','Antigravity CLI']].map(([key,label])=>{
       const supported=Boolean(providerDefaults[key][stage]);
       return `<option value="${key}" ${key===value?'selected':''} ${supported?'':'disabled'}>${label}${supported?'':' (chưa hỗ trợ)'}</option>`;
     }).join('');
@@ -165,10 +203,16 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
         thinking.type='text';
         thinking.options=sourceThinking?.options;
         thinking.description=sourceThinking?.description;
+      } else if(provider.value==='antigravity-cli'&&sourceThinking?.options){
+        thinking.type='select';
+        thinking.options=sourceThinking.options;
+        thinking.description=sourceThinking.description;
       }
       const modelField=provider.value==='chatgpt-plan'
         ? `<label class="python-setting"><span>Model</span><select data-python-setting="${model.key}" data-plan-stage-model="${stage}">${planModelOptions(model.value)}</select><small>Model của tài khoản ChatGPT dùng riêng cho ${label.toLowerCase()}.</small></label>`
-        : renderSetting(model);
+        : provider.value==='antigravity-cli'
+          ? `<label class="python-setting"><span>Model</span><select data-python-setting="${model.key}" data-agy-stage-model="${stage}">${antigravityModelOptions(model.value)}</select><small>Model của Antigravity CLI dùng riêng cho ${label.toLowerCase()}.</small></label>`
+          : renderSetting(model);
       return `<details class="pipeline-stage-setting" data-pipeline-stage="${stage}" ${stage==='translate'||stage==='import'?'open':''}><summary><strong>${label}</strong><span>${PROVIDER_LABELS[provider.value]||provider.value}</span></summary><div class="pipeline-stage-body"><label class="python-setting"><span>Engine</span><select data-python-setting="${provider.key}" data-stage-engine="${stage}">${engineOptions(stage,provider.value)}</select><small>Engine dùng riêng cho công đoạn này.</small></label>${modelField}${renderSetting(thinking)}</div></details>`;
     };
     $('#pythonSettingsFields').innerHTML=activeGroup==='pipeline'
@@ -181,13 +225,21 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
         ? `<details class="publishing-advanced"><summary>Cài đặt R2 nâng cao</summary><div class="publishing-advanced-fields">${settingFields}</div></details>`
         : activeGroup==='chatgpt-plan'
           ? `<section class="chatgpt-plan-account"><div class="chatgpt-plan-account-copy"><div class="chatgpt-plan-account-title"><strong>Tài khoản ChatGPT</strong><span id="chatgptPlanBadge" class="chatgpt-plan-badge">Đang kiểm tra</span></div><span id="chatgptPlanStatus">Đang đọc trạng thái…</span><small>Yêu cầu dùng hạn mức của tài khoản ChatGPT. <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">Xem mức sử dụng</a></small></div><div class="chatgpt-plan-actions"><button class="primary" id="chatgptPlanConnect" type="button" disabled>Continue with ChatGPT</button><button class="secondary" id="chatgptPlanDisconnect" type="button" hidden>Đăng xuất</button></div></section><label class="python-setting chatgpt-plan-model"><span>Model mặc định</span><select id="chatgptPlanModels" data-python-setting="chatgpt_plan_model">${planModelOptions(settingItem('chatgpt_plan_model')?.value)}</select><small>Dùng khi công đoạn dịch chưa chọn model riêng.</small></label>${settingFields}`
-          : settingFields;
+          : activeGroup==='antigravity-cli'
+            ? `<section class="chatgpt-plan-account"><div class="chatgpt-plan-account-copy"><div class="chatgpt-plan-account-title"><strong>Antigravity CLI (agy)</strong><span id="antigravityCliBadge" class="chatgpt-plan-badge">Đang kiểm tra</span></div><span id="antigravityCliStatus">Đang đọc trạng thái từ lệnh agy…</span><small>Chạy chế độ ẩn (headless) bằng phiên đăng nhập Antigravity trên máy. Mở Terminal để đăng nhập hoặc gõ <code>/usage</code> kiểm tra hạn mức.</small></div><div class="chatgpt-plan-actions"><button class="secondary" id="antigravityCliRefresh" type="button">Làm mới model</button><button class="primary" id="antigravityCliTerminal" type="button">Mở Terminal agy</button></div></section><label class="python-setting chatgpt-plan-model"><span>Model mặc định</span><select id="antigravityCliModels" data-python-setting="antigravity_cli_model">${antigravityModelOptions(settingItem('antigravity_cli_model')?.value)}</select><small>Dùng khi công đoạn chưa chọn model riêng.</small></label>${settingFields}`
+            : settingFields;
     if(activeGroup==='chatgpt-plan'){
       $('#chatgptPlanConnect').onclick=connectChatgptPlan;
       $('#chatgptPlanDisconnect').onclick=disconnectChatgptPlan;
       loadChatgptPlanStatus();
     }
+    if(activeGroup==='antigravity-cli'){
+      $('#antigravityCliRefresh').onclick=()=>loadAntigravityCliStatus(true);
+      $('#antigravityCliTerminal').onclick=openAntigravityCliTerminal;
+      loadAntigravityCliStatus(false);
+    }
     if(['pipeline','import'].includes(activeGroup)&&$$('[data-plan-stage-model]').length)ensurePlanModels();
+    if(['pipeline','import'].includes(activeGroup)&&$$('[data-agy-stage-model]').length)ensureAntigravityModels();
     $$('[data-settings-tab]').forEach(button=>button.onclick=()=>{
       $$('[data-python-setting]').forEach(input=>{ const item=items.find(entry=>entry.key===input.dataset.pythonSetting); if(item)item.value=settingValue(input); });
       activeGroup=button.dataset.settingsTab;
@@ -255,6 +307,49 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
     catch(error) { toast(error.message); }
   }
 
+  async function loadAntigravityCliStatus(refresh=false) {
+    const label=$('#antigravityCliStatus'); if(!label)return;
+    const refreshBtn=$('#antigravityCliRefresh');
+    if(refreshBtn)refreshBtn.disabled=true;
+    try {
+      const data=await api('/api/antigravity-cli/status'+(refresh?'?refresh=1':''));
+      if(!$('#antigravityCliStatus'))return;
+      antigravityCliModels=data.models||[];
+      if(data.connected){
+        const ver=data.version?`v${data.version} · `:'';
+        label.textContent=`${ver}${antigravityCliModels.length} model khả dụng · ${data.binary||'agy'}`;
+        $('#antigravityCliBadge').textContent='Đã sẵn sàng';
+      } else {
+        label.textContent=data.error||'Chưa kết nối được với Antigravity CLI.';
+        $('#antigravityCliBadge').textContent=data.installed?'Chưa đăng nhập':'Chưa cài đặt';
+      }
+      const picker=$('#antigravityCliModels');
+      if(picker){
+        const selected=picker.value||items.find(item=>item.key==='antigravity_cli_model')?.value||'';
+        picker.innerHTML=antigravityModelOptions(selected);
+      }
+      refreshAntigravityStageModels();
+    } catch(error) {
+      if($('#antigravityCliStatus'))label.textContent=error.message;
+      if($('#antigravityCliBadge'))$('#antigravityCliBadge').textContent='Có lỗi';
+    } finally {
+      if($('#antigravityCliRefresh'))$('#antigravityCliRefresh').disabled=false;
+    }
+  }
+
+  async function openAntigravityCliTerminal() {
+    const button=$('#antigravityCliTerminal');
+    if(button)button.disabled=true;
+    try {
+      const result=await api('/api/antigravity-cli/open-terminal',{method:'POST',body:'{}'});
+      toast(result.message||'Đã mở Antigravity CLI');
+    } catch(error) {
+      toast(error.message);
+    } finally {
+      if(button)button.disabled=false;
+    }
+  }
+
   async function loadLanStatus() {
     try {
       const data=await api('/api/lan/status'), card=$('#lanAccessCard');
@@ -283,14 +378,14 @@ export function createSettingsFeature({api,escapeHtml,refreshUpdate,showView,toa
     const button=$('#savePythonSettings'); button.disabled=true;
     const values=Object.fromEntries(items.map(item=>[item.key,item.value]));
     $$('[data-python-setting]').forEach(input=>values[input.dataset.pythonSetting]=settingValue(input));
-    try { render((await api('/api/settings',{method:'POST',body:JSON.stringify({values})})).items); await Promise.all([refreshUpdate(),loadLanStatus()]); toast('Đã lưu cấu hình · thay đổi LAN cần khởi động lại app'); }
+    try { antigravityCliModels=null; render((await api('/api/settings',{method:'POST',body:JSON.stringify({values})})).items); await Promise.all([refreshUpdate(),loadLanStatus()]); toast('Đã lưu cấu hình · thay đổi LAN cần khởi động lại app'); }
     catch(error) { toast(error.message); }
     finally { button.disabled=false; }
   }
 
   async function reset() {
     const button=$('#resetPythonSettings'); button.disabled=true;
-    try { render((await api('/api/settings',{method:'POST',body:JSON.stringify({reset:true})})).items); await loadLanStatus(); toast('Đã khôi phục toàn bộ giá trị mặc định'); }
+    try { antigravityCliModels=null; render((await api('/api/settings',{method:'POST',body:JSON.stringify({reset:true})})).items); await loadLanStatus(); toast('Đã khôi phục toàn bộ giá trị mặc định'); }
     catch(error) { toast(error.message); }
     finally { button.disabled=false; }
   }

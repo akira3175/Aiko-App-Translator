@@ -24,6 +24,7 @@ class SettingsRoutes:
     active_translation: object
     launcher: object = None
     chatgpt_plan: object = None
+    antigravity_cli: object = None
 
     def handle_get(self, handler, path, query):
         project = query.get("project", [""])[0]
@@ -38,6 +39,13 @@ class SettingsRoutes:
                 handler.json_response({"error": "Chỉ quản lý ChatGPT trên máy đang chạy app."}, HTTPStatus.FORBIDDEN)
             else:
                 handler.json_response(self.chatgpt_plan.status())
+            return True
+        if path == "/api/antigravity-cli/status" and self.antigravity_cli is not None:
+            if not handler.is_loopback():
+                handler.json_response({"error": "Chỉ quản lý Antigravity CLI trên máy đang chạy app."}, HTTPStatus.FORBIDDEN)
+            else:
+                refresh = query.get("refresh", ["0"])[0] == "1"
+                handler.json_response(self.antigravity_cli.status(refresh=refresh))
             return True
         if path == "/api/ui-preferences":
             handler.json_response(self.configuration.ui_preferences())
@@ -87,6 +95,16 @@ class SettingsRoutes:
                 return True
             action = self.chatgpt_plan.connect if path == "/api/chatgpt-plan/connect" else self.chatgpt_plan.disconnect
             return self._json_call(handler, action, (RuntimeError, ValueError, OSError))
+        if path == "/api/antigravity-cli/open-terminal" and self.antigravity_cli is not None:
+            if not handler.is_loopback():
+                handler.json_response({"error": "Chỉ mở Antigravity CLI trên máy đang chạy app."}, HTTPStatus.FORBIDDEN)
+                return True
+            origin = getattr(handler, "headers", {}).get("Origin", "")
+            host = getattr(handler, "headers", {}).get("Host", "")
+            if origin and (urlparse(origin).scheme != "http" or urlparse(origin).netloc != host):
+                handler.json_response({"error": "Nguồn yêu cầu không hợp lệ."}, HTTPStatus.FORBIDDEN)
+                return True
+            return self._json_call(handler, self.antigravity_cli.open_terminal, (RuntimeError, ValueError, OSError))
         if path == "/api/ui-preferences":
             return self._json_call(
                 handler,

@@ -87,7 +87,7 @@ class ProviderRegistryTests(unittest.TestCase):
 
     def test_all_provider_stage_combinations_use_shared_transport_contract(self):
         stages = ("translate", "polish", "pronouns", "review")
-        for provider in ("gemini-api", "gemini-web", "google-ai-studio-web", "openai-api", "chatgpt-web", "chatgpt-plan"):
+        for provider in ("gemini-api", "gemini-web", "google-ai-studio-web", "openai-api", "chatgpt-web", "chatgpt-plan", "antigravity-cli"):
             calls = []
 
             def transport(prompt, **kwargs):

@@ -129,8 +129,10 @@ class ConfigurationService:
                     value = "\n".join(parse_links(value, key.removesuffix("_rotation_links")))
                 if key == "lan_enabled" and value not in {"off", "on"}:
                     raise ValueError("Chế độ truy cập LAN không hợp lệ")
-                if key == 'pipeline_import_provider' and value not in {'gemini-api', 'gemini-web', 'google-ai-studio-web', 'openai-api', 'chatgpt-web', 'chatgpt-plan'}:
+                if key == 'pipeline_import_provider' and value not in {'gemini-api', 'gemini-web', 'google-ai-studio-web', 'openai-api', 'chatgpt-web', 'chatgpt-plan', 'antigravity-cli'}:
                     raise ValueError('Engine nhập truyện không hợp lệ')
+                if key == "antigravity_cli_effort" and value and value not in {"auto", "low", "medium", "high", "xhigh", "max"}:
+                    raise ValueError("Cấp độ suy nghĩ Antigravity CLI không hợp lệ")
                 if key == "gemini_api_streaming" and value not in {"off", "on"}:
                     raise ValueError("Chế độ streaming Gemini API không hợp lệ")
                 if key == "gemini_web_task_mode" and value not in {"off", "on"}:

@@ -48,6 +48,28 @@ class StagePipelineTests(unittest.TestCase):
             ), ("chosen-model", "auto"))
             fallback.assert_called_once_with()
 
+    def test_antigravity_cli_uses_detected_default_model_when_settings_are_blank(self):
+        values = {"translate_stage_model": "", "antigravity_cli_model": "", "antigravity_cli_path": "C:/agy.exe"}
+        with patch.object(stage_runtime, "antigravity_cli_default_model", return_value="gemini-4-carbon-medium") as fallback:
+            self.assertEqual(
+                stage_runtime.stage_model_and_thinking(
+                    "translate",
+                    "antigravity-cli",
+                    get_option=lambda key, default=None: values.get(key, default),
+                ),
+                ("gemini-4-carbon-medium", "auto"),
+            )
+            values["antigravity_cli_model"] = "claude-sonnet-5-5-high"
+            self.assertEqual(
+                stage_runtime.stage_model_and_thinking(
+                    "translate",
+                    "antigravity-cli",
+                    get_option=lambda key, default=None: values.get(key, default),
+                ),
+                ("claude-sonnet-5-5-high", "auto"),
+            )
+            fallback.assert_called_once_with("C:/agy.exe")
+
     def test_generation_logs_effective_stage_provider_and_model(self):
         values = {
             "translate_stage_model": "gemini-test",

@@ -1,6 +1,7 @@
 """Provider registry and compatibility bridge for the stage-based pipeline."""
 
 from providers.base import ProviderCapabilities
+from providers.antigravity_cli import AntigravityCliProvider
 from providers.chatgpt_web import ChatGptWebProvider
 from providers.chatgpt_plan import ChatGptPlanProvider
 from providers.gemini_api import GeminiApiProvider
@@ -51,6 +52,13 @@ PROVIDERS = {
             attachments=True, thinking=True, streaming=True,
         ),
     },
+    "antigravity-cli": {
+        "label": "Antigravity CLI",
+        "capabilities": ProviderCapabilities(
+            ("translate", "polish", "pronouns", "review", "glossary", "characters", "import"),
+            attachments=True, thinking=True, streaming=True,
+        ),
+    },
 }
 
 PROVIDER_CLASSES = {
@@ -60,6 +68,7 @@ PROVIDER_CLASSES = {
     "openai-api": OpenAiApiProvider,
     "chatgpt-web": ChatGptWebProvider,
     "chatgpt-plan": ChatGptPlanProvider,
+    "antigravity-cli": AntigravityCliProvider,
 }
 
 
@@ -134,12 +143,14 @@ def pipeline_config(config):
         key = {
             "gemini-api": "translate_model", "gemini-web": "gemini_web_model", "google-ai-studio-web": "ai_studio_model",
             "openai-api": "gpt_api_translate_model", "chatgpt-web": "chatgpt_model", "chatgpt-plan": "chatgpt_plan_model",
+            "antigravity-cli": "antigravity_cli_model",
         }[translate]
         result[key] = models["translate"]
     if thinking["translate"]:
         key = {
             "gemini-api": "gemini_api_thinking", "gemini-web": "gemini_thinking", "google-ai-studio-web": "ai_studio_thinking",
             "openai-api": "gpt_api_translate_effort", "chatgpt-web": "chatgpt_thinking", "chatgpt-plan": "chatgpt_plan_effort",
+            "antigravity-cli": "antigravity_cli_effort",
         }[translate]
         result[key] = thinking["translate"]
     return result

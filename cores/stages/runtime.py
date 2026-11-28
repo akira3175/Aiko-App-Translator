@@ -14,7 +14,9 @@ from cores.browser import (
 from cores.gemini import call_gemini
 from providers.openai_client import call_gpt_api
 from providers.chatgpt_plan_client import call_chatgpt_plan
+from providers.antigravity_cli_client import call_antigravity_cli
 from services.chatgpt_plan import default_model as chatgpt_plan_default_model
+from services.antigravity_cli import default_model as antigravity_cli_default_model
 from cores.config.runtime import option
 from cores.stages.transport import generate_for_stage
 
@@ -42,6 +44,7 @@ MODEL_DEFAULTS = {
     },
     "chatgpt-web": {},
     "chatgpt-plan": {},
+    "antigravity-cli": {},
 }
 
 
@@ -63,6 +66,7 @@ PROVIDER_LABELS = {
     "openai-api": "OpenAI API",
     "chatgpt-web": "ChatGPT Web",
     "chatgpt-plan": "ChatGPT Plan",
+    "antigravity-cli": "Antigravity CLI",
 }
 
 
@@ -116,6 +120,12 @@ def stage_model_and_thinking(stage, provider, *, get_option=option):
             model or str(get_option("chatgpt_plan_model", "")).strip() or chatgpt_plan_default_model(),
             thinking or str(get_option("chatgpt_plan_effort", "auto")),
         )
+    if provider == "antigravity-cli":
+        custom_path = str(get_option("antigravity_cli_path", "")).strip()
+        return (
+            model or str(get_option("antigravity_cli_model", "")).strip() or antigravity_cli_default_model(custom_path),
+            thinking or str(get_option("antigravity_cli_effort", "auto")),
+        )
     raise ValueError(f"Provider không hợp lệ cho công đoạn {stage}: {provider}")
 
 
@@ -127,6 +137,7 @@ def stage_transports(overrides=None):
         "openai-api": call_gpt_api,
         "chatgpt-web": generate_content_with_chatgpt,
         "chatgpt-plan": call_chatgpt_plan,
+        "antigravity-cli": call_antigravity_cli,
     }
     transports.update(overrides or {})
     return transports

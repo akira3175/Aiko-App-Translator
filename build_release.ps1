@@ -63,8 +63,8 @@ Copy-Item -LiteralPath (Join-Path $projectRoot "README_USER.md") -Destination $s
 Copy-Item -LiteralPath (Join-Path $projectRoot "LICENSE") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "requirements-portable.txt") -Destination $stageRoot
 Copy-Item -LiteralPath (Join-Path $projectRoot "VERSION") -Destination $stageRoot
-foreach ($folder in @("cloudflare", "cores", "defaults", "providers", "server", "services", "split", "web", "up")) {
-    Copy-Item -LiteralPath (Join-Path $projectRoot $folder) -Destination $stageRoot -Recurse
+foreach ($folder in @(".agents", "cloudflare", "cores", "defaults", "providers", "server", "services", "split", "web", "up")) {
+    Copy-Item -LiteralPath (Join-Path $projectRoot $folder) -Destination $stageRoot -Recurse -Force
 }
 # Publishing settings belong to the user's machine, never to the portable app.
 Remove-Item -LiteralPath (Join-Path $stageRoot "up\config_md.json") -Force -ErrorAction SilentlyContinue
@@ -74,13 +74,13 @@ New-Item -ItemType File -Force -Path (Join-Path $stageRoot "data\apikeys.txt") |
 Copy-Item -LiteralPath (Join-Path $projectRoot "defaults\r19_words.txt") -Destination (Join-Path $stageRoot "data\r19_words.txt")
 
 $stageResolved = (Resolve-Path $stageRoot).Path
-Get-ChildItem -LiteralPath $stageResolved -Directory -Recurse -Filter "__pycache__" | ForEach-Object {
+Get-ChildItem -LiteralPath $stageResolved -Directory -Recurse -Force -Filter "__pycache__" | ForEach-Object {
     if (-not $_.FullName.StartsWith($stageResolved + [IO.Path]::DirectorySeparatorChar)) {
         throw "Khong xoa thu muc ngoai goi phat hanh: $($_.FullName)"
     }
     Remove-Item -LiteralPath $_.FullName -Recurse -Force
 }
-Get-ChildItem -LiteralPath $stageResolved -File -Recurse | Where-Object {
+Get-ChildItem -LiteralPath $stageResolved -File -Recurse -Force | Where-Object {
     $_.Extension -in @(".pyc", ".pyo")
 } | Remove-Item -Force
 

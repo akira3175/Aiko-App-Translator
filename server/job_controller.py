@@ -194,6 +194,7 @@ class JobController:
             "openai-api",
             "chatgpt-web",
             "chatgpt-plan",
+            "antigravity-cli",
             "interactions",
         }:
             raise JobRequestError("Invalid translation engine")

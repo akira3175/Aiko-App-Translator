@@ -94,6 +94,30 @@ class SettingsRouteTests(unittest.TestCase):
         routes.handle_post(local, "/api/chatgpt-plan/connect", {})
         self.assertIn("url", local.responses[0][1])
 
+    def test_antigravity_cli_routes_are_local_and_same_origin(self):
+        agy = SimpleNamespace(
+            status=lambda refresh=False: {"installed": True, "connected": True, "refreshed": refresh},
+            open_terminal=lambda: {"ok": True},
+        )
+        routes = self._routes(antigravity_cli=agy)
+        remote = _Handler(loopback=False)
+        routes.handle_get(remote, "/api/antigravity-cli/status", {})
+        self.assertEqual(remote.responses[0][0], 403)
+
+        local_get = _Handler()
+        routes.handle_get(local_get, "/api/antigravity-cli/status", {"refresh": ["1"]})
+        self.assertTrue(local_get.responses[0][1]["refreshed"])
+
+        foreign = _Handler()
+        foreign.headers = {"Origin": "https://other.example", "Host": "127.0.0.1:8765"}
+        routes.handle_post(foreign, "/api/antigravity-cli/open-terminal", {})
+        self.assertEqual(foreign.responses[0][0], 403)
+
+        local_post = _Handler()
+        local_post.headers = {"Origin": "http://127.0.0.1:8765", "Host": "127.0.0.1:8765"}
+        routes.handle_post(local_post, "/api/antigravity-cli/open-terminal", {})
+        self.assertTrue(local_post.responses[0][1]["ok"])
+
     def test_active_key_is_blocked_while_translation_runs(self):
         called = []
         routes = self._routes(
